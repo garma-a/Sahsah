@@ -1,0 +1,10 @@
+{
+  "description": "Effortlessly analyze and plan MVP startup implementations by uploading PDF files, streamlining project management for entrepreneurs and teams.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
