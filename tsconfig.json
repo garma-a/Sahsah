@@ -8,7 +8,8 @@
     "moduleResolution": "bundler",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "#demo-service": ["./src/demo/service.ts"]
     },
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
@@ -19,5 +20,5 @@
     "strict": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "vite.config.ts"]
+  "include": ["src", "vite.config.ts", "server", "tests"]
 }

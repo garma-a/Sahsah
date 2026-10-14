@@ -3,6 +3,7 @@ dist/
 build/
 .cache/
 .env*
+!.env.example
 .vite/
 vite.config.*.timestamp-*
 *.tsbuildinfo
@@ -19,3 +20,10 @@ logs/
 # beside it.
 /.plugins/
 /.opencode-skills/
+
+/server/private/
+/package-lock.json
+/test-results/
+
+/assets.zip
+/sah_sah_four_new_game_modes_assets_and_prompt.zip

@@ -1,0 +1,326 @@
+[
+  {
+    "categoryId": "football",
+    "row": 0,
+    "type": "IMAGE_BLUR",
+    "prompt": "إيه البطولة اللي في الصورة؟",
+    "answer": "كأس الأمم الأفريقية",
+    "stages": [
+      "images/blur/B01/stage_1.jpg",
+      "images/blur/B01/stage_2.jpg",
+      "images/blur/B01/stage_3.jpg"
+    ],
+    "originalImage": "images/blur/B01/answer_reveal.jpg",
+    "playableAudio": null,
+    "forwardSpeech": null
+  },
+  {
+    "categoryId": "ancient",
+    "row": 4,
+    "type": "IMAGE_BLUR",
+    "prompt": "إيه المعلم ده؟",
+    "answer": "أبو الهول",
+    "stages": [
+      "images/blur/B02/stage_1.jpg",
+      "images/blur/B02/stage_2.jpg",
+      "images/blur/B02/stage_3.jpg"
+    ],
+    "originalImage": "images/blur/B02/answer_reveal.jpg",
+    "playableAudio": null,
+    "forwardSpeech": null
+  },
+  {
+    "categoryId": "travel",
+    "row": 2,
+    "type": "IMAGE_BLUR",
+    "prompt": "إيه المكان اللي في الصورة؟",
+    "answer": "استاد القاهرة الدولي",
+    "stages": [
+      "images/blur/B03/stage_1.jpg",
+      "images/blur/B03/stage_2.jpg",
+      "images/blur/B03/stage_3.jpg"
+    ],
+    "originalImage": "images/blur/B03/answer_reveal.jpg",
+    "playableAudio": null,
+    "forwardSpeech": null
+  },
+  {
+    "categoryId": "football",
+    "row": 2,
+    "type": "IMAGE_BLUR",
+    "prompt": "خمن المركز الرياضي.",
+    "answer": "حارس مرمى",
+    "stages": [
+      "images/blur/B04/stage_1.jpg",
+      "images/blur/B04/stage_2.jpg",
+      "images/blur/B04/stage_3.jpg"
+    ],
+    "originalImage": "images/blur/B04/answer_reveal.jpg",
+    "playableAudio": null,
+    "forwardSpeech": null
+  },
+  {
+    "categoryId": "football",
+    "row": 3,
+    "type": "IMAGE_BLUR",
+    "prompt": "إيه الحاجة اللي قدامك؟",
+    "answer": "قمصان كرة القدم",
+    "stages": [
+      "images/blur/B05/stage_1.jpg",
+      "images/blur/B05/stage_2.jpg",
+      "images/blur/B05/stage_3.jpg"
+    ],
+    "originalImage": "images/blur/B05/answer_reveal.jpg",
+    "playableAudio": null,
+    "forwardSpeech": null
+  },
+  {
+    "categoryId": "football",
+    "row": 4,
+    "type": "IMAGE_BLUR",
+    "prompt": "إيه اللي بيحصل في الصورة؟",
+    "answer": "توجيهات المدرب",
+    "stages": [
+      "images/blur/B06/stage_1.jpg",
+      "images/blur/B06/stage_2.jpg",
+      "images/blur/B06/stage_3.jpg"
+    ],
+    "originalImage": "images/blur/B06/answer_reveal.jpg",
+    "playableAudio": null,
+    "forwardSpeech": null
+  },
+  {
+    "categoryId": "childhood",
+    "row": 0,
+    "type": "IMAGE_ZOOM",
+    "prompt": "إيه الحاجة دي؟",
+    "answer": "كرة قدم",
+    "stages": [
+      "images/zoom/Z01/stage_1.jpg",
+      "images/zoom/Z01/stage_2.jpg",
+      "images/zoom/Z01/stage_3.jpg"
+    ],
+    "originalImage": "images/zoom/Z01/answer_reveal.jpg",
+    "playableAudio": null,
+    "forwardSpeech": null
+  },
+  {
+    "categoryId": "football",
+    "row": 5,
+    "type": "IMAGE_ZOOM",
+    "prompt": "خمن اللي في الصورة.",
+    "answer": "لاعب كرة قدم",
+    "stages": [
+      "images/zoom/Z02/stage_1.jpg",
+      "images/zoom/Z02/stage_2.jpg",
+      "images/zoom/Z02/stage_3.jpg"
+    ],
+    "originalImage": "images/zoom/Z02/answer_reveal.jpg",
+    "playableAudio": null,
+    "forwardSpeech": null
+  },
+  {
+    "categoryId": "general",
+    "row": 5,
+    "type": "IMAGE_ZOOM",
+    "prompt": "إيه المشهد ده؟",
+    "answer": "مباراة ديربي",
+    "stages": [
+      "images/zoom/Z03/stage_1.jpg",
+      "images/zoom/Z03/stage_2.jpg",
+      "images/zoom/Z03/stage_3.jpg"
+    ],
+    "originalImage": "images/zoom/Z03/answer_reveal.jpg",
+    "playableAudio": null,
+    "forwardSpeech": null
+  },
+  {
+    "categoryId": "crafts",
+    "row": 4,
+    "type": "IMAGE_ZOOM",
+    "prompt": "إيه الحاجة دي؟",
+    "answer": "كأس بطولة",
+    "stages": [
+      "images/zoom/Z04/stage_1.jpg",
+      "images/zoom/Z04/stage_2.jpg",
+      "images/zoom/Z04/stage_3.jpg"
+    ],
+    "originalImage": "images/zoom/Z04/answer_reveal.jpg",
+    "playableAudio": null,
+    "forwardSpeech": null
+  },
+  {
+    "categoryId": "travel",
+    "row": 4,
+    "type": "IMAGE_ZOOM",
+    "prompt": "إيه المعلم اللي في الصورة؟",
+    "answer": "مسجد تاريخي",
+    "stages": [
+      "images/zoom/Z05/stage_1.jpg",
+      "images/zoom/Z05/stage_2.jpg",
+      "images/zoom/Z05/stage_3.jpg"
+    ],
+    "originalImage": "images/zoom/Z05/answer_reveal.jpg",
+    "playableAudio": null,
+    "forwardSpeech": null
+  },
+  {
+    "categoryId": "general",
+    "row": 4,
+    "type": "IMAGE_ZOOM",
+    "prompt": "إيه الرمز اللي قدامك؟",
+    "answer": "علامة استفهام ذهبية",
+    "stages": [
+      "images/zoom/Z06/stage_1.jpg",
+      "images/zoom/Z06/stage_2.jpg",
+      "images/zoom/Z06/stage_3.jpg"
+    ],
+    "originalImage": "images/zoom/Z06/answer_reveal.jpg",
+    "playableAudio": null,
+    "forwardSpeech": null
+  },
+  {
+    "categoryId": "general",
+    "row": 0,
+    "type": "AUDIO_GUESS",
+    "prompt": "ده صوت إيه؟",
+    "answer": "تليفون بيرن",
+    "stages": [],
+    "originalImage": null,
+    "playableAudio": "audio/A01/question.mp3",
+    "forwardSpeech": null,
+    "durationMs": 4800.0
+  },
+  {
+    "categoryId": "crafts",
+    "row": 0,
+    "type": "AUDIO_GUESS",
+    "prompt": "ده صوت إيه؟",
+    "answer": "خبط على باب",
+    "stages": [],
+    "originalImage": null,
+    "playableAudio": "audio/A02/question.mp3",
+    "forwardSpeech": null,
+    "durationMs": 3200.0
+  },
+  {
+    "categoryId": "music",
+    "row": 0,
+    "type": "AUDIO_GUESS",
+    "prompt": "ده صوت إيه؟",
+    "answer": "ساعة بتتك",
+    "stages": [],
+    "originalImage": null,
+    "playableAudio": "audio/A03/question.mp3",
+    "forwardSpeech": null,
+    "durationMs": 4600.0
+  },
+  {
+    "categoryId": "comedy",
+    "row": 0,
+    "type": "AUDIO_GUESS",
+    "prompt": "ده صوت إيه؟",
+    "answer": "تصفيق",
+    "stages": [],
+    "originalImage": null,
+    "playableAudio": "audio/A04/question.mp3",
+    "forwardSpeech": null,
+    "durationMs": 5000.0
+  },
+  {
+    "categoryId": "cinema",
+    "row": 0,
+    "type": "AUDIO_GUESS",
+    "prompt": "ده صوت إيه؟",
+    "answer": "كاميرا بتصور",
+    "stages": [],
+    "originalImage": null,
+    "playableAudio": "audio/A05/question.mp3",
+    "forwardSpeech": null,
+    "durationMs": 3500.0
+  },
+  {
+    "categoryId": "football",
+    "row": 1,
+    "type": "AUDIO_GUESS",
+    "prompt": "ده صوت إيه؟",
+    "answer": "صفارة حكم",
+    "stages": [],
+    "originalImage": null,
+    "playableAudio": "audio/A06/question.mp3",
+    "forwardSpeech": null,
+    "durationMs": 4200.0
+  },
+  {
+    "categoryId": "street",
+    "row": 0,
+    "type": "AUDIO_GUESS",
+    "prompt": "ده صوت إيه؟",
+    "answer": "مية بتتصب",
+    "stages": [],
+    "originalImage": null,
+    "playableAudio": "audio/A07/question.mp3",
+    "forwardSpeech": null,
+    "durationMs": 4800.0
+  },
+  {
+    "categoryId": "childhood",
+    "row": 1,
+    "type": "AUDIO_GUESS",
+    "prompt": "ده صوت إيه؟",
+    "answer": "مفاتيح بتترن",
+    "stages": [],
+    "originalImage": null,
+    "playableAudio": "audio/A08/question.mp3",
+    "forwardSpeech": null,
+    "durationMs": 4800.0
+  },
+  {
+    "categoryId": "cinema",
+    "row": 3,
+    "type": "AUDIO_REVERSE",
+    "prompt": "تقدر تعرف الكلام بالمقلوب؟",
+    "answer": "صباح الخير",
+    "stages": [],
+    "originalImage": null,
+    "playableAudio": "audio/R01/question.mp3",
+    "forwardSpeech": "admin_only/reverse_originals/R01/forward_reference.wav",
+    "durationMs": 2240.5
+  },
+  {
+    "categoryId": "comedy",
+    "row": 3,
+    "type": "AUDIO_REVERSE",
+    "prompt": "تقدر تعرف الكلام بالمقلوب؟",
+    "answer": "يلا نلعب",
+    "stages": [],
+    "originalImage": null,
+    "playableAudio": "audio/R02/question.mp3",
+    "forwardSpeech": "admin_only/reverse_originals/R02/forward_reference.wav",
+    "durationMs": 2038.59375
+  },
+  {
+    "categoryId": "travel",
+    "row": 5,
+    "type": "AUDIO_REVERSE",
+    "prompt": "تقدر تعرف الكلام بالمقلوب؟",
+    "answer": "مصر جميلة",
+    "stages": [],
+    "originalImage": null,
+    "playableAudio": "audio/R03/question.mp3",
+    "forwardSpeech": "admin_only/reverse_originals/R03/forward_reference.wav",
+    "durationMs": 1986.15625
+  },
+  {
+    "categoryId": "music",
+    "row": 5,
+    "type": "AUDIO_REVERSE",
+    "prompt": "تقدر تعرف الكلام بالمقلوب؟",
+    "answer": "النيل جميل",
+    "stages": [],
+    "originalImage": null,
+    "playableAudio": "audio/R04/question.mp3",
+    "forwardSpeech": "admin_only/reverse_originals/R04/forward_reference.wav",
+    "durationMs": 2126.5625
+  }
+]

@@ -28,9 +28,69 @@ import square from '../assets/logo/square.png'
 import script from '../assets/logo/script.png'
 import bubble from '../assets/logo/bubble.png'
 import divider from '../assets/logo/divider.png'
+import boardMusic from '../assets/board/music.png'
+import boardCrafts from '../assets/board/crafts.png'
+import boardRamadan from '../assets/board/ramadan.png'
+import boardFootball from '../assets/board/football.png'
+import boardComedy from '../assets/board/comedy.png'
+import boardTravel from '../assets/board/travel.png'
+import boardAncient from '../assets/board/ancient.png'
+import boardAlex from '../assets/board/alex.png'
+import boardGeneral from '../assets/board/general.png'
+import boardStreet from '../assets/board/street.png'
+import boardChildhood from '../assets/board/childhood.png'
 
-export const PHOTO: Record<string, string> = { hero, cinema, music, football, general, ramadan, comedy, ancient, street, travel, childhood, alex, crafts, coins, flow, contact, herowide }
+export const PHOTO: Record<string, string> = {
+  person: `${import.meta.env.BASE_URL}game-modes/person.webp`,
+  color: `${import.meta.env.BASE_URL}game-modes/color.webp`,
+  riddle: `${import.meta.env.BASE_URL}game-modes/riddle.webp`,
+  voice: `${import.meta.env.BASE_URL}game-modes/voice.webp`,
+  memory: `${import.meta.env.BASE_URL}game-modes/memory.webp`,
+  hero,
+  cinema,
+  music,
+  football,
+  general,
+  ramadan,
+  comedy,
+  ancient,
+  street,
+  travel,
+  childhood,
+  alex,
+  crafts,
+  coins,
+  flow,
+  contact,
+  herowide,
+}
 export const LOGO = { badge, plaque, wordmark, square, script, bubble, divider }
+
+// Full-resolution landscape artwork supplied for the question board.
+export const BOARD_PHOTO: Readonly<Record<string, string>> = {
+  music: boardMusic,
+  crafts: boardCrafts,
+  ramadan: boardRamadan,
+  football: boardFootball,
+  comedy: boardComedy,
+  travel: boardTravel,
+  ancient: boardAncient,
+  alex: boardAlex,
+  general: boardGeneral,
+  street: boardStreet,
+  childhood: boardChildhood,
+}
+
+// Hide only the outer white canvas in the display viewport. Keep the original
+// files intact, with a small margin around the complete decorative frame.
+export const BOARD_IMAGE_PADDING: Readonly<
+  Partial<Record<string, { top: number; bottom: number }>>
+> = {
+  alex: { top: 131, bottom: 126 },
+  general: { top: 118, bottom: 90 },
+  street: { top: 130, bottom: 125 },
+  childhood: { top: 130, bottom: 85 },
+}
 
 // Football question photos, by question row. pos = focal point for the cropped (mobile) frame.
 import qph from '../assets/img/qph.webp'

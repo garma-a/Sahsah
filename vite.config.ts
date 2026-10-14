@@ -1,15 +1,16 @@
-import { defineConfig, type HtmlTagDescriptor, type Plugin } from 'vite'
+import { defineConfig, loadEnv, type HtmlTagDescriptor, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'node:path'
+import sahsahApi from './server/plugin.ts'
 
-import siteConfiguration from './.figma/make/site.json'
-
+import siteConfiguration from './.figma/make/site.json' with { type: 'json' }
 
 // Vite config — https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   // .figma/make/deploy-preview passes `--mode development` for cached-preview builds.
   const emitSourcemaps = mode === 'development'
+  const demo = loadEnv(mode, process.cwd(), 'VITE_').VITE_DEMO_MODE !== 'false'
 
   return {
     base: process.env.FIGMA_PUBLIC_URL ? `${process.env.FIGMA_PUBLIC_URL}/` : '/',
@@ -18,7 +19,8 @@ export default defineConfig(({ mode }) => {
       minify: !emitSourcemaps,
     },
     plugins: [
-react(),
+      ...(demo ? [] : [sahsahApi()]),
+      react(),
       tailwindcss(),
       figmaSiteConfiguration(siteConfiguration),
       figmaErrorOverlayReplay(),
@@ -27,17 +29,28 @@ react(),
     ],
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, './src'),
+        '@': path.resolve(import.meta.dirname, './src'),
+        '#demo-service': path.resolve(
+          import.meta.dirname,
+          demo ? './src/demo/service.ts' : './src/lib/demo-disabled.ts',
+        ),
       },
     },
     server: {
       host: process.env.FIGMA_DEV_SERVER_HOST || '0.0.0.0',
       port: parseInt(process.env.PORT || '8443'),
       strictPort: true,
+      fs: {
+        deny: [
+          '**/server/**',
+          '**/*.zip',
+          '**/.git/**',
+          '**/.env*',
+          ...(demo ? [] : ['**/src/demo/**']),
+        ],
+      },
       watch: {
-        ignored: [
-          '**/.figma/**',
-],
+        ignored: ['**/.figma/**', '**/server/private/**'],
       },
     },
     preview: {
@@ -86,7 +99,7 @@ function figmaSiteConfiguration(config: FigmaSiteConfiguration): Plugin {
     return html.replace(`<!-- ${slotName} -->`, content)
   }
 
-  const title = config.title ?? "Figma Make App"
+  const title = config.title ?? 'Figma Make App'
   const description = config.description ?? ''
   const favicon = config.icons?.icon ?? ''
   const socialImage = config.openGraph?.image ?? ''
@@ -130,25 +143,53 @@ function figmaSiteConfiguration(config: FigmaSiteConfiguration): Plugin {
 
         const tags: HtmlTagDescriptor[] = []
         if (description) {
-          tags.push({ tag: 'meta', attrs: { name: 'description', content: description }, injectTo: 'head' })
+          tags.push({
+            tag: 'meta',
+            attrs: { name: 'description', content: description },
+            injectTo: 'head',
+          })
         }
         if (config.robots?.index === false) {
-          tags.push({ tag: 'meta', attrs: { name: 'robots', content: 'noindex, nofollow' }, injectTo: 'head' })
+          tags.push({
+            tag: 'meta',
+            attrs: { name: 'robots', content: 'noindex, nofollow' },
+            injectTo: 'head',
+          })
         }
         if (favicon) {
           tags.push({ tag: 'link', attrs: { rel: 'icon', href: favicon }, injectTo: 'head' })
         }
         if (title) {
-          tags.push({ tag: 'meta', attrs: { property: 'og:title', content: title }, injectTo: 'head' })
+          tags.push({
+            tag: 'meta',
+            attrs: { property: 'og:title', content: title },
+            injectTo: 'head',
+          })
         }
         if (description) {
-          tags.push({ tag: 'meta', attrs: { property: 'og:description', content: description }, injectTo: 'head' })
+          tags.push({
+            tag: 'meta',
+            attrs: { property: 'og:description', content: description },
+            injectTo: 'head',
+          })
         }
         if (socialImage) {
           tags.push(
-            { tag: 'meta', attrs: { property: 'og:image', content: socialImage }, injectTo: 'head' },
-            { tag: 'meta', attrs: { name: 'twitter:card', content: 'summary_large_image' }, injectTo: 'head' },
-            { tag: 'meta', attrs: { name: 'twitter:image', content: socialImage }, injectTo: 'head' },
+            {
+              tag: 'meta',
+              attrs: { property: 'og:image', content: socialImage },
+              injectTo: 'head',
+            },
+            {
+              tag: 'meta',
+              attrs: { name: 'twitter:card', content: 'summary_large_image' },
+              injectTo: 'head',
+            },
+            {
+              tag: 'meta',
+              attrs: { name: 'twitter:image', content: socialImage },
+              injectTo: 'head',
+            },
           )
         }
 
@@ -339,7 +380,9 @@ function figmaReactRefreshBoundaryFallback(): Plugin {
  * into shipped bundles.
  */
 function figmaMakeKitPlugin(options: { storiesGlob: string | string[] }): Plugin {
-  const storiesGlob = Array.isArray(options.storiesGlob) ? options.storiesGlob : [options.storiesGlob]
+  const storiesGlob = Array.isArray(options.storiesGlob)
+    ? options.storiesGlob
+    : [options.storiesGlob]
   const ROUTE = '/.figma/make/kit.html'
   const VIRTUAL_ID = 'virtual:figma-stories'
   const RESOLVED_ID = '\0' + VIRTUAL_ID

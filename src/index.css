@@ -75,9 +75,12 @@ body {
     border: 1px solid rgba(255, 240, 200, 0.16);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    box-shadow:
+      0 20px 50px rgba(0, 0, 0, 0.25),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
   }
   .paper {
+    color-scheme: light;
     background: linear-gradient(180deg, #fffdf8, #f6efe0);
     color: #0d2e1d;
     border: 1px solid #e6dac4;
@@ -162,17 +165,44 @@ body {
   }
 }
 @keyframes ctaShake {
-  0%, 70%, 100% { transform: translateX(0) rotate(0); }
-  74% { transform: translateX(-6px) rotate(-2deg); }
-  78% { transform: translateX(6px) rotate(2deg); }
-  82% { transform: translateX(-5px) rotate(-1.5deg); }
-  86% { transform: translateX(5px) rotate(1.5deg); }
-  90% { transform: translateX(-2px) rotate(-0.5deg); }
-  94% { transform: translateX(2px) rotate(0.5deg); }
+  0%,
+  70%,
+  100% {
+    transform: translateX(0) rotate(0);
+  }
+  74% {
+    transform: translateX(-6px) rotate(-2deg);
+  }
+  78% {
+    transform: translateX(6px) rotate(2deg);
+  }
+  82% {
+    transform: translateX(-5px) rotate(-1.5deg);
+  }
+  86% {
+    transform: translateX(5px) rotate(1.5deg);
+  }
+  90% {
+    transform: translateX(-2px) rotate(-0.5deg);
+  }
+  94% {
+    transform: translateX(2px) rotate(0.5deg);
+  }
 }
 @keyframes barGlow {
-  0%, 100% { box-shadow: 0 0 0 1px rgba(231, 167, 43, 0.35), 0 10px 40px rgba(0, 0, 0, 0.4), 0 0 24px rgba(231, 167, 43, 0.15); }
-  50% { box-shadow: 0 0 0 1px rgba(231, 167, 43, 0.9), 0 10px 40px rgba(0, 0, 0, 0.4), 0 0 44px rgba(231, 167, 43, 0.45); }
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px rgba(231, 167, 43, 0.35),
+      0 10px 40px rgba(0, 0, 0, 0.4),
+      0 0 24px rgba(231, 167, 43, 0.15);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(231, 167, 43, 0.9),
+      0 10px 40px rgba(0, 0, 0, 0.4),
+      0 0 44px rgba(231, 167, 43, 0.45);
+  }
 }
 .cta-ready {
   animation: ctaShake 3s ease-in-out infinite !important;
@@ -206,5 +236,20 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+.audio-bar {
+  background: currentColor;
+  animation: clue-wave 650ms ease-in-out infinite alternate;
+  transform-origin: center;
+}
+
+@keyframes clue-wave {
+  from {
+    transform: scaleY(0.45);
+  }
+  to {
+    transform: scaleY(1);
   }
 }

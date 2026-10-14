@@ -1,243 +1,523 @@
-import { createContext, useContext, useEffect, useMemo, useReducer, useRef, type ReactNode } from 'react'
-import { buildQuestions, BUNDLES, PROMOS, type Question } from './data'
+import {
+  createContext,
+  useContext,
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  type ReactNode,
+} from 'react'
+import { PROMOS } from './data'
+import { migrateTokenWallet, parseTokenQuantity, type TokenOrder } from './token-economy'
+import { api, getSession, hostCredentials, saveHost, clearHost, subscribeSession } from './api'
+import type { Session, TeamId } from './game-types'
+import { DEMO_MODE, UI_STORAGE_KEY } from './runtime'
+export type { Session, Team, TeamId, Timer } from './game-types'
 
-export type TeamId = 'A' | 'B'
-export type Team = { id: TeamId; name: string; score: number }
-export type Timer = { durationMs: number; remainingMs: number; status: 'idle' | 'running' | 'paused' | 'expired'; startedAt?: number }
-export type Session = {
-  id: string
-  code: string
-  phase: 'lobby' | 'board' | 'question' | 'answer' | 'finished'
-  teams: [Team, Team]
-  categoryIds: string[]
-  questions: Question[]
-  activeQuestionId?: string
-  answerRevealed: boolean
-  timer: Timer
-  guests: { name: string; team: TeamId }[]
-  lastAward?: { teamId: TeamId | null; points: number; at: number }
-  version: number
-}
 export type User = { name: string; phone: string }
-export type Order = { id: string; bundleId: string; promo?: string; gift?: { phone: string; note: string }; status: 'review' | 'pending' | 'success' | 'failed' }
+export type Order = TokenOrder
 export type Activity = { id: string; text: string; at: number }
 
 type State = {
   selected: string[]
   user: User | null
-  coins: number
+  tokens: number
+  chargedGames: string[]
   session: Session | null
   hostSessionId: string | null
   orders: Record<string, Order>
   paidOrders: string[]
   activity: Activity[]
-  feedback: Record<string, { vote: 'like' | 'dislike'; reward: number; at: number }>
+  feedback: Record<
+    string,
+    {
+      vote: 'like' | 'dislike'
+      at: number
+    }
+  >
   toast?: { id: number; text: string }
 }
 
 type Action =
   | { type: 'toggleCategory'; id: string }
-  | { type: 'createRoom'; names: [string, string] }
+  | {
+      type: 'createRoom'
+      names: [string, string]
+      categoryIds?: string[]
+    }
   | { type: 'rename'; idx: 0 | 1; name: string }
   | { type: 'startGame' }
-  | { type: 'joinGuest'; name: string; team: TeamId }
+  | {
+      type: 'joinGuest'
+      name: string
+      team: TeamId
+    }
   | { type: 'openQuestion'; id: string }
-  | { type: 'timer'; op: 'start' | 'pause' | 'reset' | 'expire' }
+  | {
+      type: 'timer'
+      op: 'start' | 'pause' | 'reset' | 'expire'
+    }
   | { type: 'reveal' }
+  | { type: 'advanceStage' }
+  | { type: 'startMemory' | 'hideMemory' | 'resetMemory' }
+  | {
+      type: 'remoteSession'
+      session: Session
+      host?: boolean
+      chargeKey?: string
+    }
   | { type: 'award'; questionId: string; teamId: TeamId | null }
-  | { type: 'adjust'; teamId: TeamId; delta: number }
+  | {
+      type: 'adjust'
+      teamId: TeamId
+      delta: number
+    }
   | { type: 'backToBoard' }
   | { type: 'finish' }
-  | { type: 'replay'; newCategories: boolean }
+  | {
+      type: 'replay'
+      newCategories: boolean
+    }
   | { type: 'sync'; session: Session | null }
   | { type: 'login'; user: User }
-  | { type: 'logout' }
+  | {
+      type: 'logout'
+    }
   | { type: 'order'; order: Order }
-  | { type: 'settle'; orderId: string; ok: boolean }
+  | {
+      type: 'settle'
+      orderId: string
+      ok: boolean
+    }
   | { type: 'toast'; text: string }
-  | { type: 'feedback'; key: string; vote: 'like' | 'dislike'; reward: number }
+  | { type: 'walletSync'; wallet: Wallet }
+  | {
+      type: 'feedback'
+      key: string
+      vote: 'like' | 'dislike'
+    }
 
-const KEY = 'sahsah.v1'
-const DURATION = 30000
-const genCode = () => String(Math.floor(1000 + Math.random() * 9000))
-const uid = () => Math.random().toString(36).slice(2, 9)
+const KEY = UI_STORAGE_KEY
+const WALLET_KEY = KEY + '.tokens'
+type Wallet = Pick<
+  State,
+  'tokens' | 'orders' | 'paidOrders' | 'chargedGames' | 'feedback' | 'activity'
+>
+const walletOf = (state: State): Wallet => ({
+  tokens: state.tokens,
+  orders: state.orders,
+  paidOrders: state.paidOrders,
+  chargedGames: state.chargedGames,
+  feedback: state.feedback,
+  activity: state.activity,
+})
 
-const initial: State = { selected: [], user: null, coins: 0, session: null, hostSessionId: null, orders: {}, paidOrders: [], activity: [], feedback: {} }
+const initial: State = {
+  selected: [],
+  user: null,
+  tokens: 0,
+  chargedGames: [],
+  session: null,
+  hostSessionId: null,
+  orders: {},
+  paidOrders: [],
+  activity: [],
+  feedback: {},
+}
+
+function legacyGame(): Record<string, unknown> | null {
+  if (DEMO_MODE) return null
+  try {
+    const saved = JSON.parse(
+      localStorage.getItem(KEY + '.legacy') || localStorage.getItem(KEY) || 'null',
+    )
+    const session = saved?.session
+    if (
+      session &&
+      !session.questions?.every((q: { type?: string }) => q.type) &&
+      sessionStorage.getItem(KEY + '.host') === session.id
+    ) {
+      localStorage.setItem(KEY + '.legacy', JSON.stringify({ session }))
+      return session
+    }
+  } catch {
+    /* Invalid old storage cannot become an authorized session. */
+  }
+  return null
+}
 
 function load(): State {
   try {
     const raw = localStorage.getItem(KEY)
-    const host = sessionStorage.getItem(KEY + '.host')
-    if (raw) return { ...initial, ...JSON.parse(raw), hostSessionId: host, toast: undefined }
+    const saved = raw ? JSON.parse(raw) : {}
+    const wallet = JSON.parse(localStorage.getItem(WALLET_KEY) || 'null')
+    const { coins: _coins, ...ui } = saved
+    const session = saved.session?.questions?.every((q: { type?: string }) => q.type)
+      ? saved.session
+      : null
+    return {
+      ...initial,
+      ...ui,
+      ...migrateTokenWallet(wallet ? { ...saved, ...wallet } : saved),
+      session,
+      hostSessionId: hostCredentials()?.sessionId ?? null,
+      toast: undefined,
+    }
   } catch {
-    /* ignore */
+    return initial
   }
-  return initial
 }
 
-const bump = (s: Session, patch: Partial<Session>): Session => ({ ...s, ...patch, version: s.version + 1 })
-
 function reduce(state: State, a: Action): State {
-  const s = state.session
   switch (a.type) {
     case 'toggleCategory': {
-      if (state.selected.includes(a.id)) return { ...state, selected: state.selected.filter((x) => x !== a.id) }
+      if (state.selected.includes(a.id))
+        return { ...state, selected: state.selected.filter((x) => x !== a.id) }
       if (state.selected.length >= 6) return state
       return { ...state, selected: [...state.selected, a.id] }
     }
-    case 'createRoom': {
-      if (state.selected.length !== 6) return state
-      const id = uid()
-      const session: Session = {
-        id,
-        code: genCode(),
-        phase: 'lobby',
-        teams: [
-          { id: 'A', name: a.names[0], score: 0 },
-          { id: 'B', name: a.names[1], score: 0 },
-        ],
-        categoryIds: state.selected,
-        questions: buildQuestions(state.selected),
-        answerRevealed: false,
-        timer: { durationMs: DURATION, remainingMs: DURATION, status: 'idle' },
-        guests: [],
-        version: 1,
-      }
-      sessionStorage.setItem(KEY + '.host', id)
-      return { ...state, session, hostSessionId: id }
-    }
-    case 'rename':
-      if (!s) return state
-      return { ...state, session: bump(s, { teams: s.teams.map((t, i) => (i === a.idx ? { ...t, name: a.name } : t)) as [Team, Team] }) }
-    case 'startGame':
-      if (!s || s.questions.length !== 36) return state
-      return { ...state, session: bump(s, { phase: 'board' }) }
-    case 'joinGuest':
-      if (!s) return state
-      return { ...state, session: bump(s, { guests: [...s.guests, { name: a.name, team: a.team }] }) }
-    case 'openQuestion': {
-      if (!s) return state
-      const q = s.questions.find((x) => x.id === a.id)
-      if (!q || q.state === 'answered') return state
-      return { ...state, session: bump(s, { phase: 'question', activeQuestionId: a.id, answerRevealed: false, timer: { durationMs: DURATION, remainingMs: DURATION, status: 'idle' } }) }
-    }
-    case 'timer': {
-      if (!s) return state
-      const t = s.timer
-      const now = Date.now()
-      const live = t.status === 'running' && t.startedAt ? Math.max(0, t.remainingMs - (now - t.startedAt)) : t.remainingMs
-      if (a.op === 'start') {
-        if (t.status === 'running') return state
-        return { ...state, session: bump(s, { timer: { ...t, remainingMs: t.status === 'expired' ? t.durationMs : live || t.durationMs, status: 'running', startedAt: now } }) }
-      }
-      if (a.op === 'pause') return t.status !== 'running' ? state : { ...state, session: bump(s, { timer: { ...t, remainingMs: live, status: 'paused', startedAt: undefined } }) }
-      if (a.op === 'reset') return { ...state, session: bump(s, { timer: { durationMs: t.durationMs, remainingMs: t.durationMs, status: 'idle' } }) }
-      return t.status === 'running' ? { ...state, session: bump(s, { timer: { ...t, remainingMs: 0, status: 'expired', startedAt: undefined } }) } : state
-    }
-    case 'reveal':
-      if (!s || !s.activeQuestionId) return state
-      return { ...state, session: bump(s, { phase: 'answer', answerRevealed: true, timer: { ...s.timer, status: s.timer.status === 'running' ? 'paused' : s.timer.status, remainingMs: s.timer.remainingMs, startedAt: undefined } }) }
-    case 'award': {
-      if (!s) return state
-      const q = s.questions.find((x) => x.id === a.questionId)
-      if (!q || q.state === 'answered') return state
-      const questions = s.questions.map((x) => (x.id === q.id ? { ...x, state: 'answered' as const } : x))
-      const teams = s.teams.map((t) => (t.id === a.teamId ? { ...t, score: t.score + q.points } : t)) as [Team, Team]
-      const name = a.teamId ? s.teams.find((t) => t.id === a.teamId)!.name : null
-      const text = name ? `✓ ${q.points} نقطة محسوبة لـ${name}` : 'ولا حد جاوب — الدور اللي بعده'
-      const done = questions.every((x) => x.state === 'answered')
+    case 'remoteSession': {
+      const previous = state.session
+      if (previous?.id === a.session.id && previous.version > a.session.version) return state
+      const award = a.session.lastAward
+      const isNewAward = award && previous?.lastAward?.at !== award.at
+      const name = award?.teamId ? a.session.teams.find((t) => t.id === award.teamId)?.name : null
+      const charge = a.chargeKey && !state.chargedGames.includes(a.chargeKey)
       return {
         ...state,
-        toast: { id: Date.now(), text },
-        session: bump(s, { questions, teams, phase: done ? 'finished' : 'board', activeQuestionId: undefined, answerRevealed: false, lastAward: { teamId: a.teamId, points: q.points, at: Date.now() } }),
+        ...(charge
+          ? {
+              tokens: Math.max(0, state.tokens - 1),
+              chargedGames: [...state.chargedGames, a.chargeKey!],
+              activity: [
+                { id: a.chargeKey!, text: 'بدأت لعبة · ١ توكن', at: Date.now() },
+                ...state.activity,
+              ].slice(0, 6),
+            }
+          : {}),
+        session: a.session,
+        hostSessionId: a.host ? a.session.id : state.hostSessionId,
+        ...(isNewAward
+          ? {
+              toast: {
+                id: award.at,
+                text: name ? `✓ ${award.points} نقطة محسومة لـ${name}` : 'ولا حد — الدور اللي بعده',
+              },
+            }
+          : {}),
       }
-    }
-    case 'adjust':
-      if (!s) return state
-      return { ...state, session: bump(s, { teams: s.teams.map((t) => (t.id === a.teamId ? { ...t, score: Math.max(0, t.score + a.delta) } : t)) as [Team, Team] }) }
-    case 'backToBoard':
-      return s ? { ...state, session: bump(s, { phase: 'board', activeQuestionId: undefined, answerRevealed: false }) } : state
-    case 'finish':
-      return s ? { ...state, session: bump(s, { phase: 'finished' }) } : state
-    case 'replay': {
-      if (!s) return state
-      if (a.newCategories) {
-        sessionStorage.removeItem(KEY + '.host')
-        return { ...state, session: null, hostSessionId: null, selected: [] }
-      }
-      return { ...state, session: bump(s, { phase: 'board', teams: s.teams.map((t) => ({ ...t, score: 0 })) as [Team, Team], questions: buildQuestions(s.categoryIds), activeQuestionId: undefined, answerRevealed: false, lastAward: undefined }) }
     }
     case 'sync':
       if (!a.session) return { ...state, session: null }
-      if (state.session && state.session.id === a.session.id && state.session.version >= a.session.version) return state
+      if (state.session?.id === a.session.id && state.session.version > a.session.version)
+        return state
       return { ...state, session: a.session }
+    case 'replay':
+      return a.newCategories
+        ? { ...state, session: null, hostSessionId: null, selected: [] }
+        : state
+    case 'createRoom':
+    case 'rename':
+    case 'startGame':
+    case 'joinGuest':
+    case 'openQuestion':
+    case 'timer':
+    case 'reveal':
+    case 'advanceStage':
+    case 'startMemory':
+    case 'hideMemory':
+    case 'resetMemory':
+    case 'award':
+    case 'adjust':
+    case 'backToBoard':
+    case 'finish':
+      return state
     case 'login':
-      return { ...state, user: a.user, coins: state.coins || 0 }
+      return { ...state, user: a.user }
     case 'logout':
       return { ...state, user: null }
     case 'order':
-      return { ...state, orders: { ...state.orders, [a.order.id]: a.order } }
+      return parseTokenQuantity(a.order.quantity)
+        ? { ...state, orders: { ...state.orders, [a.order.id]: a.order } }
+        : state
     case 'settle': {
       const o = state.orders[a.orderId]
       if (!o || o.status === 'success') return state
-      if (!a.ok) return { ...state, orders: { ...state.orders, [o.id]: { ...o, status: 'failed' } } }
+      if (!a.ok)
+        return {
+          ...state,
+          orders: { ...state.orders, [o.id]: { ...o, status: 'failed' } },
+        }
       if (state.paidOrders.includes(o.id)) return state
-      const b = BUNDLES.find((x) => x.id === o.bundleId)!
       return {
         ...state,
         orders: { ...state.orders, [o.id]: { ...o, status: 'success' } },
         paidOrders: [...state.paidOrders, o.id],
-        coins: o.gift ? state.coins : state.coins + b.coins,
-        activity: [{ id: o.id, text: o.gift ? `إهداء ${b.coins} عملة` : `شحن ${b.coins} عملة`, at: Date.now() }, ...state.activity].slice(0, 6),
+        tokens: o.gift ? state.tokens : state.tokens + o.quantity,
+        activity: [
+          {
+            id: o.id,
+            text: `${o.gift ? 'إهداء' : 'شراء'} ${o.quantity} توكن · ${o.quantity} لعبة`,
+            at: Date.now(),
+          },
+          ...state.activity,
+        ].slice(0, 6),
       }
     }
     case 'feedback': {
       if (state.feedback[a.key]) return state
       return {
         ...state,
-        coins: state.coins + a.reward,
-        feedback: { ...state.feedback, [a.key]: { vote: a.vote, reward: a.reward, at: Date.now() } },
-        activity: [{ id: 'fb' + a.key, text: `مكافأة رأيك في سؤال: +${a.reward} عملة`, at: Date.now() }, ...state.activity].slice(0, 6),
+        feedback: {
+          ...state.feedback,
+          [a.key]: { vote: a.vote, at: Date.now() },
+        },
       }
     }
     case 'toast':
       return { ...state, toast: { id: Date.now(), text: a.text } }
+    case 'walletSync':
+      return { ...state, ...a.wallet }
   }
 }
 
-type Ctx = { state: State; dispatch: (a: Action) => void; isHost: boolean }
+type Ctx = {
+  state: State
+  dispatch: (a: Action) => Promise<boolean>
+  isHost: boolean
+  connected: boolean
+  busy: boolean
+  adoptSession: (session: Session) => void
+}
 const C = createContext<Ctx>(null as never)
+const HOST_ACTIONS = new Set([
+  'rename',
+  'startGame',
+  'openQuestion',
+  'timer',
+  'reveal',
+  'advanceStage',
+  'startMemory',
+  'hideMemory',
+  'resetMemory',
+  'award',
+  'adjust',
+  'backToBoard',
+  'finish',
+  'replay',
+])
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(reduce, undefined, load)
-  const fromRemote = useRef(false)
+  const [state, rawDispatch] = useReducer(reduce, undefined, load)
+  const legacy = useRef<Record<string, unknown> | null | undefined>(undefined)
+  if (legacy.current === undefined) legacy.current = legacyGame()
+  const current = useRef(state)
+  current.current = state
+  const [network, setNetwork] = useReducer(
+    (
+      previous: { connected: boolean; busy: boolean },
+      patch: Partial<{ connected: boolean; busy: boolean }>,
+    ) => ({ ...previous, ...patch }),
+    { connected: true, busy: false },
+  )
+  const pending = useRef(false)
+  const adoptSession = useCallback((session: Session) => {
+    if (
+      current.current.session?.id === session.id &&
+      current.current.session.version > session.version
+    )
+      return
+    current.current = { ...current.current, session }
+    rawDispatch({ type: 'sync', session })
+  }, [])
+  useEffect(() => {
+    if (!legacy.current) return
+    const old = legacy.current
+    legacy.current = null
+    void api<{ session: Session; hostToken: string }>('/api/sessions/import', old)
+      .then((result) => {
+        saveHost(result.session.id, result.hostToken)
+        localStorage.removeItem(KEY + '.legacy')
+        current.current = {
+          ...current.current,
+          session: result.session,
+          hostSessionId: result.session.id,
+        }
+        if (location.pathname.startsWith('/game/')) {
+          history.replaceState(null, '', `/game/${result.session.id}`)
+          window.dispatchEvent(new PopStateEvent('popstate'))
+        }
+        rawDispatch({ type: 'remoteSession', session: result.session, host: true })
+      })
+      .catch(() =>
+        rawDispatch({
+          type: 'toast',
+          text: 'اللعبة القديمة محفوظة. افتح الصفحة تاني لما الاتصال يرجع.',
+        }),
+      )
+  }, [])
+  const dispatch = useCallback(
+    async (a: Action) => {
+      const s = current.current.session
+      if (a.type === 'createRoom' || a.type === 'joinGuest' || HOST_ACTIONS.has(a.type)) {
+        if (pending.current) return false
+        const startsGame = a.type === 'startGame' || (a.type === 'replay' && !a.newCategories)
+        if (startsGame && current.current.tokens < 1) {
+          rawDispatch({ type: 'toast', text: 'محتاج ١ توكن عشان تبدأ لعبة جديدة' })
+          return false
+        }
+        pending.current = true
+        setNetwork({ busy: true })
+        try {
+          if (a.type === 'createRoom') {
+            const result = await api<{ session: Session; hostToken: string }>('/api/sessions', {
+              categoryIds: a.categoryIds ?? current.current.selected,
+              names: a.names,
+            })
+            saveHost(result.session.id, result.hostToken)
+            current.current = {
+              ...current.current,
+              session: result.session,
+              hostSessionId: result.session.id,
+            }
+            rawDispatch({
+              type: 'remoteSession',
+              session: result.session,
+              host: true,
+            })
+          } else if (a.type === 'replay' && a.newCategories) {
+            clearHost()
+            current.current = {
+              ...current.current,
+              session: null,
+              hostSessionId: null,
+            }
+            rawDispatch(a)
+          } else if (s) {
+            const session =
+              a.type === 'joinGuest'
+                ? await api<Session>(`/api/sessions/${s.id}/join`, a)
+                : await api<Session>(`/api/sessions/${s.id}/actions`, {
+                    ...a,
+                    version: s.version,
+                  })
+            if (
+              current.current.session?.id !== session.id ||
+              current.current.session.version <= session.version
+            )
+              current.current = { ...current.current, session }
+            const chargeKey = startsGame ? `${session.id}:${session.version}:${a.type}` : undefined
+            if (chargeKey) {
+              current.current = {
+                ...current.current,
+                tokens: Math.max(0, current.current.tokens - 1),
+              }
+            }
+            rawDispatch({ type: 'remoteSession', session, chargeKey })
+          }
+          setNetwork({ connected: true })
+        } catch (error) {
+          if (error instanceof TypeError) setNetwork({ connected: false })
+          rawDispatch({
+            type: 'toast',
+            text: error instanceof Error ? error.message : 'حصلت مشكلة، جرّب تاني',
+          })
+          if (s)
+            getSession(s.id)
+              .then(adoptSession)
+              .catch(() => {})
+          return false
+        } finally {
+          pending.current = false
+          setNetwork({ busy: false })
+        }
+      } else rawDispatch(a)
+      return true
+    },
+    [adoptSession],
+  )
 
   useEffect(() => {
     const { toast: _t, hostSessionId: _h, ...persist } = state
-    void _t
-    void _h
-    if (fromRemote.current) {
-      fromRemote.current = false
-      return
-    }
     localStorage.setItem(KEY, JSON.stringify(persist))
   }, [state])
 
   useEffect(() => {
-    const on = (e: StorageEvent) => {
-      if (e.key !== KEY || !e.newValue) return
+    const serialized = JSON.stringify(walletOf(state))
+    if (localStorage.getItem(WALLET_KEY) !== serialized)
+      localStorage.setItem(WALLET_KEY, serialized)
+  }, [
+    state.tokens,
+    state.orders,
+    state.paidOrders,
+    state.chargedGames,
+    state.feedback,
+    state.activity,
+  ])
+
+  useEffect(() => {
+    const syncWallet = (event: StorageEvent) => {
+      if (event.key !== WALLET_KEY || !event.newValue) return
       try {
-        fromRemote.current = true
-        dispatch({ type: 'sync', session: JSON.parse(e.newValue).session })
+        const wallet = migrateTokenWallet(JSON.parse(event.newValue))
+        current.current = { ...current.current, ...wallet }
+        rawDispatch({ type: 'walletSync', wallet })
       } catch {
-        /* ignore */
+        /* Ignore an incomplete presentation storage write. */
       }
     }
-    window.addEventListener('storage', on)
-    return () => window.removeEventListener('storage', on)
+    window.addEventListener('storage', syncWallet)
+    return () => window.removeEventListener('storage', syncWallet)
   }, [])
 
-  const value = useMemo(() => ({ state, dispatch, isHost: !!state.session && state.hostSessionId === state.session.id }), [state])
+  useEffect(() => {
+    const id =
+      location.pathname.match(/^\/game\/([^/]+)/)?.[1] ||
+      state.session?.id ||
+      hostCredentials()?.sessionId
+    if (!id) return
+    let active = true
+    getSession(id)
+      .then((s) => {
+        if (active) adoptSession(s)
+      })
+      .catch(() => {
+        if (active) setNetwork({ connected: false, busy: pending.current })
+      })
+    const close = subscribeSession(
+      id,
+      (session) => {
+        if (!active) return
+        if (
+          current.current.session?.id === session.id &&
+          current.current.session.version > session.version
+        )
+          return
+        current.current = { ...current.current, session }
+        rawDispatch({ type: 'remoteSession', session })
+        setNetwork({ connected: true, busy: pending.current })
+      },
+      (connected) => {
+        if (active) setNetwork({ connected, busy: pending.current })
+      },
+    )
+    return () => {
+      active = false
+      close()
+    }
+  }, [state.session?.id, adoptSession])
+
+  const value = useMemo(
+    () => ({
+      state,
+      dispatch,
+      adoptSession,
+      isHost: !!state.session && hostCredentials()?.sessionId === state.session.id,
+      ...network,
+    }),
+    [state, dispatch, adoptSession, network],
+  )
   return <C.Provider value={value}>{children}</C.Provider>
 }
 

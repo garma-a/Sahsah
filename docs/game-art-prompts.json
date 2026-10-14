@@ -1,0 +1,81 @@
+{
+  "mode": "built-in image_gen",
+  "transparent_background": false,
+  "assets": [
+    {
+      "file": "public/game-modes/person.webp",
+      "reference": "src/assets/img/cinema.webp",
+      "prompt": "Create NEW artwork using the attached image ONLY as an exact STYLE reference. Match its vintage Egyptian screen-printed poster look: distressed aged paper, coarse halftone dot shading, flat cut-paper photomontage, black engraved details, dark forest green, ochre gold, warm cream with red accents, subtle ink misregistration. No smooth 3D rendering, no clay, no modern glossy gradients. Landscape 4:3, full bleed, no text, no letters or watermark. A single large clearly recognizable portrait of Egyptian footballer Mohamed Salah, curly hair, beard, smile, red plain football shirt. Front-facing chest up with centered face and hair fully visible, simple deep green textured paper backdrop. Face must stay recognizable using black ink and cream halftones."
+    },
+    {
+      "file": "public/game-modes/chaplin.webp",
+      "reference": "src/assets/img/cinema.webp",
+      "prompt": "Create NEW artwork using the attached image ONLY as an exact STYLE reference. Match its vintage Egyptian screen-printed poster look: distressed aged paper, coarse halftone dot shading, flat cut-paper photomontage, black engraved details, dark forest green, ochre gold, warm cream with red accents, subtle ink misregistration. No smooth 3D rendering, no clay, no modern glossy gradients. Landscape 4:3, full bleed, no text, no letters or watermark. A single large clearly recognizable Charlie Chaplin Tramp portrait, black bowler hat, small toothbrush moustache, black jacket, white shirt and tie. Front-facing chest up centered with full face visible, simple deep green textured paper backdrop."
+    },
+    {
+      "file": "public/game-modes/umm.webp",
+      "reference": "src/assets/img/cinema.webp",
+      "prompt": "Create NEW artwork using the attached image ONLY as an exact STYLE reference. Match its vintage Egyptian screen-printed poster look: distressed aged paper, coarse halftone dot shading, flat cut-paper photomontage, black engraved details, dark forest green, ochre gold, warm cream with red accents, subtle ink misregistration. No smooth 3D rendering, no clay, no modern glossy gradients. Landscape 4:3, full bleed, no text, no letters or watermark. A single large clearly recognizable Umm Kulthum portrait, iconic dark cat-eye sunglasses, high updo hairstyle, pearl earrings and necklace, elegant green dress, small white handkerchief. Front-facing chest up centered, full face visible, simple deep green paper backdrop."
+    },
+    {
+      "file": "public/game-modes/adel.webp",
+      "reference": "src/assets/img/cinema.webp",
+      "prompt": "Create NEW artwork using the attached image ONLY as an exact STYLE reference. Match its vintage Egyptian screen-printed poster look: distressed aged paper, coarse halftone dot shading, flat cut-paper photomontage, black engraved details, dark forest green, ochre gold, warm cream with red accents, subtle ink misregistration. No smooth 3D rendering, no clay, no modern glossy gradients. Landscape 4:3, full bleed, no text, no letters or watermark. A single large clearly recognizable Adel Imam portrait as an older man, distinctive amused face, dark slicked back receding hair, tan jacket and dark shirt. Front-facing chest up centered with full face visible, simple deep green paper backdrop."
+    },
+    {
+      "file": "public/game-modes/bean.webp",
+      "reference": "src/assets/img/cinema.webp",
+      "prompt": "Create NEW artwork using the attached image ONLY as an exact STYLE reference. Match its vintage Egyptian screen-printed poster look: distressed aged paper, coarse halftone dot shading, flat cut-paper photomontage, black engraved details, dark forest green, ochre gold, warm cream with red accents, subtle ink misregistration. No smooth 3D rendering, no clay, no modern glossy gradients. Landscape 4:3, full bleed, no text, no letters or watermark. A single clearly recognizable Rowan Atkinson as Mr Bean portrait, raised eyebrows, mischievous expression, brown tweed jacket, white shirt and red tie. Front-facing chest up centered, full face visible, simple deep green paper backdrop."
+    },
+    {
+      "file": "public/game-modes/einstein.webp",
+      "reference": "src/assets/img/cinema.webp",
+      "prompt": "Create NEW artwork using the attached image ONLY as an exact STYLE reference. Match its vintage Egyptian screen-printed poster look: distressed aged paper, coarse halftone dot shading, flat cut-paper photomontage, black engraved details, dark forest green, ochre gold, warm cream with red accents, subtle ink misregistration. No smooth 3D rendering, no clay, no modern glossy gradients. Landscape 4:3, full bleed, no text, no letters or watermark. A single clearly recognizable Albert Einstein portrait, wild white hair and bushy white moustache, wise cheerful expression, brown cardigan. Front-facing chest up centered, full face visible, simple deep green paper backdrop."
+    },
+    {
+      "file": "public/game-modes/riddle.webp",
+      "reference": "src/assets/img/football.webp",
+      "prompt": "Create NEW artwork using the attached image ONLY as exact STYLE reference. Match vintage Egyptian screen-printed poster look: distressed aged paper, coarse halftone dot shading, flat cut-paper collage, black engraved detail, forest green, ochre gold, warm cream with red accents, subtle ink misregistration. No smooth 3D, no clay, no glossy digital rendering. Landscape 4:3 full bleed, no writing, letters, captions or watermark. A simple clear scene for a visual quiz, keep visual clues readable. A wooden door in a cream Egyptian wall stands partly open. Strong visible cream-colored gusts of wind blow through the doorway, moving a curtain and scattering leaves. On right a small man is pushing the door CLOSED with both hands. These clues illustrate the proverb 'الباب اللي يجيلك منه الريح سده واستريح' but absolutely NO text. Only one man, one door and wind."
+    },
+    {
+      "file": "public/game-modes/riddle-monkey.webp",
+      "reference": "src/assets/img/football.webp",
+      "prompt": "Create NEW artwork using the attached image ONLY as exact STYLE reference. Match vintage Egyptian screen-printed poster look: distressed aged paper, coarse halftone dot shading, flat cut-paper collage, black engraved detail, forest green, ochre gold, warm cream with red accents, subtle ink misregistration. No smooth 3D, no clay, no glossy digital rendering. Landscape 4:3 full bleed, no writing, letters, captions or watermark. A simple clear scene for a visual quiz, keep visual clues readable. A loving mother MONKEY hugs her baby MONKEY, both clearly identifiable as monkeys with monkey faces and tails. A thought bubble above the mother contains a small beautiful GAZELLE with slender short horns. Only those three animals and the thought bubble. This illustrates 'القرد في عين أمه غزال', no text."
+    },
+    {
+      "file": "public/game-modes/riddle-hand.webp",
+      "reference": "src/assets/img/football.webp",
+      "prompt": "Create NEW artwork using the attached image ONLY as exact STYLE reference. Match vintage Egyptian screen-printed poster look: distressed aged paper, coarse halftone dot shading, flat cut-paper collage, black engraved detail, forest green, ochre gold, warm cream with red accents, subtle ink misregistration. No smooth 3D, no clay, no glossy digital rendering. Landscape 4:3 full bleed, no writing, letters, captions or watermark. A simple clear scene for a visual quiz, keep visual clues readable. On left a SINGLE HUMAN HAND on its own with open palm facing viewer. On right a PAIR of hands CLAPPING with small gold motion lines. Separate groups with empty green space. Illustrates 'إيد واحدة متسقفش', no text."
+    },
+    {
+      "file": "public/game-modes/riddle-bird.webp",
+      "reference": "src/assets/img/football.webp",
+      "prompt": "Create NEW artwork using the attached image ONLY as exact STYLE reference. Match vintage Egyptian screen-printed poster look: distressed aged paper, coarse halftone dot shading, flat cut-paper collage, black engraved detail, forest green, ochre gold, warm cream with red accents, subtle ink misregistration. No smooth 3D, no clay, no glossy digital rendering. Landscape 4:3 full bleed, no writing, letters, captions or watermark. A simple clear scene for a visual quiz, keep visual clues readable. Foreground a human hand gently holds ONE small gold bird. In background right a tree branch holds MANY small birds, clearly a flock all together. Hand+one bird and branch+many birds visibly separated. Illustrates 'عصفور في اليد ولا عشرة على الشجرة', no text."
+    },
+    {
+      "file": "public/game-modes/riddle-glass.webp",
+      "reference": "src/assets/img/football.webp",
+      "prompt": "Create NEW artwork using the attached image ONLY as exact STYLE reference. Match vintage Egyptian screen-printed poster look: distressed aged paper, coarse halftone dot shading, flat cut-paper collage, black engraved detail, forest green, ochre gold, warm cream with red accents, subtle ink misregistration. No smooth 3D, no clay, no glossy digital rendering. Landscape 4:3 full bleed, no writing, letters, captions or watermark. A simple clear scene for a visual quiz, keep visual clues readable. A small clearly TRANSPARENT GLASS HOUSE with a man standing inside holding a single TERRACOTTA RED BRICK with his arm ready to throw. Glass walls visibly transparent. Simple green background. Illustrates 'اللي بيته من إزاز ميحدفش الناس بالطوب', no text."
+    },
+    {
+      "file": "public/game-modes/riddle-blanket.webp",
+      "reference": "src/assets/img/football.webp",
+      "prompt": "Create NEW artwork using the attached image ONLY as exact STYLE reference. Match vintage Egyptian screen-printed poster look: distressed aged paper, coarse halftone dot shading, flat cut-paper collage, black engraved detail, forest green, ochre gold, warm cream with red accents, subtle ink misregistration. No smooth 3D, no clay, no glossy digital rendering. Landscape 4:3 full bleed, no writing, letters, captions or watermark. A simple clear scene for a visual quiz, keep visual clues readable. One man lying on a simple wooden bed covered by a SHORT GOLDEN BLANKET that reaches only his knees, BOTH BARE FEET sticking out past the blanket. Entire bed visible. No other objects. Illustrates 'على قد لحافك مد رجليك', no text."
+    },
+    {
+      "file": "public/game-modes/color.webp",
+      "reference": "src/assets/img/football.webp",
+      "prompt": "Create NEW artwork using the attached image ONLY as exact STYLE reference. Match vintage Egyptian screen-printed poster look: distressed aged paper, coarse halftone dot shading, flat cut-paper collage, black engraved detail, forest green, ochre gold, warm cream with red accents, subtle ink misregistration. No smooth 3D, no clay, no glossy digital rendering. Landscape 4:3 full bleed, no writing, letters, captions or watermark. A simple clear scene for a visual quiz, keep visual clues readable. A SINGLE plain BRIGHT RED football jersey, BLACK collar, WHITE sleeve trim, front view on invisible mannequin, centered and fully visible. Body must be clearly red, collar black, cuffs white despite the vintage ink shading. No logos or other objects, simple forest green paper backdrop."
+    },
+    {
+      "file": "public/game-modes/memory.webp",
+      "reference": "src/assets/img/football.webp",
+      "prompt": "Create NEW artwork using the attached image ONLY as exact STYLE reference. Match vintage Egyptian screen-printed poster look: distressed aged paper, coarse halftone dot shading, flat cut-paper collage, black engraved detail, forest green, ochre gold, warm cream with red accents, subtle ink misregistration. No smooth 3D, no clay, no glossy digital rendering. Landscape 4:3 full bleed, no writing, letters, captions or watermark. A simple clear scene for a visual quiz, keep visual clues readable. TOP-DOWN tabletop still life with EXACTLY ONE red ceramic mug upper left, EXACTLY THREE separate blue glass marbles lower left arranged as triangle, ONE blank open notebook center, ONE yellow pencil horizontally to notebook RIGHT, ONE green cactus in terracotta pot upper right, ONE gold old key lower right. All fully visible and separated on warm cream tabletop. No additional objects or text. Exact colors and object count crucial for memory quiz."
+    },
+    {
+      "file": "public/game-modes/voice.webp",
+      "reference": "src/assets/img/football.webp",
+      "prompt": "Create NEW artwork using the attached image ONLY as exact STYLE reference. Match vintage Egyptian screen-printed poster look: distressed aged paper, coarse halftone dot shading, flat cut-paper collage, black engraved detail, forest green, ochre gold, warm cream with red accents, subtle ink misregistration. No smooth 3D, no clay, no glossy digital rendering. Landscape 4:3 full bleed, no writing, letters, captions or watermark. A simple clear scene for a visual quiz, keep visual clues readable. A large vintage gold brass studio microphone center with floating cream waveform strips, black radio speaker, coiled audio cable and golden starbursts, forest green backdrop, nostalgic Egyptian radio collage. No people or text."
+    }
+  ]
+}
