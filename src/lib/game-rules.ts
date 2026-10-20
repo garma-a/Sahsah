@@ -1,6 +1,7 @@
 import { CATEGORIES } from './data.ts'
 const randomUUID = () => crypto.randomUUID()
 import {
+  QUESTION_MS,
   defaultPointStages,
   type AdminQuestion,
   type Session,
@@ -24,8 +25,8 @@ export const clean = (value: unknown, max = 300) =>
     .trim()
     .slice(0, max)
 const timer = () => ({
-  durationMs: 30000,
-  remainingMs: 30000,
+  durationMs: QUESTION_MS,
+  remainingMs: QUESTION_MS,
   status: 'idle' as const,
 })
 const POINTS = [200, 200, 400, 400, 600, 600]
@@ -39,6 +40,8 @@ type Live = {
   reservation?: { id: string; device: string; until: number }
   lastAudioRequest?: string
   awarded: boolean
+  awardedTo?: TeamId | null
+  awardedPoints?: number
   revealed: boolean
 }
 export type PrivateSession = Omit<Session, 'questions'> & {
@@ -110,6 +113,8 @@ export function validateQuestion(input: unknown, previous?: AdminQuestion): Admi
     points,
     prompt: clean(data.prompt),
     answerText: clean(data.answerText),
+    ...(clean(data.promptEn) ? { promptEn: clean(data.promptEn) } : {}),
+    ...(clean(data.answerTextEn) ? { answerTextEn: clean(data.answerTextEn) } : {}),
     alternatives: (Array.isArray(data.alternatives) ? data.alternatives : [])
       .map((v) => clean(v))
       .filter(Boolean)
@@ -187,7 +192,9 @@ export class GameRules {
         row: q.row,
         points: q.points,
         prompt: q.prompt,
+        ...(q.promptEn ? { promptEn: q.promptEn } : {}),
         state: l.awarded ? ('answered' as const) : ('available' as const),
+        ...(l.awarded ? { wonBy: l.awardedTo ?? null, wonPoints: l.awardedPoints ?? 0 } : {}),
         stageIndex: l.stageIndex,
         availablePoints: l.availablePoints,
         audioPlaysUsed: l.audioPlaysUsed,
@@ -198,6 +205,7 @@ export class GameRules {
           ? {
               answer: {
                 text: q.answerText,
+                ...(q.answerTextEn ? { textEn: q.answerTextEn } : {}),
                 ...(q.originalImage && q.type.startsWith('IMAGE_')
                   ? { imageUrl: url(q.originalImage) }
                   : {}),
@@ -361,14 +369,14 @@ export class GameRules {
     }
     if (s.activeQuestionId && data.timer) {
       const remaining = Number.isFinite(data.timer.remainingMs)
-        ? Math.max(0, Math.min(30000, data.timer.remainingMs))
-        : 30000
+        ? Math.max(0, Math.min(QUESTION_MS, data.timer.remainingMs))
+        : QUESTION_MS
       const running = data.timer.status === 'running' && Number.isFinite(data.timer.startedAt)
       const live = running
         ? Math.max(0, remaining - Math.max(0, Date.now() - data.timer.startedAt))
         : remaining
       s.timer = {
-        durationMs: 30000,
+        durationMs: QUESTION_MS,
         remainingMs: live,
         status: live === 0 ? 'expired' : running && s.phase === 'question' ? 'running' : 'paused',
         ...(running && s.phase === 'question' ? { startedAt: Date.now() } : {}),
@@ -483,7 +491,11 @@ export class GameRules {
       }
       case 'advanceStage':
         check(
-          q && l && s.phase === 'question' && q.type.startsWith('IMAGE_') && l.stageIndex < 2,
+          q &&
+            l &&
+            s.phase === 'question' &&
+            q.type.startsWith('IMAGE_') &&
+            l.stageIndex < q.pointStages.length - 1,
           'مفيش توضيح تاني',
         )
         l.stageIndex++
@@ -514,11 +526,16 @@ export class GameRules {
           'اظهر الإجابة الأول',
         )
         check(data.teamId === null || ['A', 'B'].includes(data.teamId), 'الفريق مش صحيح')
-        if (data.teamId) s.teams.find((t) => t.id === data.teamId)!.score += l.availablePoints
+        // The host may pick the points manually (e.g. the other team answered on the first hint).
+        const points = data.points === undefined ? l.availablePoints : data.points
+        check(Number.isInteger(points) && points >= 0 && points <= q.points, 'النقط مش صحيحة')
+        if (data.teamId) s.teams.find((t) => t.id === data.teamId)!.score += points
         l.awarded = true
+        l.awardedTo = (data.teamId as TeamId | null) ?? null
+        l.awardedPoints = data.teamId ? points : 0
         s.lastAward = {
           teamId: data.teamId as TeamId | null,
-          points: data.teamId ? l.availablePoints : 0,
+          points: data.teamId ? points : 0,
           at: Date.now(),
         }
         s.phase = Object.values(s.live).every((l) => l.awarded) ? 'finished' : 'board'
@@ -585,8 +602,8 @@ export class GameRules {
     if (l.reservation?.id === requestId && l.reservation.device === device)
       return { reservationId: requestId }
     check(
-      !l.audioIsPlaying && !l.reservation && l.audioPlaysUsed < q.maxPlays,
-      'مرات التشغيل خلصت أو الصوت شغّال',
+      !l.audioIsPlaying && !l.reservation,
+      'الصوت شغّال',
       409,
     )
     check(requestId && requestId !== l.lastAudioRequest && device, 'طلب التشغيل مكرر', 409)
@@ -627,8 +644,7 @@ export class GameRules {
       op === 'started' &&
         s.phase === 'question' &&
         s.activeQuestionId === questionId &&
-        l.reservation.until >= Date.now() &&
-        l.audioPlaysUsed < q.maxPlays,
+        l.reservation.until >= Date.now(),
       'مش مسموح تشغيل الصوت',
       409,
     )

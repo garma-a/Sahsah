@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import {
   Check,
   CircleHelp,
-  Coins,
   Eye,
+  Lightbulb,
   ThumbsDown,
   ThumbsUp,
   Maximize2,
@@ -16,6 +16,7 @@ import {
   Plus,
   RotateCcw,
   SlidersHorizontal,
+  Smartphone,
   UserPlus,
   X,
   Trophy,
@@ -23,24 +24,47 @@ import {
 import { QRCodeSVG } from 'qrcode.react'
 import QuestionAudio from '../components/QuestionAudio'
 import PartyQuestion from '../components/PartyQuestion'
-import { GAME_MODE_LABELS as MODE_LABELS } from '../lib/game-types'
-import { CATEGORIES, toAr } from '../lib/data'
+import { GAME_MODE_LABELS as MODE_LABELS, GAME_MODE_LABELS_EN, type Question } from '../lib/game-types'
+import { CATEGORIES, TEAM_COLORS, toAr, type Category } from '../lib/data'
 import { useStore, type Session, type Team, type TeamId } from '../lib/store'
-import { Logo } from '../components/art'
-import { Modal, RollingNumber, useTimerMs } from '../components/ui'
-import {
-  BOARD_PHOTO,
-  BOARD_IMAGE_PADDING,
-  PHOTO,
-  LOGO,
-  FOOTBALL_Q,
-  QUESTION_PLACEHOLDER,
-} from '../lib/images'
+import { Logo, Poster } from '../components/art'
+import { LangToggle } from '../components/Shell'
+import { FitText, Modal, RollingNumber, useTimerMs, ZoomableImage } from '../components/ui'
+import { BOARD_PHOTO, BOARD_IMAGE_PADDING, PHOTO, LOGO, FOOTBALL_Q } from '../lib/images'
+import { useLang } from '../lib/i18n'
 
-const TEAM_COLORS = ['#e7a72b', '#6fd3a0']
+const catOf = (id: string) => CATEGORIES.find((c) => c.id === id) as Category
 
-function ScoreBar({ s, host }: { s: Session; host: boolean }) {
-  const { state, dispatch, busy, connected } = useStore()
+/** How a round works — shown on the transition screen and behind every help button. */
+function useSteps() {
+  const { t } = useLang()
+  return [
+    t('الفريق الأول يختار السؤال ويجاوب في ٦٠ ثانية', 'El fare2 el awel ye5tar el so2al w ygaweb fe 60 sanya'),
+    t('لو مجاوبش صح، الفريق التاني ياخد فرصته', 'Law magawebsh sa7, el fare2 el tany ya5od forsto'),
+    t('اكشفوا الإجابة والمضيف يحسب النقط', 'E2shefo el egaba wel host ye7seb el no2at'),
+    t('اعكسوا الدور: الفريق التاني يختار', 'E3keso el dor: el fare2 el tany ye5tar'),
+  ]
+}
+
+function HowToPlay({ compact = false }: { compact?: boolean }) {
+  const steps = useSteps()
+  return (
+    <ol className={`grid gap-2 short:gap-1 ${compact ? '' : 'sm:grid-cols-2'}`}>
+      {steps.map((step, i) => (
+        <li key={step} className="flex items-center gap-3 rounded-2xl bg-black/20 p-3 ring-1 ring-white/10 short:gap-2 short:rounded-xl short:p-1.5">
+          <span className="num grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gold font-bold text-forest short:h-6 short:w-6 short:text-xs">
+            {toAr(i + 1)}
+          </span>
+          <span className="text-[15px] font-semibold leading-snug short:text-[13px]">{step}</span>
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+function ScoreBar({ s, host, onHelp }: { s: Session; host: boolean; onHelp: () => void }) {
+  const { dispatch, busy, connected } = useStore()
+  const { t } = useLang()
   const [full, setFull] = useState(!!document.fullscreenElement)
   const [edit, setEdit] = useState(false)
   const [invite, setInvite] = useState(false)
@@ -52,55 +76,48 @@ function ScoreBar({ s, host }: { s: Session; host: boolean }) {
   }, [])
   const toggle = () => {
     void (
-      document.fullscreenElement
-        ? document.exitFullscreen()
-        : document.documentElement.requestFullscreen?.()
-    )?.catch(() => dispatch({ type: 'toast', text: 'ملء الشاشة مش متاح في المعاينة دي' }))
+      document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.()
+    )?.catch(() =>
+      dispatch({ type: 'toast', text: t('ملء الشاشة مش متاح في المعاينة دي', 'Full screen mesh mota7 hena') }),
+    )
   }
   const link = `${location.origin}/join/${s.code}`
-  const team = (t: Team, i: number) => (
+  const team = (tm: Team, i: number) => (
     <div
-      className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl bg-black/25 px-4 py-2.5"
-      style={{ boxShadow: `inset 0 0 0 1px ${TEAM_COLORS[i]}33` }}
+      className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl bg-black/25 px-4 py-2 short:py-1"
+      style={{ boxShadow: `inset 0 0 0 2px ${TEAM_COLORS[i]}55` }}
     >
-      <span className="h-9 w-1.5 rounded-full" style={{ background: TEAM_COLORS[i] }} />
+      <span className="h-9 w-2 shrink-0 rounded-full short:h-7" style={{ background: TEAM_COLORS[i] }} />
       <div className="min-w-0">
-        <div className="truncate text-[13px] text-ivory/60">{t.name}</div>
+        <div className="truncate text-[14px] font-semibold text-ivory/75 short:text-[12px]">{tm.name}</div>
         {host && edit ? (
           <button
-            aria-label={`تعديل رصيد ${t.name}`}
+            aria-label={t(`تعديل رصيد ${tm.name}`, `Ta3deel rased ${tm.name}`)}
             disabled={busy || !connected}
-            onClick={() => setManual({ teamId: t.id, value: String(t.score) })}
+            onClick={() => setManual({ teamId: tm.id, value: String(tm.score) })}
             className="block text-start underline decoration-gold decoration-dashed underline-offset-8"
-            title="اضغط لتعديل الرصيد"
           >
-            <RollingNumber
-              value={t.score}
-              className="block text-[34px] font-bold leading-none text-ivory md:text-[42px]"
-            />
+            <RollingNumber value={tm.score} className="block text-[32px] font-bold leading-none md:text-[40px] short:text-[24px]" />
           </button>
         ) : (
-          <RollingNumber
-            value={t.score}
-            className="block text-[34px] font-bold leading-none text-ivory md:text-[42px]"
-          />
+          <RollingNumber value={tm.score} className="block text-[32px] font-bold leading-none md:text-[40px] short:text-[24px]" />
         )}
       </div>
       {host && edit && (
         <div className="ms-auto flex gap-1">
           <button
             disabled={busy || !connected}
-            aria-label={`خصم ١٠٠ من ${t.name}`}
-            onClick={() => dispatch({ type: 'adjust', teamId: t.id, delta: -100 })}
-            className="grid h-11 w-11 place-items-center rounded-xl bg-white/10 hover:bg-white/20"
+            aria-label={t(`خصم ١٠٠ من ${tm.name}`, `Ekhsem 100 men ${tm.name}`)}
+            onClick={() => dispatch({ type: 'adjust', teamId: tm.id, delta: -100 })}
+            className="grid h-10 w-10 place-items-center rounded-xl bg-white/10 hover:bg-white/20"
           >
             <Minus size={18} />
           </button>
           <button
             disabled={busy || !connected}
-            aria-label={`إضافة ١٠٠ لـ${t.name}`}
-            onClick={() => dispatch({ type: 'adjust', teamId: t.id, delta: 100 })}
-            className="grid h-11 w-11 place-items-center rounded-xl bg-white/10 hover:bg-white/20"
+            aria-label={t(`إضافة ١٠٠ لـ${tm.name}`, `Daif 100 le ${tm.name}`)}
+            onClick={() => dispatch({ type: 'adjust', teamId: tm.id, delta: 100 })}
+            className="grid h-10 w-10 place-items-center rounded-xl bg-white/10 hover:bg-white/20"
           >
             <Plus size={18} />
           </button>
@@ -109,75 +126,62 @@ function ScoreBar({ s, host }: { s: Session; host: boolean }) {
     </div>
   )
   const btn =
-    'grid h-11 w-11 place-items-center rounded-xl bg-white/10 text-ivory transition hover:bg-white/20'
+    'grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-white/10 text-ivory transition hover:bg-white/20 short:h-10 short:w-10'
   return (
-    <div className="mx-auto flex max-w-[1216px] flex-wrap items-center gap-2 px-3 pt-3 md:flex-nowrap md:gap-4 md:px-8">
-      <Link to="/play" aria-label="خروج" className="hidden md:block">
-        <Logo size={40} mark />
+    <div className="mx-auto flex w-full max-w-[1400px] shrink-0 items-center gap-2 px-3 pt-3 md:gap-3 md:px-6 short:pt-2">
+      <Link to="/play" aria-label={t('خروج', 'Khoroog')} className="hidden shrink-0 lg:block">
+        <Logo size={46} mark />
       </Link>
       {team(s.teams[0], 0)}
       {team(s.teams[1], 1)}
       <div className="flex gap-1.5">
-        <button onClick={() => setInvite(true)} className={btn} aria-label="دعوة">
-          <UserPlus size={18} />
+        <button onClick={onHelp} className={btn} aria-label={t('إزاي نلعب؟', 'Ezay nel3ab?')}>
+          <CircleHelp size={20} />
+        </button>
+        <button onClick={() => setInvite(true)} className={btn} aria-label={t('دعوة', 'Da3wa')}>
+          <UserPlus size={19} />
         </button>
         {host && (
           <button
             onClick={() => setEdit((e) => !e)}
             className={`${btn} ${edit ? '!bg-gold !text-forest' : ''}`}
-            aria-label="تعديل النقاط"
+            aria-label={t('تعديل النقاط', 'Ta3deel el no2at')}
             aria-pressed={edit}
           >
-            <SlidersHorizontal size={18} />
+            <SlidersHorizontal size={19} />
           </button>
         )}
-        <button onClick={toggle} className={btn} aria-label="ملء الشاشة">
-          {full ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+        <LangToggle className="short:h-10" />
+        <button onClick={toggle} className={`${btn} max-sm:hidden`} aria-label={t('ملء الشاشة', 'Full screen')}>
+          {full ? <Minimize2 size={19} /> : <Maximize2 size={19} />}
         </button>
       </div>
-      {host && (
-        <Link
-          to="/tokens"
-          className="flex h-9 basis-full items-center justify-center gap-2 rounded-xl border border-gold/20 bg-gold/5 px-3 text-xs text-gold sm:h-11 sm:basis-auto"
-          aria-label={`رصيدك ${state.tokens} توكن، ${state.tokens} لعبة`}
-        >
-          <Coins size={15} />
-          <span className="num">{toAr(state.tokens)}</span> توكن
-        </Link>
-      )}
-      <Modal open={invite} onClose={() => setInvite(false)} title="دعوة">
+      <Modal open={invite} onClose={() => setInvite(false)} title={t('دعوة', 'Da3wa')}>
         <div className="flex flex-col items-center pt-4 text-center">
-          <h2 className="font-display text-3xl">كود اللعبة</h2>
+          <h2 className="font-display text-3xl">{t('كود اللعبة', 'Code el le3ba')}</h2>
           <div className="num my-2 text-5xl font-bold tracking-[0.2em]">{toAr(s.code)}</div>
           <div className="rounded-2xl bg-white p-4 ring-1 ring-stroke">
             <QRCodeSVG value={link} size={200} fgColor="#0d2e1d" />
           </div>
         </div>
       </Modal>
-      <Modal open={!!manual} onClose={() => setManual(null)} title="تعديل رصيد الفريق">
+      <Modal open={!!manual} onClose={() => setManual(null)} title={t('تعديل رصيد الفريق', 'Ta3deel rased el fare2')}>
         {manual && (
           <form
             onSubmit={async (event) => {
               event.preventDefault()
-              const current = s.teams.find((team) => team.id === manual.teamId)!
-              if (
-                await dispatch({
-                  type: 'adjust',
-                  teamId: manual.teamId,
-                  delta: Number(manual.value) - current.score,
-                })
-              )
+              const current = s.teams.find((x) => x.id === manual.teamId)!
+              if (await dispatch({ type: 'adjust', teamId: manual.teamId, delta: Number(manual.value) - current.score }))
                 setManual(null)
             }}
             className="pt-3"
           >
-            <h2 className="font-display text-3xl">تعديل الرصيد</h2>
+            <h2 className="font-display text-3xl">{t('تعديل الرصيد', 'Ta3deel el rased')}</h2>
             <label htmlFor="manual-score" className="mt-4 block text-sm font-semibold">
-              رصيد {s.teams.find((team) => team.id === manual.teamId)?.name}
+              {s.teams.find((x) => x.id === manual.teamId)?.name}
             </label>
             <input
               id="manual-score"
-              aria-label="الرصيد الجديد"
               type="number"
               min="0"
               max="1000000"
@@ -189,12 +193,10 @@ function ScoreBar({ s, host }: { s: Session; host: boolean }) {
             />
             <button
               type="submit"
-              disabled={
-                busy || !connected || !manual.value || !Number.isInteger(Number(manual.value))
-              }
+              disabled={busy || !connected || !manual.value || !Number.isInteger(Number(manual.value))}
               className="mt-5 h-12 w-full rounded-xl bg-forest font-bold text-ivory disabled:opacity-50"
             >
-              حفظ الرصيد
+              {t('حفظ الرصيد', '7fz el rased')}
             </button>
           </form>
         )}
@@ -203,137 +205,192 @@ function ScoreBar({ s, host }: { s: Session; host: boolean }) {
   )
 }
 
+/** Transition screen before the board: team names face off, categories, QR and how to play. */
+function Intro({ s, host, onStart }: { s: Session; host: boolean; onStart: () => void }) {
+  const { t, ar } = useLang()
+  const link = `${location.origin}/join/${s.code}`
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0, scale: 0.98 }}
+      className="mx-auto flex min-h-0 w-full max-w-[1300px] flex-1 flex-col gap-4 p-4 md:p-6 short:gap-2 short:p-2"
+    >
+      <div className="flex items-center justify-center gap-4 md:gap-8">
+        <motion.p
+          initial={{ x: ar ? 60 : -60, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          transition={{ delay: 0.1, type: 'spring' }}
+          className="min-w-0 truncate font-display text-[clamp(30px,6vw,76px)] leading-none short:text-[34px]"
+          style={{ color: TEAM_COLORS[0] }}
+        >
+          {s.teams[0].name}
+        </motion.p>
+        <motion.span
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ delay: 0.35, type: 'spring', stiffness: 400 }}
+          className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-play font-display text-2xl text-white shadow-[0_0_40px_rgba(217,52,43,.6)] md:h-20 md:w-20 md:text-3xl short:h-12 short:w-12 short:text-xl"
+        >
+          VS
+        </motion.span>
+        <motion.p
+          initial={{ x: ar ? -60 : 60, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          transition={{ delay: 0.1, type: 'spring' }}
+          className="min-w-0 truncate font-display text-[clamp(30px,6vw,76px)] leading-none short:text-[34px]"
+          style={{ color: TEAM_COLORS[1] }}
+        >
+          {s.teams[1].name}
+        </motion.p>
+      </div>
+      <div className="grid min-h-0 flex-1 gap-4 md:grid-cols-[1.25fr_1fr] short:gap-2">
+        <div className="grid min-h-0 grid-cols-6 content-center gap-2 md:gap-3">
+          {s.categoryIds.map((id, i) => (
+            <motion.div
+              key={id}
+              initial={{ y: 30, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.45 + i * 0.07 }}
+              className="min-w-0"
+            >
+              <Poster cat={catOf(id)} titleClass="text-[12px] md:text-[15px]" boxClass="min-h-[2.25rem]" className="rounded-[12px]" />
+            </motion.div>
+          ))}
+        </div>
+        <div className="flex min-h-0 flex-col justify-center gap-3 overflow-hidden short:gap-1">
+          <p className="font-display text-2xl text-gold short:text-lg">{t('إزاي نلعب؟', 'Ezay nel3ab?')}</p>
+          <HowToPlay compact />
+          <div className="flex items-center gap-3 rounded-2xl bg-black/20 p-3 ring-1 ring-white/10 short:hidden">
+            <span className="rounded-xl bg-white p-1.5">
+              <QRCodeSVG value={link} size={64} fgColor="#0d2e1d" />
+            </span>
+            <span className="text-sm text-ivory/70">
+              {t('الشلة تدخل بالكود', 'El shella tedkhol bel code')}{' '}
+              <span className="num text-xl font-bold tracking-widest text-gold">{toAr(s.code)}</span>
+            </span>
+          </div>
+        </div>
+      </div>
+      <button
+        onClick={onStart}
+        className="btn-play sheen mx-auto flex h-[72px] w-full max-w-md shrink-0 items-center justify-center gap-3 rounded-2xl text-[28px] font-bold short:h-12 short:text-xl"
+      >
+        {host ? t('يلا نبدأ!', 'Yalla nebda2!') : t('شوف اللوحة', 'Shoof el lo7a')}
+      </button>
+    </motion.div>
+  )
+}
+
 function Board({ s, host }: { s: Session; host: boolean }) {
   const { dispatch, connected, busy } = useStore()
-  return (
-    <div className="reveal mx-auto max-w-[1216px] px-3 pb-8 pt-4 md:px-8">
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="font-display text-3xl text-ivory">اختاروا التحدي… وورّونا شطارتكم</h1>
-          <p className="mt-1 text-xs text-ivory/55">
-            كل فريق يختار فئة وقيمة السؤال. المضيف يحسب النقط.
-          </p>
-        </div>
-        <span className="rounded-full border border-gold/20 bg-gold/10 px-4 py-2 text-xs text-gold">
-          اتلعب{' '}
-          <span className="num">
-            {toAr(s.questions.filter((q) => q.state === 'answered').length)}
-          </span>{' '}
-          من <span className="num">{toAr(s.questions.length)}</span>
-        </span>
-      </div>
-      <div role="region" aria-label="لوحة الأسئلة">
-        <div className="grid grid-cols-1 gap-x-5 gap-y-8 sm:grid-cols-2 lg:grid-cols-3 lg:gap-x-6 lg:gap-y-10">
-          {s.categoryIds.map((cid, index) => {
-            const cat = CATEGORIES.find((c) => c.id === cid)!
-            const titleId = `board-category-${cid}`
-            const artwork = BOARD_PHOTO[cid]
-            const padding = BOARD_IMAGE_PADDING[cid]
-            const visibleHeight = 941 - (padding?.top ?? 0) - (padding?.bottom ?? 0)
-            const questions = s.questions
-              .filter((question) => question.categoryId === cid)
-              .sort((a, b) => a.row - b.row)
-            return (
-              <section
-                key={cid}
-                data-category-id={cid}
-                aria-labelledby={titleId}
-                className="min-w-0 space-y-3"
-              >
-                <header className="overflow-hidden rounded-[22px] bg-[#0c2a1d] shadow-[0_16px_40px_rgba(0,0,0,.3)] ring-1 ring-white/10">
-                  <div className="flex aspect-[1672/941] items-center bg-[#0c2a1d]">
-                    <div
-                      className="relative w-full overflow-hidden"
-                      style={{ aspectRatio: `1672 / ${visibleHeight}` }}
-                    >
-                      <img
-                        src={artwork || PHOTO[cid]}
-                        alt={cat.name}
-                        width="1672"
-                        height="941"
-                        loading={index < 3 ? 'eager' : 'lazy'}
-                        decoding="async"
-                        draggable={false}
-                        className={`absolute inset-x-0 block w-full ${artwork ? 'object-contain' : 'object-cover'}`}
-                        style={{
-                          top: `${-((padding?.top ?? 0) / visibleHeight) * 100}%`,
-                          height: `${(941 / visibleHeight) * 100}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                  <h2
-                    id={titleId}
-                    className="flex min-h-14 items-center justify-center border-t-2 border-gold/70 px-3 py-2 text-center font-display text-[28px] leading-tight text-ivory sm:text-[30px] lg:min-h-16 lg:text-[36px]"
-                  >
-                    {cat.name}
-                  </h2>
-                </header>
-                <div className="grid grid-cols-2 gap-2.5">
-                  {questions.map((q) => {
-                    const done = q.state === 'answered'
-                    return (
-                      <motion.button
-                        key={q.id}
-                        data-question-id={q.id}
-                        disabled={done || !host || busy || !connected}
-                        onClick={() => dispatch({ type: 'openQuestion', id: q.id })}
-                        whileHover={!done && host ? { y: -3 } : undefined}
-                        whileTap={!done && host ? { scale: 0.97 } : undefined}
-                        aria-label={`${cat.name} — السؤال ${toAr(q.row + 1)} بـ ${q.points} نقطة${done ? ' — تمت الإجابة' : ''}`}
-                        className={`grid h-14 place-items-center rounded-2xl border text-[28px] font-bold transition-colors sm:h-[60px] lg:h-16 lg:text-[32px] ${
-                          done
-                            ? 'border-white/5 bg-white/5 text-ivory/30'
-                            : 'border-stroke/70 bg-gradient-to-b from-[#fffdf8] to-[#f3e9d2] text-forest shadow-[0_8px_20px_rgba(0,0,0,.25)] hover:border-gold disabled:opacity-90'
-                        }`}
-                      >
-                        {done ? (
-                          <Check size={26} strokeWidth={2.6} />
-                        ) : (
-                          <span className="num">{q.points}</span>
-                        )}
-                      </motion.button>
-                    )
-                  })}
-                </div>
-              </section>
-            )
-          })}
-        </div>
-      </div>
-      <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
-        <span />
-        {host && (
-          <button
-            disabled={busy || !connected}
-            onClick={() => dispatch({ type: 'finish' })}
-            className="h-11 rounded-full border border-white/20 px-5 text-sm font-semibold text-ivory/80 transition hover:bg-white/10"
-          >
-            إنهاء اللعبة
-          </button>
+  const { t } = useLang()
+  const tile = (q: Question, cat: Category) => {
+    const done = q.state === 'answered'
+    const won = done && q.wonBy ? s.teams.findIndex((x) => x.id === q.wonBy) : -1
+    const name = t(cat.name, cat.nameEn)
+    return (
+      <motion.button
+        key={q.id}
+        data-question-id={q.id}
+        disabled={done || !host || busy || !connected}
+        onClick={() => dispatch({ type: 'openQuestion', id: q.id })}
+        whileHover={!done && host ? { y: -2 } : undefined}
+        whileTap={!done && host ? { scale: 0.96 } : undefined}
+        aria-label={`${name} — ${q.points}${
+          done
+            ? won >= 0
+              ? t(` — كسبه ${s.teams[won].name}`, ` — kasabo ${s.teams[won].name}`)
+              : t(' — محدش كسبه', ' — ma7adsh kasabo')
+            : ''
+        }`}
+        className={`grid min-w-0 flex-1 place-items-center rounded-xl text-[clamp(16px,2.6dvh,30px)] font-bold transition-colors ${
+          done
+            ? won >= 0
+              ? 'text-forest shadow-inner'
+              : 'bg-white/5 text-ivory/30'
+            : 'border border-stroke/70 bg-gradient-to-b from-[#fffdf8] to-[#f3e9d2] text-forest shadow-[0_6px_16px_rgba(0,0,0,.25)] hover:border-gold disabled:opacity-90'
+        }`}
+        style={won >= 0 ? { background: TEAM_COLORS[won] } : undefined}
+      >
+        {done ? (
+          won >= 0 ? (
+            <Check size={22} strokeWidth={3} />
+          ) : (
+            <X size={20} />
+          )
+        ) : (
+          <span className="num">{toAr(q.points)}</span>
         )}
-      </div>
+      </motion.button>
+    )
+  }
+  return (
+    <div
+      role="region"
+      aria-label={t('لوحة الأسئلة', 'Lo7et el as2ela')}
+      className="reveal mx-auto grid min-h-0 w-full max-w-[1400px] flex-1 grid-cols-3 grid-rows-2 gap-3 p-3 md:gap-4 md:px-6 md:pb-5 portrait:grid-cols-2 portrait:grid-rows-3 short:gap-2 short:p-2"
+    >
+      {s.categoryIds.map((cid, index) => {
+        const cat = catOf(cid)
+        const artwork = BOARD_PHOTO[cid]
+        const padding = BOARD_IMAGE_PADDING[cid]
+        const visible = 941 - (padding?.top ?? 0) - (padding?.bottom ?? 0)
+        const questions = s.questions.filter((q) => q.categoryId === cid).sort((a, b) => a.row - b.row)
+        // 200 / 400 / 600 above the art, and the second 200 / 400 / 600 below it.
+        const top = questions.filter((q) => q.row % 2 === 0)
+        const bottom = questions.filter((q) => q.row % 2 === 1)
+        const row = 'flex h-[clamp(30px,7.5dvh,64px)] shrink-0 gap-1.5 short:h-[clamp(24px,8dvh,34px)]'
+        return (
+          <section
+            key={cid}
+            data-category-id={cid}
+            aria-label={t(cat.name, cat.nameEn)}
+            className="flex min-h-0 min-w-0 flex-col gap-1.5 rounded-[20px] bg-[#0c2a1d] p-1.5 shadow-[0_16px_40px_rgba(0,0,0,.3)] ring-1 ring-gold/20"
+          >
+            <div className={row}>{top.map((q) => tile(q, cat))}</div>
+            <div className="relative min-h-0 flex-1 overflow-hidden rounded-[14px]">
+              <img
+                src={artwork || PHOTO[cid]}
+                alt=""
+                loading={index < 3 ? 'eager' : 'lazy'}
+                draggable={false}
+                className="absolute inset-x-0 w-full object-cover"
+                style={
+                  artwork
+                    ? { top: `${-((padding?.top ?? 0) / visible) * 100}%`, height: `${(941 / visible) * 100}%` }
+                    : { top: 0, height: '100%' }
+                }
+              />
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#0c2a1d] via-[#0c2a1d]/80 to-transparent px-2 pb-1.5 pt-6 text-center">
+                <h2 className="truncate font-display text-[clamp(16px,3.2dvh,34px)] leading-tight text-ivory">
+                  {t(cat.name, cat.nameEn)}
+                </h2>
+              </div>
+            </div>
+            <div className={row}>{bottom.map((q) => tile(q, cat))}</div>
+          </section>
+        )
+      })}
     </div>
   )
 }
 
-function TimerRing({ compact }: { compact?: boolean }) {
+function TimerRing() {
   const { ms, t } = useTimerMs()
+  const { t: tr } = useLang()
   if (!t) return null
   const secs = Math.ceil(ms / 1000)
   const frac = ms / t.durationMs
   const r = 70
   const c = 2 * Math.PI * r
-  const low = t.status === 'running' && secs <= 5
+  const low = t.status === 'running' && secs <= 10
   return (
     <div
-      className={`relative grid shrink-0 place-items-center ${
-        compact
-          ? 'h-[112px] w-[112px] sm:h-[150px] sm:w-[150px] lg:h-[200px] lg:w-[200px]'
-          : 'h-[190px] w-[190px]'
-      } ${low ? 'animate-pulse' : ''}`}
+      className={`relative grid aspect-square shrink-0 place-items-center ${low ? 'animate-pulse' : ''}`}
+      style={{ width: 'min(100%, 30dvh, 220px)' }}
       role="timer"
-      aria-label={`${secs} ثانية`}
+      aria-label={tr(`${secs} ثانية`, `${secs} sanya`)}
     >
       <svg viewBox="0 0 170 170" className="absolute inset-0 -rotate-90">
         <circle cx="85" cy="85" r={r} fill="none" stroke="rgba(255,255,255,.1)" strokeWidth="10" />
@@ -350,21 +407,15 @@ function TimerRing({ compact }: { compact?: boolean }) {
         />
       </svg>
       <div className="text-center">
-        <div
-          className={`num font-bold leading-none ${
-            compact ? 'text-[40px] sm:text-[50px] lg:text-[68px]' : 'text-[60px]'
-          }`}
-        >
-          {toAr(secs)}
-        </div>
+        <div className="num text-[clamp(30px,8dvh,68px)] font-bold leading-none">{toAr(secs)}</div>
         <div className="mt-1 text-xs text-ivory/50">
           {t.status === 'idle'
-            ? 'جاهز'
+            ? tr('جاهز', 'Gahez')
             : t.status === 'running'
-              ? 'شغّال'
+              ? tr('شغّال', 'Shaghal')
               : t.status === 'paused'
-                ? 'واقف'
-                : 'خلص الوقت'}
+                ? tr('واقف', 'Wa2ef')
+                : tr('خلص الوقت', 'El wa2t 5eles')}
         </div>
       </div>
     </div>
@@ -373,31 +424,20 @@ function TimerRing({ compact }: { compact?: boolean }) {
 
 function QuestionFeedback({ sessionId, qid }: { sessionId: string; qid: string }) {
   const { state, dispatch } = useStore()
+  const { t } = useLang()
   const key = `${sessionId}:${qid}`
   const done = state.feedback[key]
-  const vote = (v: 'like' | 'dislike') => {
-    if (done) return
-    dispatch({
-      type: 'feedback',
-      key,
-      vote: v,
-    })
-  }
   const btn = (v: 'like' | 'dislike', Icon: typeof ThumbsUp, label: string, on: string) => (
     <motion.button
       whileHover={done ? undefined : { y: -2, scale: 1.06 }}
       whileTap={done ? undefined : { scale: 0.9 }}
-      animate={
-        done?.vote === v
-          ? { scale: [1, 1.3, 1], rotate: [0, v === 'like' ? -14 : 14, 0] }
-          : undefined
-      }
+      animate={done?.vote === v ? { scale: [1, 1.3, 1], rotate: [0, v === 'like' ? -14 : 14, 0] } : undefined}
       transition={{ duration: 0.5 }}
-      onClick={() => vote(v)}
+      onClick={() => !done && dispatch({ type: 'feedback', key, vote: v })}
       disabled={!!done}
       aria-label={label}
       aria-pressed={done?.vote === v}
-      className={`grid h-11 w-11 place-items-center rounded-full border transition-colors ${
+      className={`grid h-12 w-12 place-items-center rounded-full border transition-colors short:h-10 short:w-10 ${
         done?.vote === v
           ? `${on} border-transparent text-white`
           : done
@@ -409,315 +449,274 @@ function QuestionFeedback({ sessionId, qid }: { sessionId: string; qid: string }
     </motion.button>
   )
   return (
-    <div className="relative">
-      <div className="flex items-center gap-2.5 rounded-full border border-white/15 bg-[#00241a]/75 p-1.5 ps-4 shadow-[0_10px_30px_rgba(0,0,0,.4)] backdrop-blur-md">
-        {done ? (
-          <motion.span
-            initial={{ opacity: 0, x: 8 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="flex flex-1 items-center gap-1.5 text-[14px] font-bold text-gold"
+    <div className="flex items-center gap-1.5" role="group" aria-label={t('عجبك السؤال؟', '3agabak el so2al?')}>
+      {done && <Check size={16} className="text-gold" aria-label={t('شكرًا على رأيك', 'Shokran')} />}
+      {btn('like', ThumbsUp, t('عجبني السؤال', '3agabny el so2al'), 'bg-[#2fae6b]')}
+      {btn('dislike', ThumbsDown, t('ما عجبنيش السؤال', 'Ma3agabneesh el so2al'), 'bg-[#e0553f]')}
+    </div>
+  )
+}
+
+/** Template 3 — question → hint image 1…n → answer. Each hint costs points. */
+function HintSteps({ q, host }: { q: Extract<Question, { type: 'IMAGE_BLUR' | 'IMAGE_ZOOM' }>; host: boolean }) {
+  const { dispatch, busy, connected } = useStore()
+  const { t } = useLang()
+  const last = q.pointStages.length - 1
+  return (
+    <div className="glass flex shrink-0 flex-wrap items-center justify-between gap-2 rounded-2xl px-3 py-2">
+      <div className="flex items-center gap-1.5" aria-label={t(`تلميح ${q.stageIndex + 1}`, `Talmee7 ${q.stageIndex + 1}`)}>
+        {q.pointStages.map((points, i) => (
+          <span
+            key={i}
+            className={`num rounded-lg px-2.5 py-1 text-sm font-bold ${
+              i === q.stageIndex ? 'bg-gold text-forest' : i < q.stageIndex ? 'text-ivory/35 line-through' : 'bg-white/10 text-ivory/70'
+            }`}
           >
-            <Check size={16} /> شكرًا على رأيك!
-          </motion.span>
-        ) : (
-          <span className="flex flex-1 items-center gap-2 text-[14px] font-semibold text-ivory/90">
-            عجبك السؤال؟
+            {toAr(points)}
           </span>
-        )}
-        {btn('like', ThumbsUp, 'عجبني السؤال', 'bg-[#2fae6b]')}
-        {btn('dislike', ThumbsDown, 'ما عجبنيش السؤال', 'bg-[#e0553f]')}
+        ))}
       </div>
+      {host && (
+        <button
+          onClick={() => dispatch({ type: 'advanceStage' })}
+          disabled={busy || !connected || q.stageIndex >= last}
+          className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-gold/20 px-3 text-sm font-bold text-gold transition hover:bg-gold/30 disabled:opacity-45"
+        >
+          <Lightbulb size={17} />
+          {q.stageIndex >= last
+            ? t('آخر تلميح', 'Akher talmee7')
+            : t(`تلميح جديد (−${toAr(q.pointStages[q.stageIndex] - q.pointStages[q.stageIndex + 1])})`, `Talmee7 gdeed (−${q.pointStages[q.stageIndex] - q.pointStages[q.stageIndex + 1]})`)}
+        </button>
+      )}
+    </div>
+  )
+}
+
+function Media({ s, q, host, revealed }: { s: Session; q: Question; host: boolean; revealed: boolean }) {
+  const { t } = useLang()
+  if (q.type === 'IMAGE_PERSON' || q.type === 'IMAGE_COLOR' || q.type === 'IMAGE_RIDDLE' || q.type === 'IMAGE_MEMORY')
+    return <PartyQuestion question={q} host={host} revealed={revealed} />
+  if (q.type === 'AUDIO_GUESS' || q.type === 'AUDIO_REVERSE' || q.type === 'AUDIO_VOICE')
+    return <QuestionAudio question={q} sessionId={s.id} host={host} revealed={revealed} />
+  if (q.type === 'IMAGE_BLUR' || q.type === 'IMAGE_ZOOM') {
+    const src = revealed ? q.answer?.imageUrl || q.imageUrl : q.imageUrl
+    return (
+      <div className="flex h-full min-h-0 flex-col gap-2">
+        <div className="relative min-h-0 flex-1 overflow-hidden rounded-[22px] border border-white/15 bg-deep">
+          <ZoomableImage
+            key={src}
+            src={src}
+            alt={revealed ? t('صورة الإجابة', 'Soret el egaba') : t('صورة السؤال', 'Soret el so2al')}
+            className="h-full w-full"
+            imgClassName="h-full w-full object-contain"
+          />
+        </div>
+        {!revealed && <HintSteps q={q} host={host} />}
+      </div>
+    )
+  }
+  const photo = q.categoryId === 'football' ? FOOTBALL_Q[q.row] : undefined
+  if (!photo) return null
+  return (
+    <div className="relative h-full min-h-0 overflow-hidden rounded-[22px] border border-white/15 bg-deep">
+      <ZoomableImage
+        src={photo.src}
+        alt={t('صورة السؤال', 'Soret el so2al')}
+        className="h-full w-full"
+        imgClassName="h-full w-full object-cover"
+        style={{ objectPosition: photo.pos }}
+      />
     </div>
   )
 }
 
 function QuestionView({ s, host }: { s: Session; host: boolean }) {
   const { dispatch, busy, connected } = useStore()
-  const { t } = useTimerMs()
+  const { t: timer } = useTimerMs()
+  const { t, ar } = useLang()
   const q = s.questions.find((x) => x.id === s.activeQuestionId)!
-  const cat = CATEGORIES.find((c) => c.id === q.categoryId)!
+  const cat = catOf(q.categoryId)
   const revealed = s.phase === 'answer'
-  const imageQuestion = q.type === 'IMAGE_BLUR' || q.type === 'IMAGE_ZOOM'
-  const audioQuestion =
-    q.type === 'AUDIO_GUESS' || q.type === 'AUDIO_REVERSE' || q.type === 'AUDIO_VOICE'
-  const partyImage =
-    q.type === 'IMAGE_PERSON' ||
-    q.type === 'IMAGE_COLOR' ||
-    q.type === 'IMAGE_RIDDLE' ||
-    q.type === 'IMAGE_MEMORY'
-  const memoryWaiting = q.type === 'IMAGE_MEMORY' && q.memoryPhase !== 'recall'
-  const photo = q.categoryId === 'football' ? FOOTBALL_Q[q.row] : QUESTION_PLACEHOLDER
-  const [helpOpen, setHelpOpen] = useState(false)
+  const staged = q.type === 'IMAGE_BLUR' || q.type === 'IMAGE_ZOOM'
+  // Template 4: nothing to answer until the picture has been memorised and hidden once.
+  const memoryWaiting = q.type === 'IMAGE_MEMORY' && !q.memoryAsked
+  const hasMedia = q.type !== 'STANDARD' || q.categoryId === 'football'
   const disabled = busy || !connected
+  const [helpOpen, setHelpOpen] = useState(false)
+  const [points, setPoints] = useState<number | null>(null)
+  const started = useRef(false)
+  // Timers start on their own; "Rakez M3aya" starts once the question is asked.
+  useEffect(() => {
+    if (!host || revealed || started.current || timer?.status !== 'idle') return
+    if (memoryWaiting) return
+    const id = setTimeout(() => {
+      started.current = true
+      void dispatch({ type: 'timer', op: 'start' })
+    }, 350)
+    return () => clearTimeout(id)
+  }, [host, revealed, timer?.status, memoryWaiting, dispatch])
+  const award = points ?? q.availablePoints
+  const prompt = ar ? q.prompt : q.promptEn || q.prompt
+  const answer = q.answer && (ar ? q.answer.text : q.answer.textEn || q.answer.text)
   const ctl =
-    'inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl px-4 py-2 text-[15px] font-bold transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-14 sm:text-[17px]'
+    'inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl px-4 py-2 text-[17px] font-bold transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-45 short:min-h-11 short:text-[15px]'
   return (
     <>
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.26 }}
-        className={`mx-auto grid w-full max-w-[1240px] gap-4 px-4 pb-5 pt-4 sm:min-h-[calc(100dvh-118px)] sm:items-center sm:gap-7 sm:px-6 lg:gap-10 ${
-          q.type === 'STANDARD'
-            ? 'sm:grid-cols-[minmax(0,40%)_1fr] lg:grid-cols-[minmax(0,34%)_1fr]'
-            : 'sm:grid-cols-[minmax(0,48%)_1fr]'
-        }`}
+        className="mx-auto flex min-h-0 w-full max-w-[1400px] flex-1 flex-col gap-3 px-3 pb-3 pt-3 md:px-6 md:pb-5 short:gap-2 short:pb-2 short:pt-2"
       >
-        <div className="relative min-w-0">
-          {partyImage ? (
-            <PartyQuestion question={q} host={host} revealed={revealed} />
-          ) : audioQuestion ? (
-            <div className="h-[260px] sm:h-[min(66dvh,640px)]">
-              <QuestionAudio question={q} sessionId={s.id} host={host} revealed={revealed} />
-            </div>
-          ) : (
-            <div
-              className={`relative overflow-hidden rounded-[24px] border border-white/15 bg-deep shadow-[0_24px_60px_rgba(0,0,0,.45)] ${
-                imageQuestion
-                  ? 'h-[clamp(180px,29dvh,270px)] sm:h-[min(68dvh,680px)]'
-                  : 'h-[clamp(150px,26dvh,260px)] sm:h-[min(68dvh,680px)]'
-              }`}
-            >
-              <img
-                key={imageQuestion ? q.imageUrl + revealed : q.id}
-                src={
-                  imageQuestion
-                    ? revealed
-                      ? q.answer?.imageUrl || q.imageUrl
-                      : q.imageUrl
-                    : photo.src
-                }
-                alt={revealed ? q.answer?.text || '' : 'صورة السؤال'}
-                className={`absolute inset-0 h-full w-full ${
-                  imageQuestion ? 'object-contain' : 'object-cover'
-                }`}
-                style={imageQuestion ? undefined : { objectPosition: photo.pos }}
-              />
-              {!imageQuestion && (
-                <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-[#00241a]/70 to-transparent" />
-              )}
-              {q.type === 'STANDARD' && (
-                <div className="absolute inset-x-3 bottom-3 sm:inset-x-4 sm:bottom-4">
-                  <QuestionFeedback sessionId={s.id} qid={q.id} />
-                </div>
-              )}
-            </div>
-          )}
-          {imageQuestion && !revealed && (
-            <div className="glass mt-3 flex items-center justify-between gap-3 rounded-2xl px-4 py-3">
-              <div
-                className="flex items-center gap-2"
-                aria-label={`المرحلة ${q.stageIndex + 1} من ٣`}
-              >
-                {q.pointStages.map((points, i) => (
-                  <span
-                    key={i}
-                    className={`num rounded-lg px-2.5 py-1 text-sm font-bold ${
-                      i === q.stageIndex
-                        ? 'bg-gold text-forest'
-                        : i < q.stageIndex
-                          ? 'text-ivory/35 line-through'
-                          : 'bg-white/10 text-ivory/70'
-                    }`}
-                  >
-                    {points}
-                  </span>
-                ))}
-              </div>
-              {host && (
-                <button
-                  onClick={() => dispatch({ type: 'advanceStage' })}
-                  disabled={disabled || q.stageIndex >= 2}
-                  className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-gold/20 px-3 text-sm font-bold text-gold transition hover:bg-gold/30 disabled:opacity-45"
-                >
-                  <Eye size={17} />
-                  {q.stageIndex >= 2
-                    ? 'آخر توضيح'
-                    : q.type === 'IMAGE_BLUR'
-                      ? 'وضح الصورة'
-                      : 'وسع الصورة'}
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-        <div className="flex min-w-0 flex-col gap-4 sm:gap-6">
-          <div className="flex flex-wrap items-center gap-2">
-            <span
-              className="rounded-full px-3 py-1.5 text-xs font-semibold text-forest"
-              style={{ background: cat.accent }}
-            >
-              {cat.name}
-            </span>
-            <span className="rounded-full border border-gold/40 bg-gold/10 px-3 py-1.5 text-xs font-semibold text-gold">
-              {MODE_LABELS[q.type]}
-            </span>
+        {/* One title only: category + value, then feedback and help */}
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="truncate rounded-full bg-gold px-4 py-2 font-display text-[20px] leading-none text-forest short:py-1.5 short:text-[16px]">
+            {t(cat.name, cat.nameEn)}
+          </span>
+          <span className="flex items-baseline gap-1.5" aria-live="polite">
+            <span className="num text-[30px] font-bold leading-none text-gold short:text-[24px]">{toAr(q.availablePoints)}</span>
+            <span className="text-sm font-semibold text-ivory/55">{t('نقطة', 'no2ta')}</span>
+          </span>
+          <div className="ms-auto flex items-center gap-2">
+            <QuestionFeedback sessionId={s.id} qid={q.id} />
             <button
               onClick={() => setHelpOpen(true)}
-              aria-label="مساعدة"
-              className="ms-auto grid h-11 w-11 place-items-center rounded-full border border-white/20 bg-white/5 text-ivory transition hover:bg-white/15"
+              aria-label={t('مساعدة', 'Mosa3da')}
+              className="grid h-12 w-12 place-items-center rounded-full border border-white/20 bg-white/5 text-ivory transition hover:bg-white/15 short:h-10 short:w-10"
             >
-              <CircleHelp size={19} />
+              <CircleHelp size={20} />
             </button>
           </div>
-          <h1 className="font-display text-[clamp(28px,3.8vw,56px)] leading-[1.25] text-ivory text-balance">
-            {q.prompt}
-          </h1>
-          {partyImage && (
-            <p className="-mt-2 text-sm leading-7 text-ivory/60">
-              {q.type === 'IMAGE_MEMORY'
-                ? 'شوفوا الصورة مع بعض، وبعد ما تختفي اتفقوا على الإجابة.'
-                : cat.instruction}
-            </p>
-          )}
-          <div className="flex items-baseline gap-2" aria-live="polite">
-            <span className="num text-4xl font-bold text-gold sm:text-5xl">
-              {q.availablePoints}
-            </span>
-            <span className="text-sm font-semibold text-ivory/55">
-              نقطة{imageQuestion && !revealed ? ' متاحة' : ''}
-            </span>
-          </div>
-          <AnimatePresence>
-            {revealed && q.answer && (
-              <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="rounded-[20px] bg-gradient-to-br from-gold to-[#c98a14] px-5 py-4 text-forest shadow-[0_16px_40px_rgba(231,167,43,.3)]"
-              >
-                <div className="text-xs font-semibold text-forest/60">الإجابة</div>
-                <div className="mt-1 font-display text-[clamp(28px,3.5vw,44px)] leading-tight">
-                  {q.answer.text}
-                </div>
-                {q.type === 'IMAGE_COLOR' && (
-                  <span
-                    className="mt-3 inline-block h-9 w-16 rounded-xl border-2 border-forest/25 shadow-sm"
-                    style={{ background: q.colorHex }}
-                    aria-label="اللون الأصلي"
-                  />
-                )}
-                {q.answer.forwardAudioUrl && host && (
-                  <audio
-                    controls
-                    controlsList="nodownload"
-                    src={q.answer.forwardAudioUrl}
-                    className="mt-3 h-10 w-full"
-                    aria-label="الكلام الأصلي بعد كشف الإجابة"
-                  />
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
-          {!revealed && (
-            <div className="flex items-center gap-3 max-[360px]:flex-col sm:gap-5">
-              <TimerRing compact />
-              {host && (
-                <div className="grid min-w-0 flex-1 gap-2 max-[360px]:w-full">
-                  <button
-                    disabled={disabled || memoryWaiting}
-                    onClick={() =>
-                      dispatch({
-                        type: 'timer',
-                        op: t?.status === 'running' ? 'pause' : 'start',
-                      })
-                    }
-                    className={`${ctl} ${t?.status === 'running' ? 'bg-white/10 text-ivory' : 'bg-gold text-forest'}`}
-                  >
-                    {t?.status === 'running' ? (
-                      <Pause size={18} />
-                    ) : (
-                      <Play size={18} fill="currentColor" />
-                    )}
-                    {t?.status === 'running' ? 'وقّف الوقت' : 'ابدأ الوقت'}
-                  </button>
-                  <div className="grid grid-cols-[1fr_auto] gap-2">
-                    <button
-                      disabled={disabled || memoryWaiting}
-                      onClick={() => dispatch({ type: 'reveal' })}
-                      className={`${ctl} btn-play whitespace-nowrap`}
-                    >
-                      <Eye size={18} /> إظهار الإجابة
-                    </button>
-                    <button
-                      disabled={disabled || memoryWaiting}
-                      onClick={() => dispatch({ type: 'timer', op: 'reset' })}
-                      aria-label="إعادة الوقت"
-                      className={`${ctl} w-12 border border-white/15 !px-0 text-ivory/85 hover:bg-white/5 sm:w-14`}
-                    >
-                      <RotateCcw size={18} />
-                    </button>
-                  </div>
-                </div>
+        </div>
+        {/* Question first, then the media, then the timer — nothing overlaps, nothing scrolls. */}
+        <div
+          className={`grid min-h-0 flex-1 gap-3 md:gap-5 short:gap-2 ${
+            hasMedia
+              ? 'grid-cols-[minmax(0,1fr)_minmax(0,1.45fr)_minmax(0,0.85fr)] portrait:grid-cols-1 portrait:grid-rows-[minmax(0,0.8fr)_minmax(0,1.5fr)_auto]'
+              : 'grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)] portrait:grid-cols-1 portrait:grid-rows-[minmax(0,1fr)_auto]'
+          }`}
+        >
+          <div className="flex min-h-0 flex-col gap-3 short:gap-2">
+            <div className="glass min-h-0 flex-1 rounded-[22px] p-4 md:p-6 short:p-3">
+              <FitText max={hasMedia ? 64 : 88} min={14} className="font-display leading-[1.3] text-ivory">
+                {prompt}
+              </FitText>
+            </div>
+            <AnimatePresence>
+              {revealed && answer && (
+                <motion.div
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="max-h-[45%] shrink-0 overflow-hidden rounded-[20px] bg-gradient-to-br from-gold to-[#c98a14] px-5 py-3 text-forest shadow-[0_16px_40px_rgba(231,167,43,.3)]"
+                >
+                  <div className="text-xs font-semibold text-forest/60">{t('الإجابة', 'El egaba')}</div>
+                  <div className="mt-1 font-display text-[clamp(22px,4dvh,42px)] leading-tight">{answer}</div>
+                  {q.type === 'IMAGE_COLOR' && (
+                    <span
+                      className="mt-2 inline-block h-8 w-16 rounded-xl border-2 border-forest/25 shadow-sm"
+                      style={{ background: q.colorHex }}
+                      aria-label={t('اللون الأصلي', 'El loon el asly')}
+                    />
+                  )}
+                  {q.answer?.forwardAudioUrl && host && (
+                    <audio controls controlsList="nodownload" src={q.answer.forwardAudioUrl} className="mt-2 h-10 w-full" />
+                  )}
+                </motion.div>
               )}
+            </AnimatePresence>
+          </div>
+          {hasMedia && (
+            <div className="min-h-0">
+              <Media s={s} q={q} host={host} revealed={revealed} />
             </div>
           )}
-          {host && revealed && (
-            <div className="grid gap-2.5">
-              <p className="font-display text-2xl">مين جاوب صح؟</p>
-              <div className="grid grid-cols-2 gap-2">
+          <div className="flex min-h-0 flex-col items-center justify-center gap-3 short:gap-2 portrait:flex-row">
+            {!revealed && <TimerRing />}
+            {host && !revealed && (
+              <div className="grid w-full max-w-[260px] gap-2">
+                <div className="grid grid-cols-[1fr_auto] gap-2">
+                  <button
+                    disabled={disabled || memoryWaiting}
+                    onClick={() => dispatch({ type: 'timer', op: timer?.status === 'running' ? 'pause' : 'start' })}
+                    className={`${ctl} ${timer?.status === 'running' ? 'bg-white/10 text-ivory' : 'bg-gold text-forest'}`}
+                  >
+                    {timer?.status === 'running' ? <Pause size={18} /> : <Play size={18} fill="currentColor" />}
+                    {timer?.status === 'running' ? t('وقّف', 'Wa22af') : t('كمّل', 'Kammel')}
+                  </button>
+                  <button
+                    disabled={disabled || memoryWaiting}
+                    onClick={() => dispatch({ type: 'timer', op: 'reset' })}
+                    aria-label={t('إعادة الوقت', 'E3adet el wa2t')}
+                    className={`${ctl} w-14 border border-white/15 !px-0 text-ivory/85 hover:bg-white/5`}
+                  >
+                    <RotateCcw size={18} />
+                  </button>
+                </div>
+                <button
+                  disabled={disabled || memoryWaiting}
+                  onClick={() => dispatch({ type: 'reveal' })}
+                  className={`${ctl} btn-play whitespace-nowrap`}
+                >
+                  <Eye size={18} /> {t('إظهار الإجابة', 'Ezhar el egaba')}
+                </button>
+              </div>
+            )}
+            {host && revealed && (
+              <div className="grid w-full max-w-[300px] gap-2">
+                <p className="font-display text-2xl short:text-xl">{t('مين جاوب صح؟', 'Meen gaweb sa7?')}</p>
+                {/* Template 3: the host can pick the points (e.g. the other team got it on the first hint). */}
+                {staged && (
+                  <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={t('النقط', 'El no2at')}>
+                    {[...new Set([q.points, ...q.pointStages])].map((p) => (
+                      <button
+                        key={p}
+                        role="radio"
+                        aria-checked={award === p}
+                        onClick={() => setPoints(p)}
+                        className={`num h-10 flex-1 rounded-xl text-[15px] font-bold transition ${award === p ? 'bg-gold text-forest' : 'bg-white/10 text-ivory hover:bg-white/20'}`}
+                      >
+                        {toAr(p)}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {s.teams.map((team, i) => (
                   <button
                     key={team.id}
                     disabled={disabled}
-                    onClick={() =>
-                      dispatch({
-                        type: 'award',
-                        questionId: q.id,
-                        teamId: team.id,
-                      })
-                    }
+                    onClick={() => dispatch({ type: 'award', questionId: q.id, teamId: team.id, points: award })}
                     className={ctl}
                     style={{ background: TEAM_COLORS[i], color: '#0d2e1d' }}
                   >
                     <span className="truncate">{team.name}</span>
-                    <span className="num text-sm">+{q.availablePoints}</span>
+                    <span className="num text-sm">+{toAr(award)}</span>
                   </button>
                 ))}
-              </div>
-              <button
-                disabled={disabled}
-                onClick={() => dispatch({ type: 'award', questionId: q.id, teamId: null })}
-                className={`${ctl} border border-white/20 text-ivory hover:bg-white/5`}
-              >
-                <X size={17} /> ولا حد
-              </button>
-            </div>
-          )}
-          {host && !revealed && (
-            <div className="flex items-center justify-between">
-              <button
-                disabled={disabled || q.audioIsPlaying}
-                onClick={() => dispatch({ type: 'backToBoard' })}
-                className="min-h-11 text-xs text-ivory/55 hover:underline disabled:opacity-40"
-              >
-                رجوع للوحة
-              </button>
-              {q.type !== 'STANDARD' && (
                 <button
-                  disabled={disabled || memoryWaiting}
-                  onClick={() => dispatch({ type: 'reveal' })}
-                  className="min-h-11 text-xs text-ivory/55 hover:underline"
+                  disabled={disabled}
+                  onClick={() => dispatch({ type: 'award', questionId: q.id, teamId: null })}
+                  className={`${ctl} border border-white/20 text-ivory hover:bg-white/5`}
                 >
-                  استسلام
+                  <X size={17} /> {t('ولا حد', 'Wala 7ad')}
                 </button>
-              )}
-            </div>
-          )}
-          {!host && <p className="text-xs text-ivory/55">المضيف بيتحكم في الوقت والإجابة.</p>}
+              </div>
+            )}
+            {!host && (
+              <p className="text-center text-xs text-ivory/55">
+                {t('المضيف بيتحكم في الوقت والإجابة.', 'El host beyet7akem fel wa2t wel egaba.')}
+              </p>
+            )}
+          </div>
         </div>
       </motion.div>
-      <Modal open={helpOpen} onClose={() => setHelpOpen(false)} title="مساعدة">
+      <Modal open={helpOpen} onClose={() => setHelpOpen(false)} title={t('مساعدة', 'Mosa3da')}>
         <div className="pt-3">
-          <h2 className="font-display text-3xl">{MODE_LABELS[q.type]}</h2>
+          <h2 className="font-display text-3xl">{ar ? MODE_LABELS[q.type] : GAME_MODE_LABELS_EN[q.type]}</h2>
           <p className="mt-3 text-sm leading-7 text-forest/75">
-            {partyImage || q.type === 'AUDIO_VOICE'
-              ? cat.help
-              : 'ابدأوا الوقت، وخمنوا مع بعض. المضيف بيكشف الإجابة ويحسب النقط.'}
-            {imageQuestion
-              ? ' كل توضيح بيقلل النقط.'
-              : audioQuestion
-                ? ` الصوت متاح ${toAr(q.maxPlays)} مرات للشلة كلها.`
-                : ''}
+            {q.type !== 'STANDARD' && cat.fresh
+              ? t(cat.help, cat.helpEn)
+              : t('الوقت بيبدأ لوحده. خمنوا مع بعض، والمضيف بيكشف الإجابة ويحسب النقط.', 'El wa2t beyebda2 lewa7do. Khamenoo ma3 ba3d, wel host beye2shef el egaba w ye7seb el no2at.')}
+            {staged ? t(' كل تلميح بيقلل النقط.', ' Kol talmee7 beye2allel el no2at.') : ''}
           </p>
         </div>
       </Modal>
@@ -739,10 +738,7 @@ function Confetti() {
             opacity: [1, 1, 0],
             rotate: 360 * ((i % 3) + 1),
           }}
-          transition={{
-            duration: 2.2 + (i % 5) * 0.2,
-            ease: [0.2, 0.8, 0.3, 1],
-          }}
+          transition={{ duration: 2.2 + (i % 5) * 0.2, ease: [0.2, 0.8, 0.3, 1] }}
           className="absolute h-3 w-2 rounded-[2px]"
           style={{ background: colors[i % 5] }}
         />
@@ -751,81 +747,130 @@ function Confetti() {
   )
 }
 
+/** Categories each team "owns": the team that scored the most points in that category. */
+function useCategoryWins(s: Session) {
+  return useMemo(() => {
+    const wins: [string[], string[]] = [[], []]
+    for (const id of s.categoryIds) {
+      const totals = s.teams.map((team) =>
+        s.questions
+          .filter((q) => q.categoryId === id && q.wonBy === team.id)
+          .reduce((sum, q) => sum + (q.wonPoints ?? 0), 0),
+      )
+      if (totals[0] > totals[1]) wins[0].push(id)
+      else if (totals[1] > totals[0]) wins[1].push(id)
+    }
+    return wins
+  }, [s])
+}
+
 function Winner({ s, host }: { s: Session; host: boolean }) {
   const { state, dispatch, busy } = useStore()
+  const { t } = useLang()
   const nav = useNavigate()
   const [a, b] = s.teams
   const tie = a.score === b.score
   const win = a.score > b.score ? a : b
+  const members = state.teamMembers[s.id] ?? [[], []]
+  const wins = useCategoryWins(s)
   return (
-    <div className="reveal relative mx-auto flex min-h-[80dvh] max-w-3xl flex-col items-center justify-center px-4 text-center">
+    <div className="reveal relative mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col items-center justify-center gap-4 px-4 py-4 text-center short:gap-2 short:py-2">
       {!tie && <Confetti />}
-      <img src={LOGO.bubble} alt="" aria-hidden className="mb-4 h-24 w-auto" />
-      <div className="relative">
-        <div className="absolute inset-0 -z-10 scale-150 rounded-full bg-gold/25 blur-3xl" />
-        <Trophy size={72} strokeWidth={1.3} className="text-gold" />
+      <div className="flex items-center gap-4">
+        <img src={LOGO.bubble} alt="" aria-hidden className="h-16 w-auto short:hidden" />
+        <Trophy size={56} strokeWidth={1.3} className="text-gold short:h-10 short:w-10" />
       </div>
-      <h1 className="mt-4 font-display text-[clamp(48px,9vw,96px)] leading-none">
-        {tie ? 'تعادل!' : `مبروك يا ${win.name}!`}
+      <h1 className="font-display text-[clamp(40px,8dvh,88px)] leading-none">
+        {tie ? t('تعادل!', 'Ta3adol!') : t(`مبروك يا ${win.name}!`, `Mabrook ya ${win.name}!`)}
       </h1>
-      <div className="mt-10 grid w-full grid-cols-2 gap-4">
-        {s.teams.map((t, i) => (
-          <div
-            key={t.id}
-            className={`rounded-[22px] p-6 ${
-              !tie && win.id === t.id
-                ? 'bg-gradient-to-b from-gold to-[#c98a14] text-forest'
-                : 'glass'
-            }`}
-          >
-            <div className="text-sm opacity-70">{t.name}</div>
-            <RollingNumber value={t.score} className="text-[64px] font-bold leading-none" />
-            <span className="sr-only">{i}</span>
-          </div>
-        ))}
+      <div className="grid w-full grid-cols-2 gap-3 md:gap-4">
+        {s.teams.map((tm, i) => {
+          const winner = !tie && win.id === tm.id
+          return (
+            <div
+              key={tm.id}
+              className={`flex min-w-0 flex-col items-center rounded-[22px] p-4 md:p-5 short:p-2 ${winner ? 'bg-gradient-to-b from-gold to-[#c98a14] text-forest' : 'glass'}`}
+            >
+              <div className="truncate font-display text-2xl short:text-xl">{tm.name}</div>
+              <RollingNumber value={tm.score} className="text-[clamp(40px,9dvh,72px)] font-bold leading-none" />
+              {members[i].length > 0 && (
+                <p className={`mt-2 line-clamp-2 text-sm ${winner ? 'text-forest/75' : 'text-ivory/70'}`}>
+                  {members[i].join(' · ')}
+                </p>
+              )}
+              {wins[i].length > 0 && (
+                <div className="mt-3 flex flex-wrap justify-center gap-1.5 short:mt-1">
+                  {wins[i].map((id) => {
+                    const c = catOf(id)
+                    return (
+                      <span
+                        key={id}
+                        className={`inline-flex h-8 items-center gap-1.5 rounded-full ps-1 pe-3 text-xs font-bold ${winner ? 'bg-forest/15' : 'bg-white/10'}`}
+                      >
+                        <img src={PHOTO[id]} alt="" className="h-6 w-6 rounded-full object-cover" />
+                        {t(c.name, c.nameEn)}
+                      </span>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )
+        })}
       </div>
       {host ? (
-        <div className="mt-10 w-full">
-          <p className="mb-4 text-sm text-ivory/65">
-            كل لعبة جديدة بتكلف ١ توكن · رصيدك {toAr(state.tokens)} توكن
-          </p>
-          <div className="flex w-full flex-col gap-3 sm:flex-row sm:justify-center">
-            <button
-              disabled={busy}
-              onClick={() =>
-                state.tokens < 1
-                  ? nav('/tokens?returnTo=' + encodeURIComponent(`/game/${s.id}/results`))
-                  : dispatch({ type: 'replay', newCategories: false })
-              }
-              className="btn-play h-16 rounded-2xl px-10 text-[22px] font-bold"
-            >
-              {state.tokens >= 1 ? 'العبوا مرة تانية' : 'اشتري توكن للعبة جديدة'}
-            </button>
-            <button
-              onClick={() => {
-                dispatch({ type: 'replay', newCategories: true })
-                nav('/play')
-              }}
-              className="h-16 rounded-2xl border border-white/20 px-8 text-lg font-semibold text-ivory hover:bg-white/5"
-            >
-              فئات جديدة
-            </button>
-          </div>
+        <div className="flex w-full flex-col gap-3 sm:flex-row sm:justify-center">
+          <button
+            disabled={busy}
+            onClick={() =>
+              state.tokens < 1
+                ? nav('/tokens?returnTo=' + encodeURIComponent(`/game/${s.id}/results`))
+                : dispatch({ type: 'replay', newCategories: false })
+            }
+            className="btn-play sheen h-16 rounded-2xl px-12 text-[24px] font-bold short:h-12 short:text-lg"
+          >
+            {t('العبوا مرة تانية', 'El3abo marra tanya')}
+          </button>
+          <button
+            onClick={() => {
+              dispatch({ type: 'replay', newCategories: true })
+              nav('/play')
+            }}
+            className="h-16 rounded-2xl border border-white/20 px-8 text-lg font-semibold text-ivory hover:bg-white/5 short:h-12"
+          >
+            {t('فئات جديدة', 'Fe2at gdeeda')}
+          </button>
         </div>
       ) : (
-        <Link to="/play" className="mt-10 text-gold underline">
-          العب لعبتك
+        <Link to="/play" className="text-gold underline">
+          {t('العب لعبتك', 'El3ab le3betak')}
         </Link>
       )}
     </div>
   )
 }
 
+/** Games are played in landscape on phones. */
+function RotateHint() {
+  const { t } = useLang()
+  return (
+    <div className="fixed inset-0 z-[95] hidden flex-col items-center justify-center gap-4 bg-deep/97 p-8 text-center max-md:portrait:flex">
+      <motion.div animate={{ rotate: [0, -90, -90, 0] }} transition={{ duration: 2.4, repeat: Infinity, times: [0, 0.3, 0.7, 1] }}>
+        <Smartphone size={64} className="text-gold" strokeWidth={1.4} />
+      </motion.div>
+      <p className="font-display text-3xl">{t('لف الموبايل', 'Leff el mobile')}</p>
+      <p className="text-sm text-ivory/65">{t('اللعبة بتتلعب والشاشة بالعرض', 'El le3ba btetle3eb wel shasha bel 3ard')}</p>
+    </div>
+  )
+}
+
 export default function GamePage() {
-  const { state, isHost, connected } = useStore()
+  const { state, isHost, connected, dispatch } = useStore()
+  const { t } = useLang()
   const { sessionId } = useParams()
   const nav = useNavigate()
   const s = state.session
+  const [howTo, setHowTo] = useState(false)
   useEffect(() => {
     if (!s || s.id !== sessionId) return
     const url =
@@ -843,14 +888,12 @@ export default function GamePage() {
         <div className="rounded-2xl bg-forest p-3">
           <Logo size={64} />
         </div>
-        <h1 className="font-display text-4xl">الشلة بتتجمع</h1>
-        <p className="text-sm text-ivory/60">المضيف هيبدأ اللعبة حالًا</p>
-        <div className="glass num rounded-2xl px-8 py-4 text-4xl tracking-widest text-gold">
-          {toAr(s.code)}
-        </div>
+        <h1 className="font-display text-4xl">{t('الشلة بتتجمع', 'El shella betetgamma3')}</h1>
+        <p className="text-sm text-ivory/60">{t('المضيف هيبدأ اللعبة حالًا', 'El host hayebda2 el le3ba 7alan')}</p>
+        <div className="glass num rounded-2xl px-8 py-4 text-4xl tracking-widest text-gold">{toAr(s.code)}</div>
         {isHost && (
           <Link to="/play?step=room" className="btn-play rounded-xl px-6 py-3">
-            ابدأ اللعبة
+            {t('ابدأ اللعبة', 'Ebda2 el le3ba')}
           </Link>
         )}
       </div>
@@ -860,34 +903,38 @@ export default function GamePage() {
     return (
       <div className="grid min-h-dvh place-items-center px-4 text-center">
         <div>
-          <h1 className="font-display text-5xl">
-            {connected ? 'ثانية واحدة…' : 'اللعبة مش موجودة'}
-          </h1>
-          <Link
-            to="/play"
-            className="btn-play mt-8 inline-flex h-14 items-center rounded-2xl px-8 text-lg font-bold"
-          >
-            العب الآن
+          <h1 className="font-display text-5xl">{connected ? t('ثانية واحدة…', 'Sanya wa7da…') : t('اللعبة مش موجودة', 'El le3ba mesh mawgooda')}</h1>
+          <Link to="/play" className="btn-play mt-8 inline-flex h-14 items-center rounded-2xl px-8 text-lg font-bold">
+            {t('العب الآن', 'El3ab delwa2ty')}
           </Link>
         </div>
       </div>
     )
   }
+  const fresh = s.phase === 'board' && !state.introSeen.includes(s.id) && s.questions.every((q) => q.state !== 'answered')
   return (
-    <div className="min-h-dvh">
+    <div className="flex h-dvh flex-col overflow-hidden">
+      {s.phase !== 'finished' && <RotateHint />}
       {!connected && (
-        <div role="status" className="bg-gold/20 px-4 py-2 text-center text-xs">
-          الاتصال اتقطع — بنحاول نرجع…
+        <div role="status" className="shrink-0 bg-gold/20 px-4 py-1.5 text-center text-xs">
+          {t('الاتصال اتقطع — بنحاول نرجع…', 'El etesal et2ata3 — bne7awel nerga3…')}
         </div>
       )}
-      {s.phase !== 'finished' && <ScoreBar s={s} host={isHost} />}
+      {s.phase !== 'finished' && !fresh && <ScoreBar s={s} host={isHost} onHelp={() => setHowTo(true)} />}
       <AnimatePresence mode="wait">
-        {s.phase === 'board' && <Board key="b" s={s} host={isHost} />}
+        {fresh && <Intro key="i" s={s} host={isHost} onStart={() => dispatch({ type: 'introSeen', sessionId: s.id })} />}
+        {s.phase === 'board' && !fresh && <Board key="b" s={s} host={isHost} />}
         {(s.phase === 'question' || s.phase === 'answer') && s.activeQuestionId && (
           <QuestionView key={s.activeQuestionId} s={s} host={isHost} />
         )}
         {s.phase === 'finished' && <Winner key="w" s={s} host={isHost} />}
       </AnimatePresence>
+      <Modal open={howTo} onClose={() => setHowTo(false)} title={t('إزاي نلعب؟', 'Ezay nel3ab?')} tone="glass" wide>
+        <div className="pt-2">
+          <h2 className="mb-4 font-display text-3xl">{t('إزاي نلعب؟', 'Ezay nel3ab?')}</h2>
+          <HowToPlay />
+        </div>
+      </Modal>
     </div>
   )
 }

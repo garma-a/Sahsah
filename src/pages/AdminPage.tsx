@@ -268,6 +268,16 @@ function QuestionEditor({
             placeholder={defaults[q.type] || 'اكتب سؤال قصير…'}
           />
         </Field>
+        <Field label="نص السؤال — فرانكو (English)" hint="بيظهر لما اللاعب يختار English. لو فاضي بيظهر النص العربي.">
+          <textarea
+            dir="ltr"
+            value={q.promptEn ?? ''}
+            maxLength={300}
+            onChange={(event) => patch({ promptEn: event.target.value })}
+            className={`${inputClass} min-h-20 resize-y text-start`}
+            placeholder="Meen bataal film..."
+          />
+        </Field>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="الفئة">
             <select
@@ -323,6 +333,17 @@ function QuestionEditor({
               className={inputClass}
             />
           </Field>
+          <div className="mt-4">
+            <Field label="الإجابة — فرانكو (English)">
+              <input
+                dir="ltr"
+                value={q.answerTextEn ?? ''}
+                maxLength={300}
+                onChange={(event) => patch({ answerTextEn: event.target.value })}
+                className={`${inputClass} text-start`}
+              />
+            </Field>
+          </div>
           <div className="mt-4">
             <Field label="إجابات بديلة" hint="افصل بين الإجابات بفاصلة عربية.">
               <input
@@ -513,17 +534,7 @@ function QuestionEditor({
         )}
         {audio && (
           <>
-            <Field label="مرات التشغيل للشلة كلها">
-              <input
-                type="number"
-                min="1"
-                max="10"
-                required
-                value={q.maxPlays}
-                onChange={(event) => patch({ maxPlays: +event.target.value })}
-                className={inputClass}
-              />
-            </Field>
+            <p className="text-xs text-forest/55">الصوت بيتشغّل عدد مرات غير محدود أثناء اللعب.</p>
             {sourcePreview && (
               <div>
                 <p className="mb-2 text-xs text-forest/55">معاينة الملف المختار</p>

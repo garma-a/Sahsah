@@ -131,6 +131,32 @@ test('standard board, manual timer, reveal/award ordering and score correction',
   })
   assert.equal(s.teams[0].score, 200)
   assert.equal(s.questions[0].state, 'answered')
+  assert.equal(s.questions[0].wonBy, 'A')
+  assert.equal(s.questions[0].wonPoints, 200)
+  // Manual points: the host can award a chosen value up to the tile value.
+  const second = s.questions[1]
+  s = engine.action(s.id, hostToken, { type: 'openQuestion', id: second.id, version: s.version })
+  s = engine.action(s.id, hostToken, { type: 'reveal', version: s.version })
+  assert.throws(
+    () =>
+      engine.action(s.id, hostToken, {
+        type: 'award',
+        questionId: second.id,
+        teamId: 'B',
+        points: 900,
+        version: s.version,
+      }),
+    errorStatus(400),
+  )
+  s = engine.action(s.id, hostToken, {
+    type: 'award',
+    questionId: second.id,
+    teamId: 'B',
+    points: 150,
+    version: s.version,
+  })
+  assert.equal(s.teams[1].score, 150)
+  assert.equal(s.questions[1].wonBy, 'B')
   s = engine.action(s.id, hostToken, {
     type: 'adjust',
     teamId: 'A',
@@ -240,10 +266,9 @@ test('audio lease is atomic, cancellation is free, acknowledgment is idempotent 
     )
     s = engine.acknowledgeAudio(s.id, hostToken, q.id, 'main', `play-${i}`, 'ended')
   }
-  assert.throws(
-    () => engine.reserveAudio(s.id, hostToken, q.id, 'main', 'fourth'),
-    errorStatus(409),
-  )
+  // Replays are unlimited: a fourth play is still allowed.
+  engine.reserveAudio(s.id, hostToken, q.id, 'main', 'fourth')
+  s = engine.acknowledgeAudio(s.id, hostToken, q.id, 'main', 'fourth', 'cancel')
   assert.throws(
     () => engine.reserveAudio(s.id, hostToken, q.id, 'second', 'device'),
     errorStatus(409),
@@ -449,7 +474,9 @@ test('real HTTP: seed, guest authorization, media privacy, concurrent stages, gl
       )
       assert.equal((await audioRequest('ended', id)).res.status, 200)
     }
-    assert.equal((await audioRequest('reserve', 'fourth')).res.status, 409)
+    // Unlimited replays: a fourth play is accepted.
+    assert.equal((await audioRequest('reserve', 'fourth')).res.status, 200)
+    assert.equal((await audioRequest('cancel', 'fourth')).res.status, 200)
     assert.equal((await request('/api/admin/questions')).res.status, 401)
     const login = await request('/api/admin/auth', {
       password: 'test-password-12345',

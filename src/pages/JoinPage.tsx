@@ -6,10 +6,12 @@ import type { Session } from '../lib/game-types'
 import { Logo } from '../components/art'
 import { toAr } from '../lib/data'
 import { useStore, type TeamId } from '../lib/store'
+import { useLang } from '../lib/i18n'
 
 export default function JoinPage() {
   const { code: param } = useParams()
   const { state, adoptSession } = useStore()
+  const { t } = useLang()
   const nav = useNavigate()
   const [digits, setDigits] = useState<string[]>(() =>
     param && /^\d{4}$/.test(param) ? param.split('') : ['', '', '', ''],
@@ -58,13 +60,13 @@ export default function JoinPage() {
     try {
       const room = await api<Session>(`/api/rooms/${code}`)
       const session = await api<Session>(`/api/sessions/${room.id}/join`, {
-        name: name.trim() || 'ضيف',
+        name: name.trim() || t('ضيف', 'Deif'),
         team,
       })
       adoptSession(session)
       nav(`/game/${session.id}`)
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'جرّب تاني')
+      setError(error instanceof Error ? error.message : t('جرّب تاني', 'Garrab tany'))
     } finally {
       setBusy(false)
     }
@@ -78,7 +80,7 @@ export default function JoinPage() {
             <Logo size={72} variant="square" />
           </span>
         </Link>
-        <h1 className="mt-4 font-display text-[40px] leading-none">ادخل اللعبة</h1>
+        <h1 className="mt-4 font-display text-[40px] leading-none">{t('ادخل اللعبة', 'Odkhol el le3ba')}</h1>
 
         <div dir="ltr" className="mt-6 flex justify-center gap-3">
           {digits.map((d, i) => (
@@ -90,7 +92,7 @@ export default function JoinPage() {
               value={d}
               inputMode="numeric"
               autoComplete="one-time-code"
-              aria-label={`الرقم ${toAr(i + 1)}`}
+              aria-label={t(`الرقم ${toAr(i + 1)}`, `Raqam ${i + 1}`)}
               onChange={(e) => set(i, e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Backspace' && !d && i > 0) refs.current[i - 1]?.focus()
@@ -102,7 +104,7 @@ export default function JoinPage() {
 
         <fieldset className="mt-6 text-start">
           <label className="text-sm font-semibold" htmlFor="gname">
-            اسمك (اختياري)
+            {t('اسمك (اختياري)', 'Esmak (e5tyary)')}
           </label>
           <input
             id="gname"
@@ -111,18 +113,18 @@ export default function JoinPage() {
             maxLength={20}
             className="mt-1.5 h-12 w-full rounded-xl border-2 border-stroke bg-white px-4 outline-none focus:border-gold"
           />
-          <div className="mt-4 grid grid-cols-2 gap-2" role="radiogroup" aria-label="الفريق">
-            {(['A', 'B'] as TeamId[]).map((t, i) => (
+          <div className="mt-4 grid grid-cols-2 gap-2" role="radiogroup" aria-label={t('الفريق', 'El fare2')}>
+            {(['A', 'B'] as TeamId[]).map((id, i) => (
               <button
-                key={t}
+                key={id}
                 role="radio"
-                aria-checked={team === t}
-                onClick={() => setTeam(t)}
+                aria-checked={team === id}
+                onClick={() => setTeam(id)}
                 className={`h-12 rounded-xl border-2 text-[15px] font-semibold transition ${
-                  team === t ? 'border-gold bg-gold/20' : 'border-stroke bg-white'
+                  team === id ? 'border-gold bg-gold/20' : 'border-stroke bg-white'
                 }`}
               >
-                {s?.teams[i].name ?? (i ? 'الفريق ٢' : 'الفريق ١')}
+                {s?.teams[i].name ?? (i ? t('الفريق ٢', 'Fare2 2') : t('الفريق ١', 'Fare2 1'))}
               </button>
             ))}
           </div>
@@ -141,12 +143,12 @@ export default function JoinPage() {
           onClick={join}
           className="btn-play mt-6 h-14 w-full rounded-2xl text-lg font-bold"
         >
-          {busy ? 'ثانية واحدة…' : 'ادخل'}
+          {busy ? t('ثانية واحدة…', 'Sanya wa7da…') : t('ادخل', 'Odkhol')}
         </button>
         <p className="mt-3 text-xs text-forest/55">
           {DEMO_MODE
-            ? 'عرض ضيف تجريبي — المشاركة بين الأجهزة في النسخة النهائية.'
-            : 'هتتفرج بس — المضيف هو اللي بيتحكم في اللعبة.'}
+            ? t('عرض ضيف تجريبي — المشاركة بين الأجهزة في النسخة النهائية.', 'Ard deif tagreeby — el moshareka bein el agheza fel noskha el neha2eya.')
+            : t('هتتفرج بس — المضيف هو اللي بيتحكم في اللعبة.', 'Hatetfarrag bas — el host howa elly beyet7akem.')}
         </p>
       </div>
     </div>

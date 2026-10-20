@@ -1,4 +1,4 @@
-import { PROMOS, TOKEN_PRICE } from './data.ts'
+import { GIFT_DISCOUNT, PROMOS, TOKEN_PRICE } from './data.ts'
 
 export const MAX_TOKEN_QUANTITY = 999
 export type TokenOrder = {
@@ -19,8 +19,11 @@ export const parseTokenQuantity = (value: string | number): number | null => {
   const quantity = Number(normalized)
   return quantity >= 1 && quantity <= MAX_TOKEN_QUANTITY ? quantity : null
 }
-export const orderTotal = (order: Pick<TokenOrder, 'quantity' | 'unitPrice' | 'promo'>) =>
-  Math.round(order.quantity * order.unitPrice * (1 - (PROMOS[order.promo ?? ''] ?? 0)) * 100) / 100
+/** Before promo codes: gifted tokens are always discounted. */
+export const listTotal = (order: Pick<TokenOrder, 'quantity' | 'unitPrice' | 'gift'>) =>
+  Math.round(order.quantity * order.unitPrice * (order.gift ? 1 - GIFT_DISCOUNT : 1) * 100) / 100
+export const orderTotal = (order: Pick<TokenOrder, 'quantity' | 'unitPrice' | 'promo' | 'gift'>) =>
+  Math.round(listTotal(order) * (1 - (PROMOS[order.promo ?? ''] ?? 0)) * 100) / 100
 
 export const gameReturnPath = (value?: string | null) =>
   value && (value === '/play?step=room' || /^\/game\/[a-zA-Z0-9-]+(?:\/results)?$/.test(value))

@@ -13,11 +13,36 @@ import { migrateTokenWallet, parseTokenQuantity, type TokenOrder } from './token
 import { api, getSession, hostCredentials, saveHost, clearHost, subscribeSession } from './api'
 import type { Session, TeamId } from './game-types'
 import { DEMO_MODE, UI_STORAGE_KEY } from './runtime'
+import { currentLang } from './lang'
 export type { Session, Team, TeamId, Timer } from './game-types'
 
-export type User = { name: string; phone: string }
+export type User = { name: string; phone: string; email?: string }
 export type Order = TokenOrder
 export type Activity = { id: string; text: string; at: number }
+/** A hosted game, kept so an unfinished or closed game can be reopened from the account. */
+export type GameRecord = {
+  id: string
+  code: string
+  hostToken: string
+  createdAt: number
+  updatedAt: number
+  categoryIds: string[]
+  teams: { name: string; score: number }[]
+  phase: Session['phase']
+  played: number
+}
+export type TeamMembers = [string[], string[]]
+
+const recordOf = (session: Session, previous?: GameRecord): Omit<GameRecord, 'hostToken'> => ({
+  id: session.id,
+  code: session.code,
+  createdAt: previous?.createdAt ?? Date.now(),
+  updatedAt: Date.now(),
+  categoryIds: session.categoryIds,
+  teams: session.teams.map((t) => ({ name: t.name, score: t.score })),
+  phase: session.phase,
+  played: session.questions.filter((q) => q.state === 'answered').length,
+})
 
 type State = {
   selected: string[]
@@ -29,6 +54,9 @@ type State = {
   orders: Record<string, Order>
   paidOrders: string[]
   activity: Activity[]
+  history: GameRecord[]
+  teamMembers: Record<string, TeamMembers>
+  introSeen: string[]
   feedback: Record<
     string,
     {
@@ -67,7 +95,11 @@ type Action =
       host?: boolean
       chargeKey?: string
     }
-  | { type: 'award'; questionId: string; teamId: TeamId | null }
+  | { type: 'award'; questionId: string; teamId: TeamId | null; points?: number }
+  | { type: 'setMembers'; sessionId: string; members: TeamMembers }
+  | { type: 'introSeen'; sessionId: string }
+  | { type: 'updateProfile'; user: User }
+  | { type: 'remember'; record: GameRecord }
   | {
       type: 'adjust'
       teamId: TeamId
@@ -99,6 +131,8 @@ type Action =
     }
 
 const KEY = UI_STORAGE_KEY
+/** Toast text in the visitor's format (Arabic or Franco). */
+const tr = (arabic: string, franco: string) => (currentLang() === 'ar' ? arabic : franco)
 const WALLET_KEY = KEY + '.tokens'
 type Wallet = Pick<
   State,
@@ -123,6 +157,9 @@ const initial: State = {
   orders: {},
   paidOrders: [],
   activity: [],
+  history: [],
+  teamMembers: {},
+  introSeen: [],
   feedback: {},
 }
 
@@ -184,8 +221,13 @@ function reduce(state: State, a: Action): State {
       const isNewAward = award && previous?.lastAward?.at !== award.at
       const name = award?.teamId ? a.session.teams.find((t) => t.id === award.teamId)?.name : null
       const charge = a.chargeKey && !state.chargedGames.includes(a.chargeKey)
+      const known = state.history.find((g) => g.id === a.session.id)
+      const history = known
+        ? state.history.map((g) => (g.id === a.session.id ? { ...g, ...recordOf(a.session, g) } : g))
+        : state.history
       return {
         ...state,
+        history,
         ...(charge
           ? {
               tokens: Math.max(0, state.tokens - 1),
@@ -202,7 +244,9 @@ function reduce(state: State, a: Action): State {
           ? {
               toast: {
                 id: award.at,
-                text: name ? `✓ ${award.points} نقطة محسومة لـ${name}` : 'ولا حد — الدور اللي بعده',
+                text: name
+                  ? tr(`✓ ${award.points} نقطة محسومة لـ${name}`, `✓ ${award.points} no2ta le ${name}`)
+                  : tr('ولا حد — الدور اللي بعده', 'Wala 7ad — el dor elly ba3do'),
               },
             }
           : {}),
@@ -233,6 +277,18 @@ function reduce(state: State, a: Action): State {
     case 'backToBoard':
     case 'finish':
       return state
+    case 'setMembers':
+      return { ...state, teamMembers: { ...state.teamMembers, [a.sessionId]: a.members } }
+    case 'introSeen':
+      return state.introSeen.includes(a.sessionId)
+        ? state
+        : { ...state, introSeen: [...state.introSeen, a.sessionId].slice(-30) }
+    case 'remember':
+      return {
+        ...state,
+        history: [a.record, ...state.history.filter((g) => g.id !== a.record.id)].slice(0, 30),
+      }
+    case 'updateProfile':
     case 'login':
       return { ...state, user: a.user }
     case 'logout':
@@ -289,6 +345,7 @@ type Ctx = {
   connected: boolean
   busy: boolean
   adoptSession: (session: Session) => void
+  resumeGame: (record: GameRecord) => Promise<boolean>
 }
 const C = createContext<Ctx>(null as never)
 const HOST_ACTIONS = new Set([
@@ -353,7 +410,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       .catch(() =>
         rawDispatch({
           type: 'toast',
-          text: 'اللعبة القديمة محفوظة. افتح الصفحة تاني لما الاتصال يرجع.',
+          text: tr(
+            'اللعبة القديمة محفوظة. افتح الصفحة تاني لما الاتصال يرجع.',
+            'El le3ba el 2adeema mat7fooza. Efta7 el sa7fa tany lama el etesal yerga3.',
+          ),
         }),
       )
   }, [])
@@ -364,7 +424,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (pending.current) return false
         const startsGame = a.type === 'startGame' || (a.type === 'replay' && !a.newCategories)
         if (startsGame && current.current.tokens < 1) {
-          rawDispatch({ type: 'toast', text: 'محتاج ١ توكن عشان تبدأ لعبة جديدة' })
+          rawDispatch({
+            type: 'toast',
+            text: tr('محتاج ١ توكن عشان تبدأ لعبة جديدة', 'Me7tag 1 token 3ashan tebda2 le3ba gdeeda'),
+          })
           return false
         }
         pending.current = true
@@ -381,6 +444,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               session: result.session,
               hostSessionId: result.session.id,
             }
+            rawDispatch({
+              type: 'remember',
+              record: { ...recordOf(result.session), hostToken: result.hostToken },
+            })
             rawDispatch({
               type: 'remoteSession',
               session: result.session,
@@ -421,7 +488,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           if (error instanceof TypeError) setNetwork({ connected: false })
           rawDispatch({
             type: 'toast',
-            text: error instanceof Error ? error.message : 'حصلت مشكلة، جرّب تاني',
+            text: error instanceof Error ? error.message : tr('حصلت مشكلة، جرّب تاني', '7asalet moshkela, garrab tany'),
           })
           if (s)
             getSession(s.id)
@@ -434,6 +501,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }
       } else rawDispatch(a)
       return true
+    },
+    [adoptSession],
+  )
+
+  // Reopen a hosted game from the account history (after closing the tab or disconnecting).
+  const resumeGame = useCallback(
+    async (record: GameRecord) => {
+      try {
+        saveHost(record.id, record.hostToken)
+        const session = await getSession(record.id)
+        current.current = { ...current.current, hostSessionId: session.id }
+        adoptSession(session)
+        return true
+      } catch {
+        rawDispatch({ type: 'toast', text: tr('اللعبة دي مش متاحة تاني', 'El le3ba di mesh mota7a tany') })
+        return false
+      }
     },
     [adoptSession],
   )
@@ -513,10 +597,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       state,
       dispatch,
       adoptSession,
+      resumeGame,
       isHost: !!state.session && hostCredentials()?.sessionId === state.session.id,
       ...network,
     }),
-    [state, dispatch, adoptSession, network],
+    [state, dispatch, adoptSession, resumeGame, network],
   )
   return <C.Provider value={value}>{children}</C.Provider>
 }

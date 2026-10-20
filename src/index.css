@@ -1,6 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Lalezar&family=Readex+Pro:wght@300;400;500;600;700&family=Reem+Kufi:wght@500;600;700&display=swap');
 @import 'tailwindcss';
 
+/* Landscape phones and other short screens: game screens compact so nothing scrolls. */
+@custom-variant short (@media (max-height: 540px));
+
 @theme {
   --font-display: 'Lalezar', 'Noto Sans Arabic', sans-serif;
   --font-sans: 'Readex Pro', 'Noto Sans Arabic', system-ui, sans-serif;
@@ -20,10 +23,6 @@
 
 :root {
   color-scheme: dark;
-}
-
-html {
-  direction: rtl;
 }
 
 body {
@@ -134,6 +133,25 @@ body {
     background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.28), transparent);
     animation: sheen 5.5s var(--ease-brand) infinite;
   }
+}
+
+@keyframes marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+@keyframes marquee-rtl {
+  to {
+    transform: translateX(50%);
+  }
+}
+.marquee {
+  display: flex;
+  width: max-content;
+  animation: marquee 38s linear infinite;
+}
+[dir='rtl'] .marquee {
+  animation-name: marquee-rtl;
 }
 
 @keyframes sheen {

@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { Play, Volume2, AudioLines } from 'lucide-react'
 import { api } from '../lib/api'
-import { toAr } from '../lib/data'
 import type { Question, Session } from '../lib/game-types'
 import { useStore } from '../lib/store'
+import { useLang } from '../lib/i18n'
 
 type AudioQuestion = Extract<
   Question,
@@ -23,6 +23,7 @@ export default function QuestionAudio({
   revealed: boolean
 }) {
   const { adoptSession, dispatch, connected } = useStore()
+  const { t } = useLang()
   const player = useRef<HTMLAudioElement>(null)
   const requestId = useRef('')
   const inFlight = useRef(false)
@@ -66,14 +67,8 @@ export default function QuestionAudio({
       requestId: id,
     })
   const play = async () => {
-    if (
-      inFlight.current ||
-      q.audioIsPlaying ||
-      q.audioPlaysUsed >= q.maxPlays ||
-      !host ||
-      !connected
-    )
-      return
+    // Replays are unlimited: the clip can be played as many times as the room needs.
+    if (inFlight.current || q.audioIsPlaying || !host || !connected) return
     inFlight.current = true
     setPending(true)
     setError('')
@@ -89,7 +84,7 @@ export default function QuestionAudio({
       })
       reserved = true
       const audio = player.current
-      if (!audio || revealed) throw new Error('الصوت مش جاهز')
+      if (!audio || revealed) throw new Error(t('الصوت مش جاهز', 'El soot mesh gahez'))
       audio.currentTime = 0
       await audio.play()
       // play() resolves only after the browser accepts playback. The server
@@ -102,12 +97,12 @@ export default function QuestionAudio({
       if (reserved) await send('cancel', id).catch(() => {})
       setError(
         err instanceof DOMException
-          ? 'الصوت مش اشتغل، جرّب تاني'
+          ? t('الصوت مش اشتغل، جرّب تاني', 'El soot mashtaghalsh, garrab tany')
           : err instanceof TypeError
-            ? 'الاتصال اتقطع، جرّب تاني'
+            ? t('الاتصال اتقطع، جرّب تاني', 'El etesal et2ata3, garrab tany')
             : err instanceof Error
               ? err.message
-              : 'الصوت مش اشتغل، جرّب تاني',
+              : t('الصوت مش اشتغل، جرّب تاني', 'El soot mashtaghalsh, garrab tany'),
       )
       inFlight.current = false
     } finally {
@@ -123,7 +118,7 @@ export default function QuestionAudio({
       } catch {
         await dispatch({
           type: 'toast',
-          text: 'اتصال الصوت اتقطع؛ الحالة هتتحدث تلقائيًا',
+          text: t('اتصال الصوت اتقطع؛ الحالة هتتحدث تلقائيًا', 'Etesal el soot et2ata3; hayet7adas lewa7do'),
         })
       }
     }
@@ -132,12 +127,14 @@ export default function QuestionAudio({
     setPending(false)
     setProgress(0)
   }
-  const remaining = Math.max(0, q.maxPlays - q.audioPlaysUsed)
+  const hint = q.hint
+    ? t(q.hint, q.hintEn || q.hint)
+    : t('ركّز في النبرة… مش بس في الكلام', 'Rakez fel nabra… mesh bas fel kalam')
   const isPlaying = q.audioIsPlaying || (inFlight.current && !pending)
   return (
-    <div className="glass flex h-full min-h-[230px] flex-col items-center justify-center rounded-[24px] p-6 text-ivory sm:min-h-[320px] sm:p-10">
+    <div className="glass flex h-full min-h-0 flex-col items-center justify-center overflow-hidden rounded-[24px] p-4 text-ivory sm:p-8">
       <div
-        className="mb-4 flex h-12 w-full max-w-[325px] items-center justify-between gap-[3px] text-gold sm:mb-10 sm:h-28 sm:gap-[5px]"
+        className="mb-4 flex h-12 w-full max-w-[325px] items-center justify-between gap-[3px] text-gold sm:mb-8 sm:h-24 sm:gap-[5px] short:mb-2 short:h-10"
         aria-hidden="true"
       >
         {Array.from({ length: 33 }, (_, i) => (
@@ -158,52 +155,31 @@ export default function QuestionAudio({
         </div>
       ) : (
         <button
-          aria-label={isPlaying ? 'الصوت شغّال' : 'شغّل الصوت'}
+          aria-label={isPlaying ? t('الصوت شغّال', 'El soot shaghal') : t('شغّل الصوت', 'Shaghal el soot')}
           onClick={play}
-          disabled={
-            !host ||
-            !connected ||
-            pending ||
-            q.audioIsPlaying ||
-            remaining === 0 ||
-            inFlight.current
-          }
-          className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-gold sm:h-20 sm:w-20 text-forest shadow-[0_8px_24px_rgba(231,167,43,.25)] transition hover:scale-105 disabled:cursor-default disabled:opacity-50"
+          disabled={!host || !connected || pending || q.audioIsPlaying || inFlight.current}
+          className="grid h-20 w-20 shrink-0 place-items-center rounded-full bg-gold sm:h-24 sm:w-24 short:h-14 short:w-14 text-forest shadow-[0_8px_24px_rgba(231,167,43,.25)] transition hover:scale-105 disabled:cursor-default disabled:opacity-50"
         >
           {isPlaying ? <Volume2 size={30} /> : <Play size={30} fill="currentColor" />}
         </button>
       )}
-      <div role="status" aria-live="polite" className="mt-5 text-center">
-        <p className="text-base font-bold">
+      {/* Two lines only: what to do, plus one hint/joke line. */}
+      <div role="status" aria-live="polite" className="mt-4 max-w-xs text-center short:mt-2">
+        <p className="text-lg font-bold">
           {revealed
-            ? 'عرفت الصوت؟'
+            ? t('عرفت الصوت؟', '3eraft el soot?')
             : isPlaying
-              ? 'اسمعوا كويس…'
+              ? t('اسمعوا كويس…', 'Esma3o kwayes…')
               : pending
-                ? 'جاري التشغيل…'
-                : remaining
-                  ? `${toAr(remaining)} مرات متاحة`
-                  : 'مرات التشغيل خلصت'}
+                ? t('جاري التشغيل…', 'Beyeshtaghal…')
+                : t('شغّل الصوت', 'Shaghal el soot')}
         </p>
-        {!revealed && (
-          <p className="mt-1 text-xs text-ivory/55">
-            {host ? 'الصوت من جهاز المضيف' : 'اسمعوا من جهاز المضيف'} ·{' '}
-            <span className="num">
-              {toAr(q.audioPlaysUsed)} / {toAr(q.maxPlays)}
-            </span>
-          </p>
-        )}
+        <p className="mt-1 line-clamp-1 text-sm text-ivory/60">{hint}</p>
       </div>
-      {q.type === 'AUDIO_VOICE' && (
-        <div className="mt-4 max-w-xs text-center">
-          <p className="text-xs text-gold">أصوات تمثيلية لشخصيات صح صح</p>
-          <p className="mt-2 text-xs leading-6 text-ivory/55">المذيع · الكابتن · الحكّاء</p>
-        </div>
-      )}
       {!revealed && (
         <div
           role="progressbar"
-          aria-label="تقدم الصوت"
+          aria-label={t('تقدم الصوت', 'Ta2adom el soot')}
           aria-valuenow={Math.round(progress * 100)}
           aria-valuemin={0}
           aria-valuemax={100}
@@ -226,7 +202,7 @@ export default function QuestionAudio({
           onEnded={end}
           onError={() => {
             if (inFlight.current && requestId.current) void end()
-            setError('الصوت مش متاح دلوقتي')
+            setError(t('الصوت مش متاح دلوقتي', 'El soot mesh mota7 delwa2ty'))
           }}
         />
       )}

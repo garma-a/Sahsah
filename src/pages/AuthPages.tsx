@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { MessageCircle, Pencil } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { Logo } from '../components/art'
+import { useLang } from '../lib/i18n'
 
 const KEY = 'sahsah.pending'
 const DEMO_CODE = '123456'
@@ -48,6 +49,7 @@ const field =
   'mt-1.5 h-12 w-full rounded-xl border-2 border-stroke bg-white px-4 outline-none focus:border-gold'
 
 export function LoginPage() {
+  const { t } = useLang()
   const nav = useNavigate()
   const [params] = useSearchParams()
   const next = params.get('next')
@@ -56,8 +58,8 @@ export function LoginPage() {
   const [err, setErr] = useState('')
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (name.trim().length < 2) return setErr('اكتب اسمك.')
-    if (!valid(phone)) return setErr('رقم موبايل مصري مش صح. مثال: ٠١٢٠ ٠٠٠ ٠٠٠٠')
+    if (name.trim().length < 2) return setErr(t('اكتب اسمك.', 'Ekteb esmak.'))
+    if (!valid(phone)) return setErr(t('رقم موبايل مصري مش صح. مثال: ٠١٢٠ ٠٠٠ ٠٠٠٠', 'Raqam mobile masry mesh sa7. Masalan: 0120 000 0000'))
     sessionStorage.setItem(
       KEY,
       JSON.stringify({
@@ -70,10 +72,10 @@ export function LoginPage() {
     nav('/auth/verify')
   }
   return (
-    <Card title="دخول المضيف">
+    <Card title={t('دخول المضيف', 'Dokhool el host')}>
       <form onSubmit={submit} className="mt-6" noValidate>
         <label htmlFor="n" className="text-sm font-semibold">
-          الاسم
+          {t('الاسم', 'El esm')}
         </label>
         <input
           id="n"
@@ -86,7 +88,7 @@ export function LoginPage() {
           autoComplete="name"
         />
         <label htmlFor="p" className="mt-4 block text-sm font-semibold">
-          رقم الموبايل
+          {t('رقم الموبايل', 'Raqam el mobile')}
         </label>
         <input
           id="p"
@@ -107,10 +109,10 @@ export function LoginPage() {
           </p>
         )}
         <button className="btn-play mt-6 inline-flex h-14 w-full items-center justify-center gap-2 rounded-2xl text-lg font-bold">
-          <MessageCircle size={20} /> ابعت الكود على واتساب
+          <MessageCircle size={20} /> {t('ابعت الكود على واتساب', 'Eb3at el code 3al WhatsApp')}
         </button>
         <p className="mt-3 text-center text-xs text-forest/55">
-          نسخة تجريبية: مفيش رسالة هتتبعت فعلًا.
+          {t('نسخة تجريبية: مفيش رسالة هتتبعت فعلًا.', 'Noskha tagreebeya: mafeesh resala hatetb3et.')}
         </p>
       </form>
     </Card>
@@ -118,6 +120,7 @@ export function LoginPage() {
 }
 
 export function VerifyPage() {
+  const { t } = useLang()
   const nav = useNavigate()
   const { dispatch } = useStore()
   const pending = (() => {
@@ -138,12 +141,12 @@ export function VerifyPage() {
   }, [wait])
   if (!pending)
     return (
-      <Card title="انتهت الجلسة">
+      <Card title={t('انتهت الجلسة', 'El session khelset')}>
         <Link
           to="/auth/login"
           className="btn-play mt-6 flex h-14 items-center justify-center rounded-2xl text-lg font-bold"
         >
-          رجوع
+          {t('رجوع', 'Rogoo3')}
         </Link>
       </Card>
     )
@@ -166,14 +169,15 @@ export function VerifyPage() {
   }
   const code = d.join('')
   const confirm = () => {
-    if (code !== DEMO_CODE) return setErr('الكود مش صح. جرّب الكود التجريبي المكتوب فوق.')
+    if (code !== DEMO_CODE)
+      return setErr(t('الكود مش صح. جرّب الكود التجريبي المكتوب فوق.', 'El code mesh sa7. Garrab el code el tagreeby elly fo2.'))
     dispatch({ type: 'login', user: { name: pending.name, phone: pending.phone } })
     sessionStorage.removeItem(KEY)
-    dispatch({ type: 'toast', text: `أهلًا يا ${pending.name}` })
+    dispatch({ type: 'toast', text: t(`أهلًا يا ${pending.name}`, `Ahlan ya ${pending.name}`) })
     nav(pending.next && /^\/tokens(?:\?|$)/.test(pending.next) ? pending.next : '/account')
   }
   return (
-    <Card title="اكتب الكود">
+    <Card title={t('اكتب الكود', 'Ekteb el code')}>
       <div className="-mt-3 text-center">
         <button
           onClick={() =>
@@ -185,10 +189,10 @@ export function VerifyPage() {
           <span dir="ltr" className="num">
             {pending.phone}
           </span>{' '}
-          — تعديل الرقم
+          — {t('تعديل الرقم', 'Ghayar el raqam')}
         </button>
         <div className="mt-4 rounded-xl bg-gold/20 px-3 py-2 text-sm font-semibold">
-          وضع تجريبي: الكود هو <span className="num font-bold">{DEMO_CODE}</span>
+          {t('وضع تجريبي: الكود هو', 'Wad3 tagreeby: el code howa')} <span className="num font-bold">{DEMO_CODE}</span>
         </div>
       </div>
       <div dir="ltr" className="mt-6 flex justify-center gap-2">
@@ -201,7 +205,7 @@ export function VerifyPage() {
             value={c}
             inputMode="numeric"
             autoComplete="one-time-code"
-            aria-label={`رقم ${i + 1}`}
+            aria-label={t(`رقم ${i + 1}`, `Raqam ${i + 1}`)}
             onChange={(e) => set(i, e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Backspace' && !c && i > 0) refs.current[i - 1]?.focus()
@@ -220,14 +224,16 @@ export function VerifyPage() {
         onClick={confirm}
         className="btn-play mt-6 h-14 w-full rounded-2xl text-lg font-bold"
       >
-        تأكيد والدخول
+        {t('تأكيد والدخول', 'Akked w odkhol')}
       </button>
       <button
         disabled={wait > 0}
         onClick={() => setWait(30)}
         className="mt-3 h-11 w-full text-sm font-semibold text-forest/70 disabled:opacity-50"
       >
-        {wait > 0 ? `إعادة الإرسال بعد ${wait} ث` : 'إعادة إرسال الكود'}
+        {wait > 0
+          ? t(`إعادة الإرسال بعد ${wait} ث`, `Eb3at tany ba3d ${wait}s`)
+          : t('إعادة إرسال الكود', 'Eb3at el code tany')}
       </button>
     </Card>
   )

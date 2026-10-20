@@ -1,6 +1,7 @@
 import { GameRules, clean, check, validateQuestion, type GameDatabase } from '../lib/game-rules'
 import type { AdminQuestion, Session } from '../lib/game-types'
 import { BANK } from './standard-bank'
+import { BANK_EN } from './standard-bank-en'
 import samples from './samples.json'
 import { mediaUrl, warmMedia, uploadMedia, regenerateMedia } from './media'
 import { PARTY_SAMPLES, presentPartySession, type MemoryLive } from './party-modes'
@@ -17,6 +18,16 @@ const DEMO_BANK = {
     ]),
   ),
 }
+// Franco text, row for row with DEMO_BANK.
+const DEMO_BANK_EN: Record<string, [string, string][]> = {
+  ...BANK_EN,
+  ...Object.fromEntries(
+    Object.entries(PARTY_SAMPLES).map(([id, rows]) => [
+      id,
+      rows.map((row): [string, string] => [row.promptEn ?? '', row.answerEn ?? '']),
+    ]),
+  ),
+}
 function seed(): AdminQuestion[] {
   const questions = Object.entries(DEMO_BANK).flatMap(([categoryId, rows]) =>
     rows.map(([prompt, answerText], row) =>
@@ -25,6 +36,8 @@ function seed(): AdminQuestion[] {
         row,
         prompt,
         answerText,
+        promptEn: DEMO_BANK_EN[categoryId]?.[row]?.[0],
+        answerTextEn: DEMO_BANK_EN[categoryId]?.[row]?.[1],
         type: 'STANDARD',
         status: 'PUBLISHED',
       }),
@@ -36,6 +49,8 @@ function seed(): AdminQuestion[] {
       type: sample.type,
       prompt: sample.prompt,
       answerText: sample.answer,
+      promptEn: sample.promptEn,
+      answerTextEn: sample.answerEn,
       stages: sample.stages,
       originalImage: sample.originalImage ?? undefined,
       playableAudio: sample.playableAudio ?? undefined,
@@ -78,6 +93,14 @@ async function engine() {
     ...(saved?.questions ?? []),
     ...Object.values(saved?.sessions ?? {}).flatMap((s) => s.records),
   ]
+  // Questions saved before the Franco format existed: add the Franco text when the
+  // Arabic text is still the original sample, so admin edits are never overwritten.
+  for (const q of records) {
+    if (q.promptEn) continue
+    const original = sampleQuestions.find((s) => s.categoryId === q.categoryId && s.row === q.row)
+    if (original?.prompt === q.prompt && original.answerText === q.answerText)
+      Object.assign(q, { promptEn: original.promptEn, answerTextEn: original.answerTextEn })
+  }
   await warmMedia(
     records.flatMap((q) =>
       [...q.stages, q.originalImage, q.playableAudio, q.forwardSpeech].filter(
@@ -155,26 +178,6 @@ async function execute(url: string, data: any, method: string, token: string) {
   if (!parts[1]) return rules.create(data.categoryIds, data.names)
   if (parts[1] === 'import') return rules.importLegacy(data)
   const s = rules.get(parts[1])
-  const beforeMemoryExpiry = s.version
-  let expiredMemory = false
-  for (const record of s.records) {
-    if (PARTY_SAMPLES[record.categoryId]?.[record.row]?.mode !== 'IMAGE_MEMORY') continue
-    const recordLive = s.live[record.id] as MemoryLive
-    if (
-      recordLive.memoryEndsAt &&
-      !recordLive.memoryHidden &&
-      Date.now() >= recordLive.memoryEndsAt
-    ) {
-      recordLive.memoryHidden = true
-      expiredMemory = true
-    }
-  }
-  if (expiredMemory) {
-    rules.touch(s)
-    // A viewing countdown may finish while this local click is being handled.
-    if (parts[2] === 'actions' && data?.version === beforeMemoryExpiry)
-      data = { ...data, version: s.version }
-  }
   const current = s.activeQuestionId
     ? s.records.find((q) => q.id === s.activeQuestionId)
     : undefined
@@ -188,22 +191,22 @@ async function execute(url: string, data: any, method: string, token: string) {
       rules.host(s, token)
       check(s.phase === 'question' && memory && live && current, 'تحدي الذاكرة مش مفتوح')
       if (data.type === 'startMemory') {
-        check(!live.memoryEndsAt, 'الصورة اتعرضت بالفعل')
-        const seconds = current.points === 600 ? 5 : current.points === 400 ? 7 : 10
-        live.memoryEndsAt = Date.now() + seconds * 1000
+        check(!live.memoryShown, 'الصورة اتعرضت بالفعل')
+        live.memoryShown = true
         live.memoryHidden = false
       } else if (data.type === 'hideMemory') {
-        check(live.memoryEndsAt, 'اعرض الصورة الأول')
+        check(live.memoryShown, 'اعرض الصورة الأول')
         live.memoryHidden = true
+        live.memoryAsked = true
       } else {
-        delete live.memoryEndsAt
-        delete live.memoryHidden
-        s.timer = { durationMs: 30000, remainingMs: 30000, status: 'idle' }
+        // Back to the picture; the question and running timer are kept.
+        check(live.memoryShown, 'اعرض الصورة الأول')
+        live.memoryHidden = false
       }
       return rules.touch(s)
     }
     if (memory && ['reveal', 'timer'].includes(data.type))
-      check(live?.memoryHidden, 'شوف الصورة الأول، وبعد ما تختفي جاوب السؤال')
+      check(live?.memoryShown, 'اعرض الصورة الأول')
     return rules.action(s.id, token, data)
   }
   if (parts[2] === 'join') {

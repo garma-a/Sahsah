@@ -25,20 +25,43 @@ export const GAME_MODE_LABELS = {
   AUDIO_VOICE: 'مين صاحب الصوت؟',
   IMAGE_MEMORY: 'ركز معايا',
 }
+/** Franco-Arabic labels for the English format. */
+export const GAME_MODE_LABELS_EN: Record<keyof typeof GAME_MODE_LABELS, string> = {
+  STANDARD: 'So2al 3ady',
+  IMAGE_BLUR: 'Wada7 El Soora',
+  IMAGE_ZOOM: 'Wada7 El Soora',
+  AUDIO_GUESS: 'Khamen El Soot',
+  AUDIO_REVERSE: 'El Kalam bel Ma2loob',
+  IMAGE_PERSON: 'Meen fel Soora?',
+  IMAGE_COLOR: 'El Loon El Asly Eh?',
+  IMAGE_RIDDLE: 'El Soora Bet2ool Eh?',
+  AUDIO_VOICE: 'Meen Sa7b El Soot?',
+  IMAGE_MEMORY: 'Rakez M3aya',
+}
+/** Every question timer runs for one minute and starts automatically. */
+export const QUESTION_MS = 60000
 export type QuestionCommon = {
   id: string
   categoryId: string
   row: number
   points: number
   prompt: string
+  /** Franco-Arabic prompt; falls back to `prompt` when missing. */
+  promptEn?: string
+  /** One short optional hint/joke line shown under sound clips. */
+  hint?: string
+  hintEn?: string
   state: 'available' | 'answered'
+  /** Team that won the question (null = nobody) once it is answered. */
+  wonBy?: TeamId | null
+  wonPoints?: number
   stageIndex: number
   availablePoints: number
   audioPlaysUsed: number
   audioIsPlaying: boolean
   audioStartedAt?: number
   audioDurationMs?: number
-  answer?: { text: string; imageUrl?: string; forwardAudioUrl?: string }
+  answer?: { text: string; textEn?: string; imageUrl?: string; forwardAudioUrl?: string }
 }
 // Only reveal-authorized content enters this public union.
 export type StandardQuestion = QuestionCommon & { type: 'STANDARD' }
@@ -62,6 +85,8 @@ export type MemoryQuestion = QuestionCommon & {
   type: 'IMAGE_MEMORY'
   imageUrl: string
   memoryPhase: 'ready' | 'viewing' | 'recall'
+  /** True once the picture was hidden and the question shown (stays true if the host goes back). */
+  memoryAsked?: boolean
   memorySeconds: number
   memoryEndsAt?: number
 }
@@ -108,6 +133,8 @@ export type AdminQuestion = {
   packageId: string
   prompt: string
   answerText: string
+  promptEn?: string
+  answerTextEn?: string
   alternatives: string[]
   status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'
   notes: string
