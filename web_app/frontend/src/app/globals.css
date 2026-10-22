@@ -1,0 +1,80 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --radius: 0.75rem;
+  --background: #faf8f0;
+  --foreground: #163e33;
+  --card: #ffffff;
+  --card-foreground: #163e33;
+  --popover: #ffffff;
+  --popover-foreground: #163e33;
+  --primary: #1b5543;
+  --primary-foreground: #ffffff;
+  --secondary: #f1e7ca;
+  --secondary-foreground: #163e33;
+  --muted: #f0eee7;
+  --muted-foreground: #626b62;
+  --accent: #ead7a4;
+  --accent-foreground: #163e33;
+  --destructive: #b42318;
+  --border: #d9ddd3;
+  --input: #d9ddd3;
+  --ring: #b69c52;
+}
+
+.dark {
+  --background: #102e25;
+  --foreground: #faf8f0;
+  --card: #163e33;
+  --card-foreground: #faf8f0;
+  --popover: #163e33;
+  --popover-foreground: #faf8f0;
+  --primary: #ead7a4;
+  --primary-foreground: #102e25;
+  --secondary: #245543;
+  --secondary-foreground: #faf8f0;
+  --muted: #1b4436;
+  --muted-foreground: #bac7ba;
+  --accent: #245543;
+  --accent-foreground: #faf8f0;
+  --destructive: #f28c80;
+  --border: #38604f;
+  --input: #38604f;
+  --ring: #ead7a4;
+}
+
+@layer base {
+  * { @apply border-border outline-ring/50; }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: Arial, Tahoma, sans-serif;
+  }
+}

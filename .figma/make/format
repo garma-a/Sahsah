@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
-pnpm run format -- "$@"
+cd "$(dirname "$0")/../../sahsah_prototype"
+exec pnpm run format -- "$@"

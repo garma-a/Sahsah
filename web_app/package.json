@@ -1,0 +1,14 @@
+{
+  "name": "@sahsah/web",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.34.3",
+  "engines": { "node": ">=24.15.0 <25" },
+  "scripts": {
+    "dev": "concurrently --kill-others --names api,web,admin \"npm --prefix backend run dev\" \"npm --prefix frontend run dev\" \"npm --prefix adminJS run dev\"",
+    "build": "npm --prefix backend run build && npm --prefix frontend run build && npm --prefix adminJS run build",
+    "check": "npm --prefix backend run check && npm --prefix frontend run check && npm --prefix adminJS run check",
+    "lint": "npm --prefix frontend run lint"
+  },
+  "devDependencies": { "concurrently": "10.0.6" }
+}

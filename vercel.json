@@ -1,7 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "vite",
+  "installCommand": "npm run install:prototype",
   "buildCommand": "npm run build",
-  "outputDirectory": "dist",
+  "outputDirectory": "sahsah_prototype/dist",
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }

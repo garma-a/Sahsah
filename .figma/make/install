@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
-pnpm install --prefer-offline --no-frozen-lockfile
+cd "$(dirname "$0")/../../sahsah_prototype"
+exec pnpm install --frozen-lockfile

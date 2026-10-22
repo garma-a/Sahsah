@@ -1,0 +1,18 @@
+packages:
+  - frontend
+  - backend
+  - adminJS
+
+onlyBuiltDependencies:
+  - '@nestjs/core'
+  - '@swc/core'
+  - esbuild
+  - sharp
+  - unrs-resolver
+
+# AdminJS pins an older core while its starter-kit resolves newer extensions.
+# Keep the editor packages on one compatible release to avoid missing exports.
+overrides:
+  '@tiptap/core': 2.27.3
+  '@tiptap/pm': 2.27.3
+  '@tiptap/starter-kit': 2.27.3

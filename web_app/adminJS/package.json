@@ -1,0 +1,31 @@
+{
+  "name": "@sahsah/admin",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "tsc",
+    "start": "node dist/main.js",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@adminjs/express": "6.1.1",
+    "@babel/plugin-syntax-import-assertions": "7.29.7",
+    "adminjs": "7.8.17",
+    "dotenv": "18.0.9",
+    "express": "5.3.0",
+    "express-formidable": "1.2.0",
+    "express-session": "1.19.0",
+    "tslib": "2.8.1"
+  },
+  "devDependencies": {
+    "@types/express": "5.0.6",
+    "@types/express-session": "1.19.0",
+    "@types/node": "^24.0.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3"
+  }
+}
