@@ -12,7 +12,8 @@
     "test": "node --test tests/*.test.ts",
     "check": "tsc --noEmit",
     "test:browser": "node tests/browser.mjs",
-    "test:demo": "node tests/demo-browser.mjs"
+    "test:demo": "node tests/demo-browser.mjs",
+    "test:deployment": "node tests/deployment-smoke.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.54.0",

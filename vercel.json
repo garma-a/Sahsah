@@ -1,8 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": "vite",
-  "installCommand": "npm run install:prototype",
-  "buildCommand": "npm run build",
+  "framework": null,
+  "installCommand": "npx --yes pnpm@10.34.3 --dir sahsah_prototype install --frozen-lockfile",
+  "buildCommand": "npm --prefix sahsah_prototype run build",
+  "devCommand": "npm --prefix sahsah_prototype run dev -- --port $PORT",
   "outputDirectory": "sahsah_prototype/dist",
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }

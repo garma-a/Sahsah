@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.adminjs/
+.env*
+!.env.example
+*.tsbuildinfo
+*.log

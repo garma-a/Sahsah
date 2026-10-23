@@ -1,4 +1,4 @@
 {
-  "installOn": ["package.json", "sahsah_prototype/package.json", "sahsah_prototype/pnpm-lock.yaml"],
+  "installOn": ["sahsah_prototype/package.json", "sahsah_prototype/pnpm-lock.yaml"],
   "restartOn": []
 }

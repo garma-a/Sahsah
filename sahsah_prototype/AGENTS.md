@@ -2,6 +2,32 @@
 
 React + Vite + Tailwind CSS project running inside Figma Make.
 
+## Required skill selection
+
+For **every user prompt**, check for relevant skills before substantive investigation, answering, or implementation, even when the user does not name a skill.
+
+1. Search the available skill names and descriptions by the request's intent, the work involved, and the project's actual stack. If the session catalog is incomplete, inspect project `.agents/skills/` and installed user skill directories such as `~/.agents/skills/` and `$CODEX_HOME/skills/`.
+2. Select the smallest set of skills that covers the request. Open and read each selected `SKILL.md` before proceeding; read supporting references when their instructions require them. Reassess the selection on every prompt and whenever the task changes.
+3. Follow the selected workflows, prerequisites, and verification requirements within the user's authorized scope. Respect skills restricted to explicit invocation. If a relevant skill is unavailable or incompatible, state the limitation briefly and use a compatible approach.
+4. Briefly identify the skills being used and why. When no skill applies, proceed normally after checking; unrelated skills are unnecessary.
+
+Use these starting points, then check the catalog for any other relevant skills:
+
+| Task | Skills to consider |
+| --- | --- |
+| New UI, visual redesign, layout, or typography | `frontend-design` |
+| Tailwind tokens, themes, component variants, or consistent styling | `tailwind-design-system` |
+| React implementation or performance | `vercel-react-best-practices` |
+| Reusable React components or component API refactoring | `vercel-composition-patterns` |
+| Accessibility, usability, or UI review | `web-design-guidelines` |
+| Bug diagnosis or performance regression | `diagnosing-bugs` |
+| Browser workflows or end-to-end tests | `e2e`; preserve the existing test framework unless a change is authorized |
+| Test-first implementation | `tdd` |
+| Implementing a Figma design | `figma:figma-design-to-code` |
+| Editing agent instructions | `writing-for-agents` |
+
+This project uses React and Vite. Apply Next.js-specific skills only when the code actually in scope uses Next.js and meets the skill's prerequisites. A skill recommendation alone does not authorize a framework upgrade or a new test framework.
+
 ## Development Server
 
 A Vite development server is **already running** on `$PORT` (default 8443). You don't need to start it manually.
