@@ -1,0 +1,1197 @@
+{
+  "schema_sha256": "d00486c7abcaee863556b9829e1967a9cb6977511fd865349ac68e6e61b6510c",
+  "artifacts_sha256": {
+    "sahsah.dbml": "d00486c7abcaee863556b9829e1967a9cb6977511fd865349ac68e6e61b6510c",
+    "postgresql-supplement.sql": "2e28a4e2823c8f441b29d040d12c2b2f806ae6c1a761b6090ee9f2889a7bb1e4",
+    "postgresql-guards.sql": "d1378044ec1fd71c0763ae0ac9029ed7f2d5bfdb29eb8a06446f80e6073ab40c"
+  },
+  "postgresql": "PostgreSQL 18.6 (Ubuntu 18.6-0ubuntu0.26.04.1) on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0, 64-bit",
+  "counts": {
+    "tables": 39,
+    "enums": 37,
+    "foreign_keys": 87,
+    "checks": 304,
+    "indexes": 148,
+    "partial_indexes": 19
+  },
+  "cases": [
+    {
+      "name": "staff credit projects the bank once",
+      "passed": true,
+      "expected": "accepted"
+    },
+    {
+      "name": "direct balance edits are rejected",
+      "passed": true,
+      "expected": "owned by the ledger"
+    },
+    {
+      "name": "ledger history is append-only",
+      "passed": true,
+      "expected": "append-only"
+    },
+    {
+      "name": "order retries cannot change the original digest",
+      "passed": true,
+      "expected": "intent and quote are immutable"
+    },
+    {
+      "name": "verified Paymob settlement and bank delivery commit together",
+      "passed": true,
+      "expected": "accepted"
+    },
+    {
+      "name": "settlement without bank delivery is rejected",
+      "passed": true,
+      "expected": "must credit its bank"
+    },
+    {
+      "name": "settled evidence cannot be cleared",
+      "passed": true,
+      "expected": "cannot be cleared"
+    },
+    {
+      "name": "verified payment amount cannot be rewritten",
+      "passed": true,
+      "expected": "identity and original amount are immutable"
+    },
+    {
+      "name": "payment projection cannot fabricate a later proof time",
+      "passed": true,
+      "expected": "matching latest verified evidence"
+    },
+    {
+      "name": "unconfigured payment integration cannot fund",
+      "passed": true,
+      "expected": "successful Paymob funding proof"
+    },
+    {
+      "name": "duplicate credit is rejected even with another request key",
+      "passed": true,
+      "expected": "duplicate key"
+    },
+    {
+      "name": "inquiry that did not confirm closure cannot close checkout",
+      "passed": true,
+      "expected": "affirmative same-attempt"
+    },
+    {
+      "name": "affirmative same-attempt closure is accepted",
+      "passed": true,
+      "expected": "accepted"
+    },
+    {
+      "name": "event transaction and merchant namespaces must agree",
+      "passed": true,
+      "expected": "namespace mismatch"
+    },
+    {
+      "name": "payment source cannot be reused by a different order",
+      "passed": true,
+      "expected": "token_orders_settlement_payment"
+    },
+    {
+      "name": "later reversal preserves the original bank and accepted proof",
+      "passed": true,
+      "expected": "accepted"
+    },
+    {
+      "name": "google_play verified delivery and completion intent",
+      "passed": true,
+      "expected": "accepted"
+    },
+    {
+      "name": "google_play completion before delivery is rejected",
+      "passed": true,
+      "expected": "completion requires committed bank delivery"
+    },
+    {
+      "name": "google_play cannot use Paymob checkout",
+      "passed": true,
+      "expected": "positive pending website order"
+    },
+    {
+      "name": "google_play cannot roll verification time backward",
+      "passed": true,
+      "expected": "verification cannot move backward"
+    },
+    {
+      "name": "apple_app_store verified delivery and completion intent",
+      "passed": true,
+      "expected": "accepted"
+    },
+    {
+      "name": "apple_app_store completion before delivery is rejected",
+      "passed": true,
+      "expected": "completion requires committed bank delivery"
+    },
+    {
+      "name": "apple_app_store cannot use Paymob checkout",
+      "passed": true,
+      "expected": "positive pending website order"
+    },
+    {
+      "name": "apple_app_store cannot roll verification time backward",
+      "passed": true,
+      "expected": "verification cannot move backward"
+    },
+    {
+      "name": "mapped RTDN alone cannot fund tokens",
+      "passed": true,
+      "expected": "PURCHASED native financial proof"
+    },
+    {
+      "name": "verified pending store purchase cannot fund tokens",
+      "passed": true,
+      "expected": "PURCHASED native financial proof"
+    },
+    {
+      "name": "native reinstatement may repeat earlier facts without duplicating delivery",
+      "passed": true,
+      "expected": "accepted"
+    },
+    {
+      "name": "older purchased proof cannot overwrite a later revocation",
+      "passed": true,
+      "expected": "verification cannot move backward"
+    },
+    {
+      "name": "removed account cannot rejoin until host unblock",
+      "passed": true,
+      "expected": "remains removed"
+    },
+    {
+      "name": "unblock creates a new membership and leaves old credential revoked",
+      "passed": true,
+      "expected": "accepted"
+    },
+    {
+      "name": "capacity is six including host",
+      "passed": true,
+      "expected": "capacity includes"
+    },
+    {
+      "name": "empty room reserves one seat for its host",
+      "passed": true,
+      "expected": "capacity includes"
+    },
+    {
+      "name": "deletion confirmation requires funding clearance",
+      "passed": true,
+      "expected": "cleared_confirmation"
+    },
+    {
+      "name": "unresolved checkout blocks deletion clearance",
+      "passed": true,
+      "expected": "resolve pending funding"
+    },
+    {
+      "name": "deletion-pending account cannot create new checkout",
+      "passed": true,
+      "expected": "active buyer"
+    },
+    {
+      "name": "deletion confirmation must match exact current bank",
+      "passed": true,
+      "expected": "current locked bank"
+    },
+    {
+      "name": "exact confirmed forfeiture and anonymization complete atomically",
+      "passed": true,
+      "expected": "accepted"
+    },
+    {
+      "name": "deletion cannot silently forfeit a different balance",
+      "passed": true,
+      "expected": "exact confirmed bank"
+    },
+    {
+      "name": "forfeiture cannot commit without completing deletion",
+      "passed": true,
+      "expected": "forfeiture must commit together"
+    },
+    {
+      "name": "deleted account identity cannot be reactivated",
+      "passed": true,
+      "expected": "cannot be revived"
+    },
+    {
+      "name": "verified undelivered native funding blocks deletion clearance",
+      "passed": true,
+      "expected": "resolve pending funding"
+    },
+    {
+      "name": "incoming verified funding invalidates deletion confirmation",
+      "passed": true,
+      "expected": "accepted"
+    },
+    {
+      "name": "new funding evidence requires a new staff review",
+      "passed": true,
+      "expected": "resolve pending funding"
+    },
+    {
+      "name": "new native attribution invalidates old deletion consent",
+      "passed": true,
+      "expected": "accepted"
+    },
+    {
+      "name": "100% promotion delivers without Paymob",
+      "passed": true,
+      "expected": "accepted"
+    },
+    {
+      "name": "zero-cost order cannot create Paymob attempt",
+      "passed": true,
+      "expected": "positive pending website order"
+    },
+    {
+      "name": "consumed campaign allowance cannot be released",
+      "passed": true,
+      "expected": "cannot be released"
+    },
+    {
+      "name": "same campaign phone cannot reset free allowance with another account",
+      "passed": true,
+      "expected": "allowance exhausted"
+    },
+    {
+      "name": "campaign phone marker cannot be cleared before end",
+      "passed": true,
+      "expected": "only be cleared after campaign end"
+    },
+    {
+      "name": "expired campaign permits marker cleanup without deleting financial evidence",
+      "passed": true,
+      "expected": "accepted"
+    },
+    {
+      "name": "accepted game has exactly 36 copied questions",
+      "passed": true,
+      "expected": "accepted"
+    },
+    {
+      "name": "first opening cannot be cleared to obtain an unopened refund",
+      "passed": true,
+      "expected": "opening is permanent"
+    },
+    {
+      "name": "ended game cannot be revived",
+      "passed": true,
+      "expected": "terminal game cannot reopen"
+    },
+    {
+      "name": "host cannot remove a player after game start",
+      "passed": true,
+      "expected": "limited to the lobby"
+    },
+    {
+      "name": "due content purge preserves the original host vote",
+      "passed": true,
+      "expected": "accepted"
+    },
+    {
+      "name": "vote edits close after actual content purge",
+      "passed": true,
+      "expected": "feedback is closed"
+    },
+    {
+      "name": "purge cannot leave some copied questions behind",
+      "passed": true,
+      "expected": "remove all copied payloads"
+    },
+    {
+      "name": "purged game cannot acquire a new media reference",
+      "passed": true,
+      "expected": "cannot acquire new media pins"
+    },
+    {
+      "name": "expired OTP payload can redact while proof identity remains",
+      "passed": true,
+      "expected": "accepted"
+    },
+    {
+      "name": "redacted OTP proof cannot be restored or reused",
+      "passed": true,
+      "expected": "cannot be reused or restored"
+    },
+    {
+      "name": "linked phone proofs can redact without breaking their history FKs",
+      "passed": true,
+      "expected": "accepted"
+    },
+    {
+      "name": "redacted phone-change payload cannot be restored",
+      "passed": true,
+      "expected": "history cannot be restored"
+    },
+    {
+      "name": "two starts cannot spend the last token twice",
+      "passed": true,
+      "expected": "exactly one concurrent commit"
+    },
+    {
+      "name": "simultaneous payment handlers cannot double-credit",
+      "passed": true,
+      "expected": "exactly one concurrent commit"
+    },
+    {
+      "name": "concurrent free orders obey the final global campaign slot",
+      "passed": true,
+      "expected": "exactly one concurrent commit"
+    },
+    {
+      "name": "simultaneous guests cannot exceed six including host",
+      "passed": true,
+      "expected": "exactly one concurrent commit"
+    },
+    {
+      "name": "deletion serializes against new checkout admission",
+      "passed": true,
+      "expected": "locked contender rejected after committed state change"
+    },
+    {
+      "name": "content purge serializes against media reference insertion",
+      "passed": true,
+      "expected": "locked contender rejected after committed state change"
+    }
+  ],
+  "measurements": {
+    "fixture": {
+      "jobs": 100000,
+      "pending_jobs": 20,
+      "running_jobs": 20,
+      "terminal_games": 10000,
+      "active_games": 50,
+      "unpurged_terminal_games": 50,
+      "additional_questions": 4080,
+      "note": "Minimal valid measurement rows; no media transfer, network, complete historical gameplay or production traffic simulation."
+    },
+    "maintenance_queries": [
+      {
+        "name": "pending_jobs",
+        "sql": "SELECT id FROM outbox_events WHERE state='pending' AND available_at<=now() ORDER BY available_at,id LIMIT 20",
+        "partial_bytes": 16384,
+        "full_bytes": 4980736,
+        "selected_indexes": [
+          "outbox_events_pending_work"
+        ],
+        "current": {
+          "Plan": {
+            "Node Type": "Limit",
+            "Parallel Aware": false,
+            "Async Capable": false,
+            "Startup Cost": 0.14,
+            "Total Cost": 8.16,
+            "Plan Rows": 1,
+            "Plan Width": 24,
+            "Actual Startup Time": 0.024,
+            "Actual Total Time": 0.028,
+            "Actual Rows": 20.0,
+            "Actual Loops": 1,
+            "Disabled": false,
+            "Shared Hit Blocks": 2,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Plans": [
+              {
+                "Node Type": "Index Only Scan",
+                "Parent Relationship": "Outer",
+                "Parallel Aware": false,
+                "Async Capable": false,
+                "Scan Direction": "Forward",
+                "Index Name": "outbox_events_pending_work",
+                "Relation Name": "outbox_events",
+                "Alias": "outbox_events",
+                "Startup Cost": 0.14,
+                "Total Cost": 8.16,
+                "Plan Rows": 1,
+                "Plan Width": 24,
+                "Actual Startup Time": 0.023,
+                "Actual Total Time": 0.026,
+                "Actual Rows": 20.0,
+                "Actual Loops": 1,
+                "Disabled": false,
+                "Index Cond": "(available_at <= now())",
+                "Rows Removed by Index Recheck": 0,
+                "Heap Fetches": 20,
+                "Index Searches": 1,
+                "Shared Hit Blocks": 2,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Local Hit Blocks": 0,
+                "Local Read Blocks": 0,
+                "Local Dirtied Blocks": 0,
+                "Local Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0
+              }
+            ]
+          },
+          "Planning": {
+            "Shared Hit Blocks": 225,
+            "Shared Read Blocks": 2,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0
+          },
+          "Planning Time": 0.704,
+          "Triggers": [],
+          "Execution Time": 0.051
+        },
+        "full_candidate_without_this_partial": {
+          "Plan": {
+            "Node Type": "Limit",
+            "Parallel Aware": false,
+            "Async Capable": false,
+            "Startup Cost": 0.42,
+            "Total Cost": 8.44,
+            "Plan Rows": 1,
+            "Plan Width": 24,
+            "Actual Startup Time": 0.07,
+            "Actual Total Time": 0.074,
+            "Actual Rows": 20.0,
+            "Actual Loops": 1,
+            "Disabled": false,
+            "Shared Hit Blocks": 1,
+            "Shared Read Blocks": 3,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Plans": [
+              {
+                "Node Type": "Index Only Scan",
+                "Parent Relationship": "Outer",
+                "Parallel Aware": false,
+                "Async Capable": false,
+                "Scan Direction": "Forward",
+                "Index Name": "audit_full_outbox_pending",
+                "Relation Name": "outbox_events",
+                "Alias": "outbox_events",
+                "Startup Cost": 0.42,
+                "Total Cost": 8.44,
+                "Plan Rows": 1,
+                "Plan Width": 24,
+                "Actual Startup Time": 0.068,
+                "Actual Total Time": 0.071,
+                "Actual Rows": 20.0,
+                "Actual Loops": 1,
+                "Disabled": false,
+                "Index Cond": "((state = 'pending'::work_state) AND (available_at <= now()))",
+                "Rows Removed by Index Recheck": 0,
+                "Heap Fetches": 20,
+                "Index Searches": 1,
+                "Shared Hit Blocks": 1,
+                "Shared Read Blocks": 3,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Local Hit Blocks": 0,
+                "Local Read Blocks": 0,
+                "Local Dirtied Blocks": 0,
+                "Local Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0
+              }
+            ]
+          },
+          "Planning": {
+            "Shared Hit Blocks": 197,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0
+          },
+          "Planning Time": 0.568,
+          "Triggers": [],
+          "Execution Time": 0.102
+        }
+      },
+      {
+        "name": "stale_job_leases",
+        "sql": "SELECT id FROM outbox_events WHERE state='running' AND lease_until<=now() ORDER BY lease_until,id LIMIT 20",
+        "partial_bytes": 16384,
+        "full_bytes": 4997120,
+        "selected_indexes": [
+          "outbox_events_stale_leases"
+        ],
+        "current": {
+          "Plan": {
+            "Node Type": "Limit",
+            "Parallel Aware": false,
+            "Async Capable": false,
+            "Startup Cost": 0.14,
+            "Total Cost": 8.15,
+            "Plan Rows": 1,
+            "Plan Width": 24,
+            "Actual Startup Time": 0.026,
+            "Actual Total Time": 0.031,
+            "Actual Rows": 20.0,
+            "Actual Loops": 1,
+            "Disabled": false,
+            "Shared Hit Blocks": 2,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Plans": [
+              {
+                "Node Type": "Index Only Scan",
+                "Parent Relationship": "Outer",
+                "Parallel Aware": false,
+                "Async Capable": false,
+                "Scan Direction": "Forward",
+                "Index Name": "outbox_events_stale_leases",
+                "Relation Name": "outbox_events",
+                "Alias": "outbox_events",
+                "Startup Cost": 0.14,
+                "Total Cost": 8.15,
+                "Plan Rows": 1,
+                "Plan Width": 24,
+                "Actual Startup Time": 0.024,
+                "Actual Total Time": 0.028,
+                "Actual Rows": 20.0,
+                "Actual Loops": 1,
+                "Disabled": false,
+                "Index Cond": "(lease_until <= now())",
+                "Rows Removed by Index Recheck": 0,
+                "Heap Fetches": 20,
+                "Index Searches": 1,
+                "Shared Hit Blocks": 2,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Local Hit Blocks": 0,
+                "Local Read Blocks": 0,
+                "Local Dirtied Blocks": 0,
+                "Local Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0
+              }
+            ]
+          },
+          "Planning": {
+            "Shared Hit Blocks": 227,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0
+          },
+          "Planning Time": 0.612,
+          "Triggers": [],
+          "Execution Time": 0.054
+        },
+        "full_candidate_without_this_partial": {
+          "Plan": {
+            "Node Type": "Limit",
+            "Parallel Aware": false,
+            "Async Capable": false,
+            "Startup Cost": 0.42,
+            "Total Cost": 8.44,
+            "Plan Rows": 1,
+            "Plan Width": 24,
+            "Actual Startup Time": 0.07,
+            "Actual Total Time": 0.075,
+            "Actual Rows": 20.0,
+            "Actual Loops": 1,
+            "Disabled": false,
+            "Shared Hit Blocks": 1,
+            "Shared Read Blocks": 3,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Plans": [
+              {
+                "Node Type": "Index Only Scan",
+                "Parent Relationship": "Outer",
+                "Parallel Aware": false,
+                "Async Capable": false,
+                "Scan Direction": "Forward",
+                "Index Name": "audit_full_outbox_leases",
+                "Relation Name": "outbox_events",
+                "Alias": "outbox_events",
+                "Startup Cost": 0.42,
+                "Total Cost": 8.44,
+                "Plan Rows": 1,
+                "Plan Width": 24,
+                "Actual Startup Time": 0.069,
+                "Actual Total Time": 0.073,
+                "Actual Rows": 20.0,
+                "Actual Loops": 1,
+                "Disabled": false,
+                "Index Cond": "((state = 'running'::work_state) AND (lease_until <= now()))",
+                "Rows Removed by Index Recheck": 0,
+                "Heap Fetches": 20,
+                "Index Searches": 1,
+                "Shared Hit Blocks": 1,
+                "Shared Read Blocks": 3,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Local Hit Blocks": 0,
+                "Local Read Blocks": 0,
+                "Local Dirtied Blocks": 0,
+                "Local Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0
+              }
+            ]
+          },
+          "Planning": {
+            "Shared Hit Blocks": 197,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0
+          },
+          "Planning Time": 0.545,
+          "Triggers": [],
+          "Execution Time": 0.099
+        }
+      },
+      {
+        "name": "expired_active_games",
+        "sql": "SELECT id FROM games WHERE status='active' AND idle_expires_at<=now() ORDER BY idle_expires_at,id LIMIT 20",
+        "partial_bytes": 16384,
+        "full_bytes": 516096,
+        "selected_indexes": [
+          "games_one_active_per_room"
+        ],
+        "current": {
+          "Plan": {
+            "Node Type": "Limit",
+            "Parallel Aware": false,
+            "Async Capable": false,
+            "Startup Cost": 22.11,
+            "Total Cost": 22.16,
+            "Plan Rows": 20,
+            "Plan Width": 24,
+            "Actual Startup Time": 0.126,
+            "Actual Total Time": 0.128,
+            "Actual Rows": 20.0,
+            "Actual Loops": 1,
+            "Disabled": false,
+            "Shared Hit Blocks": 48,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Plans": [
+              {
+                "Node Type": "Sort",
+                "Parent Relationship": "Outer",
+                "Parallel Aware": false,
+                "Async Capable": false,
+                "Startup Cost": 22.11,
+                "Total Cost": 22.24,
+                "Plan Rows": 51,
+                "Plan Width": 24,
+                "Actual Startup Time": 0.125,
+                "Actual Total Time": 0.126,
+                "Actual Rows": 20.0,
+                "Actual Loops": 1,
+                "Disabled": false,
+                "Sort Key": [
+                  "idle_expires_at",
+                  "id"
+                ],
+                "Sort Method": "top-N heapsort",
+                "Sort Space Used": 27,
+                "Sort Space Type": "Memory",
+                "Shared Hit Blocks": 48,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Local Hit Blocks": 0,
+                "Local Read Blocks": 0,
+                "Local Dirtied Blocks": 0,
+                "Local Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0,
+                "Plans": [
+                  {
+                    "Node Type": "Index Scan",
+                    "Parent Relationship": "Outer",
+                    "Parallel Aware": false,
+                    "Async Capable": false,
+                    "Scan Direction": "Forward",
+                    "Index Name": "games_one_active_per_room",
+                    "Relation Name": "games",
+                    "Alias": "games",
+                    "Startup Cost": 0.14,
+                    "Total Cost": 20.76,
+                    "Plan Rows": 51,
+                    "Plan Width": 24,
+                    "Actual Startup Time": 0.012,
+                    "Actual Total Time": 0.081,
+                    "Actual Rows": 50.0,
+                    "Actual Loops": 1,
+                    "Disabled": false,
+                    "Filter": "(idle_expires_at <= now())",
+                    "Rows Removed by Filter": 1,
+                    "Index Searches": 1,
+                    "Shared Hit Blocks": 42,
+                    "Shared Read Blocks": 0,
+                    "Shared Dirtied Blocks": 0,
+                    "Shared Written Blocks": 0,
+                    "Local Hit Blocks": 0,
+                    "Local Read Blocks": 0,
+                    "Local Dirtied Blocks": 0,
+                    "Local Written Blocks": 0,
+                    "Temp Read Blocks": 0,
+                    "Temp Written Blocks": 0
+                  }
+                ]
+              }
+            ]
+          },
+          "Planning": {
+            "Shared Hit Blocks": 248,
+            "Shared Read Blocks": 2,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0
+          },
+          "Planning Time": 0.742,
+          "Triggers": [],
+          "Execution Time": 0.152
+        },
+        "full_candidate_without_this_partial": {
+          "Plan": {
+            "Node Type": "Limit",
+            "Parallel Aware": false,
+            "Async Capable": false,
+            "Startup Cost": 22.11,
+            "Total Cost": 22.16,
+            "Plan Rows": 20,
+            "Plan Width": 24,
+            "Actual Startup Time": 0.108,
+            "Actual Total Time": 0.11,
+            "Actual Rows": 20.0,
+            "Actual Loops": 1,
+            "Disabled": false,
+            "Shared Hit Blocks": 45,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Plans": [
+              {
+                "Node Type": "Sort",
+                "Parent Relationship": "Outer",
+                "Parallel Aware": false,
+                "Async Capable": false,
+                "Startup Cost": 22.11,
+                "Total Cost": 22.24,
+                "Plan Rows": 51,
+                "Plan Width": 24,
+                "Actual Startup Time": 0.106,
+                "Actual Total Time": 0.107,
+                "Actual Rows": 20.0,
+                "Actual Loops": 1,
+                "Disabled": false,
+                "Sort Key": [
+                  "idle_expires_at",
+                  "id"
+                ],
+                "Sort Method": "top-N heapsort",
+                "Sort Space Used": 27,
+                "Sort Space Type": "Memory",
+                "Shared Hit Blocks": 45,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Local Hit Blocks": 0,
+                "Local Read Blocks": 0,
+                "Local Dirtied Blocks": 0,
+                "Local Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0,
+                "Plans": [
+                  {
+                    "Node Type": "Index Scan",
+                    "Parent Relationship": "Outer",
+                    "Parallel Aware": false,
+                    "Async Capable": false,
+                    "Scan Direction": "Forward",
+                    "Index Name": "games_one_active_per_room",
+                    "Relation Name": "games",
+                    "Alias": "games",
+                    "Startup Cost": 0.14,
+                    "Total Cost": 20.76,
+                    "Plan Rows": 51,
+                    "Plan Width": 24,
+                    "Actual Startup Time": 0.012,
+                    "Actual Total Time": 0.069,
+                    "Actual Rows": 50.0,
+                    "Actual Loops": 1,
+                    "Disabled": false,
+                    "Filter": "(idle_expires_at <= now())",
+                    "Rows Removed by Filter": 1,
+                    "Index Searches": 1,
+                    "Shared Hit Blocks": 39,
+                    "Shared Read Blocks": 0,
+                    "Shared Dirtied Blocks": 0,
+                    "Shared Written Blocks": 0,
+                    "Local Hit Blocks": 0,
+                    "Local Read Blocks": 0,
+                    "Local Dirtied Blocks": 0,
+                    "Local Written Blocks": 0,
+                    "Temp Read Blocks": 0,
+                    "Temp Written Blocks": 0
+                  }
+                ]
+              }
+            ]
+          },
+          "Planning": {
+            "Shared Hit Blocks": 220,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0
+          },
+          "Planning Time": 0.7,
+          "Triggers": [],
+          "Execution Time": 0.135
+        }
+      },
+      {
+        "name": "content_due_for_purge",
+        "sql": "SELECT id FROM games WHERE content_purged_at IS NULL AND content_purge_after IS NOT NULL AND content_purge_after<=now() ORDER BY content_purge_after,id LIMIT 20",
+        "partial_bytes": 16384,
+        "full_bytes": 425984,
+        "selected_indexes": [
+          "games_due_content_purge"
+        ],
+        "current": {
+          "Plan": {
+            "Node Type": "Limit",
+            "Parallel Aware": false,
+            "Async Capable": false,
+            "Startup Cost": 0.14,
+            "Total Cost": 34.0,
+            "Plan Rows": 20,
+            "Plan Width": 24,
+            "Actual Startup Time": 0.035,
+            "Actual Total Time": 0.051,
+            "Actual Rows": 20.0,
+            "Actual Loops": 1,
+            "Disabled": false,
+            "Shared Hit Blocks": 13,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Plans": [
+              {
+                "Node Type": "Index Only Scan",
+                "Parent Relationship": "Outer",
+                "Parallel Aware": false,
+                "Async Capable": false,
+                "Scan Direction": "Forward",
+                "Index Name": "games_due_content_purge",
+                "Relation Name": "games",
+                "Alias": "games",
+                "Startup Cost": 0.14,
+                "Total Cost": 169.44,
+                "Plan Rows": 100,
+                "Plan Width": 24,
+                "Actual Startup Time": 0.034,
+                "Actual Total Time": 0.049,
+                "Actual Rows": 20.0,
+                "Actual Loops": 1,
+                "Disabled": false,
+                "Index Cond": "(content_purge_after <= now())",
+                "Rows Removed by Index Recheck": 0,
+                "Heap Fetches": 20,
+                "Index Searches": 1,
+                "Shared Hit Blocks": 13,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Local Hit Blocks": 0,
+                "Local Read Blocks": 0,
+                "Local Dirtied Blocks": 0,
+                "Local Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0
+              }
+            ]
+          },
+          "Planning": {
+            "Shared Hit Blocks": 250,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0
+          },
+          "Planning Time": 0.681,
+          "Triggers": [],
+          "Execution Time": 0.073
+        },
+        "full_candidate_without_this_partial": {
+          "Plan": {
+            "Node Type": "Limit",
+            "Parallel Aware": false,
+            "Async Capable": false,
+            "Startup Cost": 0.29,
+            "Total Cost": 253.89,
+            "Plan Rows": 20,
+            "Plan Width": 24,
+            "Actual Startup Time": 0.568,
+            "Actual Total Time": 2.147,
+            "Actual Rows": 20.0,
+            "Actual Loops": 1,
+            "Disabled": false,
+            "Shared Hit Blocks": 3908,
+            "Shared Read Blocks": 21,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Plans": [
+              {
+                "Node Type": "Index Scan",
+                "Parent Relationship": "Outer",
+                "Parallel Aware": false,
+                "Async Capable": false,
+                "Scan Direction": "Forward",
+                "Index Name": "audit_full_games_purge",
+                "Relation Name": "games",
+                "Alias": "games",
+                "Startup Cost": 0.29,
+                "Total Cost": 1268.29,
+                "Plan Rows": 100,
+                "Plan Width": 24,
+                "Actual Startup Time": 0.567,
+                "Actual Total Time": 2.144,
+                "Actual Rows": 20.0,
+                "Actual Loops": 1,
+                "Disabled": false,
+                "Index Cond": "((content_purge_after IS NOT NULL) AND (content_purge_after <= now()))",
+                "Rows Removed by Index Recheck": 0,
+                "Filter": "(content_purged_at IS NULL)",
+                "Rows Removed by Filter": 3900,
+                "Index Searches": 1,
+                "Shared Hit Blocks": 3908,
+                "Shared Read Blocks": 21,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Local Hit Blocks": 0,
+                "Local Read Blocks": 0,
+                "Local Dirtied Blocks": 0,
+                "Local Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0
+              }
+            ]
+          },
+          "Planning": {
+            "Shared Hit Blocks": 220,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0
+          },
+          "Planning Time": 0.617,
+          "Triggers": [],
+          "Execution Time": 2.171
+        }
+      }
+    ],
+    "six_current_slots_without_extra_full_index": {
+      "Plan": {
+        "Node Type": "Sort",
+        "Parallel Aware": false,
+        "Async Capable": false,
+        "Startup Cost": 26.09,
+        "Total Cost": 26.11,
+        "Plan Rows": 6,
+        "Plan Width": 18,
+        "Actual Startup Time": 0.083,
+        "Actual Total Time": 0.084,
+        "Actual Rows": 6.0,
+        "Actual Loops": 1,
+        "Disabled": false,
+        "Sort Key": [
+          "slot_number"
+        ],
+        "Sort Method": "quicksort",
+        "Sort Space Used": 25,
+        "Sort Space Type": "Memory",
+        "Shared Hit Blocks": 11,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Local Hit Blocks": 0,
+        "Local Read Blocks": 0,
+        "Local Dirtied Blocks": 0,
+        "Local Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0,
+        "Plans": [
+          {
+            "Node Type": "Bitmap Heap Scan",
+            "Parent Relationship": "Outer",
+            "Parallel Aware": false,
+            "Async Capable": false,
+            "Relation Name": "questions",
+            "Alias": "questions",
+            "Startup Cost": 4.33,
+            "Total Cost": 26.02,
+            "Plan Rows": 6,
+            "Plan Width": 18,
+            "Actual Startup Time": 0.045,
+            "Actual Total Time": 0.059,
+            "Actual Rows": 6.0,
+            "Actual Loops": 1,
+            "Disabled": false,
+            "Recheck Cond": "((pack_id = '63758277-672f-d623-c491-c036ad7df7cb'::uuid) AND (retired_at IS NULL))",
+            "Rows Removed by Index Recheck": 0,
+            "Exact Heap Blocks": 6,
+            "Lossy Heap Blocks": 0,
+            "Shared Hit Blocks": 8,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Plans": [
+              {
+                "Node Type": "Bitmap Index Scan",
+                "Parent Relationship": "Outer",
+                "Parallel Aware": false,
+                "Async Capable": false,
+                "Index Name": "questions_one_current_per_pack_slot",
+                "Startup Cost": 0.0,
+                "Total Cost": 4.33,
+                "Plan Rows": 6,
+                "Plan Width": 0,
+                "Actual Startup Time": 0.03,
+                "Actual Total Time": 0.03,
+                "Actual Rows": 6.0,
+                "Actual Loops": 1,
+                "Disabled": false,
+                "Index Cond": "(pack_id = '63758277-672f-d623-c491-c036ad7df7cb'::uuid)",
+                "Index Searches": 1,
+                "Shared Hit Blocks": 2,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Local Hit Blocks": 0,
+                "Local Read Blocks": 0,
+                "Local Dirtied Blocks": 0,
+                "Local Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0
+              }
+            ]
+          }
+        ]
+      },
+      "Planning": {
+        "Shared Hit Blocks": 141,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Local Hit Blocks": 0,
+        "Local Read Blocks": 0,
+        "Local Dirtied Blocks": 0,
+        "Local Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0
+      },
+      "Planning Time": 0.796,
+      "Triggers": [],
+      "Execution Time": 0.124
+    },
+    "interpretation": "Index footprints and planner access paths only. Local timings are not Railway capacity or an application latency guarantee."
+  },
+  "elapsed_seconds": 10.43,
+  "limits": "Disposable local SQL/reference transactions only; no NestJS, Paymob, Apple/Google SDK or Railway load validation."
+}

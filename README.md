@@ -19,7 +19,7 @@
 
 The repository root and `web_app/` organize applications. Each application installs, builds, runs and deploys from its own directory, with its own dependencies and lockfile. There is no shared JavaScript workspace. Frontend/backend communication uses HTTP.
 
-The playable game remains in `sahsah_prototype/`. The new frontend, API and empty AdminJS dashboard are starters; gameplay, accounts, payments, persistent storage and multiplayer have not been migrated into them.
+The playable game remains in `sahsah_prototype/`. The API now owns the [Drizzle/PostgreSQL schema and database foundation](web_app/backend/README.md); account, gameplay, payment and multiplayer workflows remain unimplemented in the new applications. The new frontend and empty AdminJS dashboard remain starters.
 
 ## Tooling
 
@@ -75,7 +75,7 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-The NestJS API listens at http://localhost:3001/api/health. Copy `.env.example` to `.env` to change the bind address, port and allowed frontend origins. Run `pnpm check`, `pnpm test` and `pnpm build`; run `pnpm start` after building. Backend tests cover the API, admin disabled/misconfigured states, login, session cookies and AdminJS asset delivery.
+The NestJS API listens at http://localhost:3001/api/health. Copy `.env.example` to `.env` to configure the server and PostgreSQL. Process liveness remains `/api/health`; database readiness is `/api/health/ready`. Follow the [backend guide](web_app/backend/README.md) for separate migration/runtime credentials, schema setup and `pnpm test:database`. Run `pnpm check`, `pnpm test` and `pnpm build`; run `pnpm start` after building. Backend HTTP tests cover the API, admin disabled/misconfigured states, login, session cookies and AdminJS asset delivery.
 
 AdminJS belongs to this backend at `src/admin/` and shares its server at **http://localhost:3001/admin**. It uses the supported Express integration directly with Nest's Express server; there is no separate admin package, process, port or dependency installation. Keeping it with the API also gives future database resources one owner.
 
@@ -90,7 +90,7 @@ ADMIN_SESSION_SECRET=your-random-secret-of-at-least-32-characters
 
 Generate a session secret with `openssl rand -hex 32`, and restart the backend after editing `.env`. Enabling the dashboard without valid credentials fails startup. Login protects the dashboard; public assets remain available to render the login page. The cookie is HttpOnly, SameSite=Lax, scoped to `/admin`, and Secure in production. Production HTTPS behind a proxy requires configuring Express's trusted proxy for your deployment.
 
-The dashboard currently has no database resources. It uses an in-memory session store for the starter; configure a persistent session store before production admin use. Add your database adapter and resources here when implementing the real backend. The prototype's simulated `/admin` editor remains a separate feature of the presentation app.
+The dashboard currently has no database resources. The staff tables now exist, but it still uses the starter environment login and in-memory sessions; staff-backed login/session integration remains a separate increment. The prototype's simulated `/admin` editor remains a separate feature of the presentation app.
 
 The backend alone pins AdminJS's TipTap core/PM/starter-kit to the same compatible v2 release. Frontend dependencies and versions do not inherit these overrides.
 

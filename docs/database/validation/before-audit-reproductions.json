@@ -1,0 +1,16 @@
+{
+  "baseline_dbml_sha256": "c0677d3dba9250d8d819d32d64ae3f72c6857568bfbeb71165d3ec2b064a87d4",
+  "cases": [
+    {
+      "case": "mapped_native_notification_funded_pending_purchase",
+      "accepted_by_baseline": true,
+      "error": null
+    },
+    {
+      "case": "inquiry_without_unpaid_confirmation_closed_attempt",
+      "accepted_by_baseline": true,
+      "error": null
+    }
+  ],
+  "note": "Isolated pre-audit v1.1 snapshot, loaded before improvements. New fields omitted to match that historical schema. Both cases are rejected by v1.2."
+}

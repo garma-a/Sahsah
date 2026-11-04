@@ -6,7 +6,7 @@ import AppModule from "./app.module.js";
 import { mountAdminDashboard } from "./admin/admin-dashboard.js";
 
 export async function createApplication() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { abortOnError: false });
   const config = app.get(ConfigService);
   app.setGlobalPrefix("api");
   app.enableCors({
@@ -17,6 +17,7 @@ export async function createApplication() {
   try {
     // Mount before Nest installs its body parser and catch-all handlers.
     await mountAdminDashboard(app, config);
+    await app.init();
     return app;
   } catch (error) {
     await app.close();

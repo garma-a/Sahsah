@@ -2,6 +2,10 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createApplication } from "../dist/application.js";
 
+// Starter HTTP tests must never pick up a developer's configured database.
+process.env.DATABASE_URL = "";
+process.env.NODE_ENV = "test";
+
 const credentials = {
   email: "admin@example.test",
   password: "test-only-password-for-admin",
@@ -21,6 +25,7 @@ test("the API works independently with the admin dashboard disabled", async (t) 
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("access-control-allow-origin"), "http://localhost:3000");
   assert.deepEqual(await response.json(), { status: "ok", service: "sahsah-backend" });
+  assert.equal((await fetch(`${base}/api/health/ready`)).status, 503);
   assert.equal((await fetch(`${base}/admin`)).status, 404);
 });
 

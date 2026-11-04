@@ -1,0 +1,165 @@
+// Database names and constraints follow the accepted v1.2 design.
+// Cyclic foreign keys are evaluated lazily in pgTable extra configuration.
+import * as t from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { accountState, deletionRequestState, phoneVerificationPurpose, playerLocale } from "./enums.js";
+import { bytea } from "./types.js";
+import { gamePlayers } from "./games.js";
+import { staffAuditEvents } from "./staff.js";
+
+export const accounts = t.pgTable("accounts", {
+  id: t.uuid("id").primaryKey().notNull(),
+  state: accountState("state").default("active").notNull(),
+  displayName: t.text("display_name"),
+  phoneE164: t.text("phone_e164").unique(),
+  phoneVerifiedAt: t.timestamp("phone_verified_at", { withTimezone: true, mode: "string" }),
+  preferredLocale: playerLocale("preferred_locale").default("ar").notNull(),
+  createdAt: t.timestamp("created_at", { withTimezone: true, mode: "string" }).default(sql`now()`).notNull(),
+  deletedAt: t.timestamp("deleted_at", { withTimezone: true, mode: "string" }),
+  firebaseProjectId: t.text("firebase_project_id"),
+  firebaseUid: t.text("firebase_uid"),
+  activeGameId: t.uuid("active_game_id"),
+  activeGameClaimedAt: t.timestamp("active_game_claimed_at", { withTimezone: true, mode: "string" }),
+  tokenBalance: t.integer("token_balance").default(0).notNull(),
+  tokenBalanceUpdatedAt: t.timestamp("token_balance_updated_at", { withTimezone: true, mode: "string" }).default(sql`now()`).notNull(),
+}, (table): t.PgTableExtraConfigValue[] => [
+  t.uniqueIndex("accounts_firebase_identity").on(table.firebaseProjectId, table.firebaseUid),
+  t.index("accounts_active_game_release").on(table.activeGameId, table.id).where(sql`active_game_id IS NOT NULL`),
+  t.foreignKey({
+    name: "accounts_active_roster",
+    columns: [table.activeGameId, table.id],
+    foreignColumns: [gamePlayers.gameId, gamePlayers.accountId],
+  }).onDelete("no action").onUpdate("no action"),
+  t.check("accounts_verified_phone_pair", sql`(phone_e164 IS NULL) = (phone_verified_at IS NULL)`),
+  t.check("accounts_egypt_e164_shape", sql`phone_e164 IS NULL OR (phone_e164 ~ '^\\+[1-9][0-9]{7,14}$' AND left(phone_e164, 3) = '+20')`),
+  t.check("accounts_live_profile_required", sql`state = 'deleted' OR (display_name IS NOT NULL AND length(btrim(display_name)) > 0 AND phone_e164 IS NOT NULL)`),
+  t.check("accounts_deleted_time_pair", sql`(state = 'deleted') = (deleted_at IS NOT NULL)`),
+  t.check("accounts_deleted_profile_cleared", sql`state <> 'deleted' OR (display_name IS NULL AND phone_e164 IS NULL AND phone_verified_at IS NULL)`),
+  t.check("accounts_deletion_order", sql`deleted_at IS NULL OR deleted_at >= created_at`),
+  t.check("accounts_firebase_pair", sql`(firebase_project_id IS NULL) = (firebase_uid IS NULL)`),
+  t.check("accounts_firebase_nonblank", sql`firebase_uid IS NULL OR (length(btrim(firebase_uid)) > 0 AND length(btrim(firebase_project_id)) > 0)`),
+  t.check("accounts_active_claim_pair", sql`(active_game_id IS NULL) = (active_game_claimed_at IS NULL)`),
+  t.check("accounts_active_claim_state", sql`active_game_id IS NULL OR state = 'active'`),
+  t.check("accounts_nonnegative_bank", sql`token_balance >= 0`),
+  t.check("accounts_deleted_bank_released", sql`state <> 'deleted' OR (token_balance = 0 AND active_game_id IS NULL)`),
+]);
+
+export const phoneVerificationChallenges = t.pgTable("phone_verification_challenges", {
+  id: t.uuid("id").primaryKey().notNull(),
+  accountId: t.uuid("account_id"),
+  phoneE164: t.text("phone_e164"),
+  purpose: phoneVerificationPurpose("purpose").notNull(),
+  otpMac: bytea("otp_mac"),
+  macKeyVersion: t.smallint("mac_key_version").notNull(),
+  attempts: t.smallint("attempts").default(0).notNull(),
+  maxAttempts: t.smallint("max_attempts").default(5).notNull(),
+  createdAt: t.timestamp("created_at", { withTimezone: true, mode: "string" }).notNull(),
+  expiresAt: t.timestamp("expires_at", { withTimezone: true, mode: "string" }).notNull(),
+  providerMessageId: t.text("provider_message_id"),
+  sentAt: t.timestamp("sent_at", { withTimezone: true, mode: "string" }),
+  verifiedAt: t.timestamp("verified_at", { withTimezone: true, mode: "string" }),
+  consumedAt: t.timestamp("consumed_at", { withTimezone: true, mode: "string" }),
+  invalidatedAt: t.timestamp("invalidated_at", { withTimezone: true, mode: "string" }),
+  redactedAt: t.timestamp("redacted_at", { withTimezone: true, mode: "string" }),
+}, (table): t.PgTableExtraConfigValue[] => [
+  t.index("phone_verification_challenges_cleanup").on(table.expiresAt, table.id),
+  t.index("phone_verification_challenges_phone_history").on(table.phoneE164, table.createdAt, table.id).where(sql`phone_e164 IS NOT NULL`),
+  t.foreignKey({
+    name: "phone_verification_challenges_account",
+    columns: [table.accountId],
+    foreignColumns: [accounts.id],
+  }).onDelete("no action").onUpdate("no action"),
+  t.check("phone_verification_challenges_fresh_consumption", sql`consumed_at IS NULL OR consumed_at < expires_at`),
+  t.check("phone_verification_challenges_redaction_order", sql`redacted_at IS NULL OR redacted_at >= created_at`),
+  t.check("phone_verification_challenges_redaction_shape", sql`(redacted_at IS NULL AND phone_e164 IS NOT NULL AND otp_mac IS NOT NULL) OR (redacted_at IS NOT NULL AND phone_e164 IS NULL AND otp_mac IS NULL AND provider_message_id IS NULL)`),
+  t.check("phone_verification_challenges_egypt_shape", sql`phone_e164 IS NULL OR (phone_e164 ~ '^\\+[1-9][0-9]{7,14}$' AND left(phone_e164, 3) = '+20')`),
+  t.check("phone_verification_challenges_change_owner", sql`purpose = 'sign_in' OR account_id IS NOT NULL`),
+  t.check("phone_verification_challenges_mac_shape", sql`(otp_mac IS NULL OR octet_length(otp_mac) = 32) AND mac_key_version > 0`),
+  t.check("phone_verification_challenges_attempt_bounds", sql`max_attempts > 0 AND attempts BETWEEN 0 AND max_attempts`),
+  t.check("phone_verification_challenges_expiry_order", sql`expires_at > created_at`),
+  t.check("phone_verification_challenges_send_order", sql`sent_at IS NULL OR sent_at >= created_at`),
+  t.check("phone_verification_challenges_verification_window", sql`verified_at IS NULL OR (verified_at >= created_at AND verified_at < expires_at)`),
+  t.check("phone_verification_challenges_consumption_order", sql`consumed_at IS NULL OR (verified_at IS NOT NULL AND consumed_at >= verified_at)`),
+  t.check("phone_verification_challenges_invalidation_order", sql`invalidated_at IS NULL OR invalidated_at >= created_at`),
+]);
+
+export const accountPhoneChanges = t.pgTable("account_phone_changes", {
+  id: t.uuid("id").primaryKey().notNull(),
+  accountId: t.uuid("account_id").notNull(),
+  oldPhoneE164: t.text("old_phone_e164"),
+  newPhoneE164: t.text("new_phone_e164"),
+  oldPhoneChallengeId: t.uuid("old_phone_challenge_id").unique(),
+  newPhoneChallengeId: t.uuid("new_phone_challenge_id").unique().notNull(),
+  supportAuditEventId: t.uuid("support_audit_event_id").unique(),
+  changedAt: t.timestamp("changed_at", { withTimezone: true, mode: "string" }).notNull(),
+  redactedAt: t.timestamp("redacted_at", { withTimezone: true, mode: "string" }),
+}, (table): t.PgTableExtraConfigValue[] => [
+  t.index("account_phone_changes_account_history").on(table.accountId, table.changedAt, table.id),
+  t.foreignKey({
+    name: "account_phone_changes_account",
+    columns: [table.accountId],
+    foreignColumns: [accounts.id],
+  }).onDelete("no action").onUpdate("no action"),
+  t.foreignKey({
+    name: "account_phone_changes_old_proof",
+    columns: [table.oldPhoneChallengeId],
+    foreignColumns: [phoneVerificationChallenges.id],
+  }).onDelete("no action").onUpdate("no action"),
+  t.foreignKey({
+    name: "account_phone_changes_new_proof",
+    columns: [table.newPhoneChallengeId],
+    foreignColumns: [phoneVerificationChallenges.id],
+  }).onDelete("no action").onUpdate("no action"),
+  t.foreignKey({
+    name: "account_phone_changes_support_audit",
+    columns: [table.supportAuditEventId],
+    foreignColumns: [staffAuditEvents.id],
+  }).onDelete("no action").onUpdate("no action"),
+  t.check("account_phone_changes_redaction_order", sql`redacted_at IS NULL OR redacted_at >= changed_at`),
+  t.check("account_phone_changes_redaction_shape", sql`(redacted_at IS NULL AND old_phone_e164 IS NOT NULL AND new_phone_e164 IS NOT NULL) OR (redacted_at IS NOT NULL AND old_phone_e164 IS NULL AND new_phone_e164 IS NULL)`),
+  t.check("account_phone_changes_different_numbers", sql`old_phone_e164 <> new_phone_e164`),
+  t.check("account_phone_changes_distinct_proofs", sql`old_phone_challenge_id <> new_phone_challenge_id`),
+  t.check("account_phone_changes_authorization_source", sql`(old_phone_challenge_id IS NOT NULL) <> (support_audit_event_id IS NOT NULL)`),
+]);
+
+export const accountDeletionRequests = t.pgTable("account_deletion_requests", {
+  id: t.uuid("id").primaryKey().notNull(),
+  accountId: t.uuid("account_id").notNull(),
+  requestKey: t.uuid("request_key").unique().notNull(),
+  state: deletionRequestState("state").default("requested").notNull(),
+  confirmedBank: t.integer("confirmed_bank"),
+  requestedAt: t.timestamp("requested_at", { withTimezone: true, mode: "string" }).notNull(),
+  fundingClearedAt: t.timestamp("funding_cleared_at", { withTimezone: true, mode: "string" }),
+  fundingChangedAt: t.timestamp("funding_changed_at", { withTimezone: true, mode: "string" }),
+  fundingReviewAuditEventId: t.uuid("funding_review_audit_event_id"),
+  confirmedAt: t.timestamp("confirmed_at", { withTimezone: true, mode: "string" }),
+  completedAt: t.timestamp("completed_at", { withTimezone: true, mode: "string" }),
+  cancelledAt: t.timestamp("cancelled_at", { withTimezone: true, mode: "string" }),
+}, (table): t.PgTableExtraConfigValue[] => [
+  t.uniqueIndex("account_deletion_requests_account_identity").on(table.id, table.accountId),
+  t.index("account_deletion_requests_account_history").on(table.accountId, table.requestedAt, table.id),
+  t.index("account_deletion_requests_pending_work").on(table.state, table.requestedAt, table.id),
+  t.uniqueIndex("account_deletion_requests_one_open_account").on(table.accountId).where(sql`state IN ('requested', 'confirmed')`),
+  t.foreignKey({
+    name: "account_deletion_requests_account",
+    columns: [table.accountId],
+    foreignColumns: [accounts.id],
+  }).onDelete("no action").onUpdate("no action"),
+  t.foreignKey({
+    name: "deletion_funding_review",
+    columns: [table.fundingReviewAuditEventId],
+    foreignColumns: [staffAuditEvents.id],
+  }).onDelete("no action").onUpdate("no action"),
+  t.check("account_deletion_requests_funding_change_order", sql`funding_changed_at IS NULL OR funding_changed_at >= requested_at`),
+  t.check("account_deletion_requests_fresh_clearance", sql`funding_cleared_at IS NULL OR funding_cleared_at >= coalesce(funding_changed_at, requested_at)`),
+  t.check("account_deletion_requests_cleared_confirmation", sql`confirmed_at IS NULL OR (funding_cleared_at IS NOT NULL AND confirmed_at >= funding_cleared_at)`),
+  t.check("account_deletion_requests_clearance_order", sql`funding_cleared_at IS NULL OR funding_cleared_at >= requested_at`),
+  t.check("account_deletion_requests_confirmation_pair", sql`(confirmed_bank IS NULL) = (confirmed_at IS NULL)`),
+  t.check("account_deletion_requests_bank_bounds", sql`confirmed_bank IS NULL OR confirmed_bank >= 0`),
+  t.check("account_deletion_requests_confirmation_required", sql`state NOT IN ('confirmed', 'completed') OR confirmed_at IS NOT NULL`),
+  t.check("account_deletion_requests_completion_pair", sql`(state = 'completed') = (completed_at IS NOT NULL)`),
+  t.check("account_deletion_requests_cancellation_pair", sql`(state = 'cancelled') = (cancelled_at IS NOT NULL)`),
+  t.check("account_deletion_requests_confirmation_order", sql`confirmed_at IS NULL OR confirmed_at >= requested_at`),
+  t.check("account_deletion_requests_completion_order", sql`completed_at IS NULL OR (confirmed_at IS NOT NULL AND completed_at >= confirmed_at)`),
+  t.check("account_deletion_requests_cancellation_order", sql`cancelled_at IS NULL OR cancelled_at >= requested_at`),
+]);

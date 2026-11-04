@@ -1,0 +1,5 @@
+# Consolidate the launch schema while retaining every agreed feature
+
+Accepted on 2026-11-02: replace the expanded 61-table physical model with the approximately 37-table consolidation proposed in the [simplification review](../database/schema-simplification-review.md). The user explicitly selected “Retain all features: about 37 tables” and requested simple staff administration. Public-page management, self-service phone changes and automatic free campaigns therefore remain in scope.
+
+Combine bounded one-to-one data on its owning record, use three staff tables with two fixed roles, and retain explicit question progress, media references, token movements and verified payment evidence. This reduces entities and joins while moving some relationship/transition validation into transactional NestJS services; it does not change the accepted product rules. PostgreSQL remains authoritative, and rebuildable local caching is the initial technical recommendation. The original four pending policy questions remain open; neither consolidation nor cache makes them answered.

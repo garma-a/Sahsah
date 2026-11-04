@@ -1,0 +1,1734 @@
+Project sahsah {
+  database_type: 'PostgreSQL'
+  Note: '''
+    Working design v1.0, 2026-11-02: approved 37-table consolidation with all features.
+    Physical layout changed; accepted product rules remain. This is a planning draft,
+    not an applied migration or a performance result. Q84-Q87 and final retention/
+    integrity review remain open. See decisions-summary and ADR 0007.
+    One PostgreSQL authority; caches are rebuildable, accepted game/financial state is durable.
+    One permanent token bank, no cash-out/source lots. Public edits use starting game
+    snapshots, question replacement creates new identity. Six people include the host.
+    Three staff-specific tables, two fixed roles. All public CMS/phone-change/free-campaign
+    features remain included. PostgreSQL-only partial indexes are in the supplement.
+  '''
+}
+
+Enum game_status {
+  active
+  finished
+  expired
+  failed
+}
+
+Enum game_end_reason {
+  completed
+  host_ended
+  host_left
+  idle_timeout
+  platform_failure
+}
+
+Enum token_entry_kind {
+  credit
+  game_debit
+  game_restoration
+  deletion_forfeiture
+}
+
+Enum game_restoration_reason {
+  unopened_game
+  platform_failure
+}
+
+Enum token_order_kind {
+  personal
+  gift
+}
+
+Enum applied_discount_kind {
+  none
+  gift
+  promo_code
+}
+
+Enum order_payment_state {
+  pending
+  paid
+  not_required
+  cancelled
+}
+
+Enum promo_usage_state {
+  held
+  consumed
+  released
+}
+
+Enum question_timer_state {
+  ready
+  running
+  paused
+  elapsed
+}
+
+Enum score_entry_kind {
+  question_award
+  manual_adjustment
+}
+
+Enum pack_publication_state {
+  draft
+  published
+}
+
+Enum question_format {
+  STANDARD
+  IMAGE_BLUR
+  IMAGE_ZOOM
+  AUDIO_GUESS
+  AUDIO_REVERSE
+  IMAGE_PERSON
+  IMAGE_COLOR
+  IMAGE_RIDDLE
+  AUDIO_VOICE
+  IMAGE_MEMORY
+}
+
+Enum media_kind {
+  image
+  audio
+}
+
+Enum media_asset_state {
+  pending
+  ready
+  failed
+}
+
+Enum question_media_role {
+  prompt_image
+  answer_image
+  source_image
+  question_audio
+  source_audio
+  answer_audio
+  hint_image
+}
+
+Enum account_state {
+  active
+  deletion_pending
+  deleted
+}
+
+Enum player_locale {
+  ar
+  franco
+}
+
+Enum phone_verification_purpose {
+  sign_in
+  phone_change_old
+  phone_change_new
+}
+
+Enum promotion_trigger {
+  code
+  automatic_free
+}
+
+Enum payment_environment {
+  test
+  live
+}
+
+Enum payment_attempt_state {
+  initializing
+  ready
+  unknown
+  closed_unpaid
+  paid
+}
+
+Enum provider_reference_kind {
+  intention
+  order
+}
+
+Enum payment_outcome {
+  pending
+  authorized
+  succeeded
+  failed
+  voided
+}
+
+Enum payment_receipt_state {
+  queued
+  processed
+  needs_review
+  ignored
+}
+
+Enum settlement_kind {
+  payment
+  zero_cost
+}
+
+Enum reconciliation_state {
+  open
+  resolved
+}
+
+Enum payment_verification_method {
+  hmac_callback
+  authenticated_inquiry
+}
+
+Enum payment_transaction_kind {
+  payment
+  capture
+  refund
+  void
+}
+
+Enum deletion_request_state {
+  requested
+  confirmed
+  completed
+  cancelled
+}
+
+Enum feedback_vote {
+  like
+  dislike
+}
+
+Enum contact_kind {
+  support
+  experience
+  business
+}
+
+Enum contact_state {
+  open
+  closed
+}
+
+Enum work_state {
+  pending
+  running
+  succeeded
+  dead
+}
+
+Enum media_access_scope {
+  private
+  public
+}
+
+Enum staff_role {
+  super_admin
+  admin
+}
+
+Table accounts {
+  id uuid [pk]
+  state account_state [not null, default: 'active']
+  display_name text
+  phone_e164 text [unique]
+  phone_verified_at timestamptz
+  preferred_locale player_locale [not null, default: 'ar']
+  created_at timestamptz [not null, default: `now()`]
+  deleted_at timestamptz
+  firebase_project_id text
+  firebase_uid text
+  active_game_id uuid
+  active_game_claimed_at timestamptz
+  token_balance integer [not null, default: 0]
+  token_balance_updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (firebase_project_id, firebase_uid) [unique, name: 'accounts_firebase_identity']
+    (active_game_id, id) [name: 'accounts_active_game_release']
+  }
+
+  checks {
+    `(phone_e164 IS NULL) = (phone_verified_at IS NULL)` [name: 'accounts_verified_phone_pair']
+    `phone_e164 IS NULL OR (phone_e164 ~ '^\+[1-9][0-9]{7,14}$' AND left(phone_e164, 3) = '+20')` [name: 'accounts_egypt_e164_shape']
+    `state = 'deleted' OR (display_name IS NOT NULL AND length(btrim(display_name)) > 0 AND phone_e164 IS NOT NULL)` [name: 'accounts_live_profile_required']
+    `(state = 'deleted') = (deleted_at IS NOT NULL)` [name: 'accounts_deleted_time_pair']
+    `state <> 'deleted' OR (display_name IS NULL AND phone_e164 IS NULL AND phone_verified_at IS NULL)` [name: 'accounts_deleted_profile_cleared']
+    `deleted_at IS NULL OR deleted_at >= created_at` [name: 'accounts_deletion_order']
+    `(firebase_project_id IS NULL) = (firebase_uid IS NULL)` [name: 'accounts_firebase_pair']
+    `firebase_uid IS NULL OR (length(btrim(firebase_uid)) > 0 AND length(btrim(firebase_project_id)) > 0)` [name: 'accounts_firebase_nonblank']
+    `(active_game_id IS NULL) = (active_game_claimed_at IS NULL)` [name: 'accounts_active_claim_pair']
+    `active_game_id IS NULL OR state = 'active'` [name: 'accounts_active_claim_state']
+    `token_balance >= 0` [name: 'accounts_nonnegative_bank']
+    `state <> 'deleted' OR (token_balance = 0 AND active_game_id IS NULL)` [name: 'accounts_deleted_bank_released']
+  }
+
+  Note: '''
+    Stable player identity, verified Egypt phone and locale, plus one Firebase identity in the configured project, one active-game pointer and one permanent combined token bank. Firebase owns ordinary player sessions. All token changes update token_balance with an append-only ledger movement under the account lock; it is not an editable AdminJS field. One active pointer per account replaces a claim table; its composite FK proves roster membership, while lifecycle checks prove active eligibility. Freeze game roster identity at start; mid-game sign-in does not backfill. Retain tombstone IDs for finance and revoke external auth through durable work. Phone change preserves identity and credits. Pending Q86/Q87 are not answered by consolidation. Firebase credentials are not stored here.
+  '''
+}
+
+Table phone_verification_challenges {
+  id uuid [pk]
+  account_id uuid
+  phone_e164 text [not null]
+  purpose phone_verification_purpose [not null]
+  otp_mac bytea [not null]
+  mac_key_version smallint [not null]
+  attempts smallint [not null, default: 0]
+  max_attempts smallint [not null, default: 5]
+  created_at timestamptz [not null]
+  expires_at timestamptz [not null]
+  provider_message_id text
+  sent_at timestamptz
+  verified_at timestamptz
+  consumed_at timestamptz
+  invalidated_at timestamptz
+
+  indexes {
+    (phone_e164, created_at, id) [name: 'phone_verification_challenges_phone_history']
+    (expires_at, id) [name: 'phone_verification_challenges_cleanup']
+  }
+
+  checks {
+    `phone_e164 ~ '^\+[1-9][0-9]{7,14}$' AND left(phone_e164, 3) = '+20'` [name: 'phone_verification_challenges_egypt_shape']
+    `purpose = 'sign_in' OR account_id IS NOT NULL` [name: 'phone_verification_challenges_change_owner']
+    `octet_length(otp_mac) = 32 AND mac_key_version > 0` [name: 'phone_verification_challenges_mac_shape']
+    `max_attempts > 0 AND attempts BETWEEN 0 AND max_attempts` [name: 'phone_verification_challenges_attempt_bounds']
+    `expires_at > created_at` [name: 'phone_verification_challenges_expiry_order']
+    `sent_at IS NULL OR sent_at >= created_at` [name: 'phone_verification_challenges_send_order']
+    `verified_at IS NULL OR (verified_at >= created_at AND verified_at < expires_at)` [name: 'phone_verification_challenges_verification_window']
+    `consumed_at IS NULL OR (verified_at IS NOT NULL AND consumed_at >= verified_at)` [name: 'phone_verification_challenges_consumption_order']
+    `invalidated_at IS NULL OR invalidated_at >= created_at` [name: 'phone_verification_challenges_invalidation_order']
+  }
+
+  Note: '''
+    Short-lived Meta/WhatsApp verification proof; never store plaintext OTP. otp_mac
+    is a keyed MAC using a separately managed server secret/version, not an unsalted
+    hash of a guessable code. Lock verification rows for attempt/expiry/consumption
+    checks and rate-limit sends by canonical phone plus service-level controls. The
+    expiry is stored per issued challenge; five attempts is a proposed technical
+    default, not an additional product entitlement. Phone-change proofs are purpose-
+    and account-bound. Consume a proof once with its authorized identity transition.
+    Provider message delivery is not proof of phone ownership or login success.
+    Expired/consumed challenge retention and send-retry handling still need policy.
+  '''
+
+}
+
+Table account_phone_changes {
+  id uuid [pk]
+  account_id uuid [not null]
+  old_phone_e164 text [not null]
+  new_phone_e164 text [not null]
+  old_phone_challenge_id uuid [unique]
+  new_phone_challenge_id uuid [not null, unique]
+  support_audit_event_id uuid [unique]
+  changed_at timestamptz [not null]
+
+  indexes {
+    (account_id, changed_at, id) [name: 'account_phone_changes_account_history']
+  }
+
+  checks {
+    `old_phone_e164 <> new_phone_e164` [name: 'account_phone_changes_different_numbers']
+    `old_phone_challenge_id <> new_phone_challenge_id` [name: 'account_phone_changes_distinct_proofs']
+    `(old_phone_challenge_id IS NOT NULL) <> (support_audit_event_id IS NOT NULL)` [name: 'account_phone_changes_authorization_source']
+  }
+
+  Note: '''
+    Successful self-service change with two independently verified one-use proofs.
+    Under account/phone locks validate purpose, same account, exact old/new phones,
+    fresh proof validity and unused target ownership; consume proofs, change current
+    phone, record this evidence and schedule external session revocation atomically
+    where local state permits. No change to account ID, bank, progress or bound gifts.
+    Recovery without the old phone instead requires authorized Admin support authorization
+    with reason/evidence and the target account's new-phone verification; its audit
+    replaces the old-phone proof, never the new-phone proof. Verify audit action/actor/
+    target and ownership evidence; no automatic reassignment or account merging.
+    This personal history/challenge linkage follows the
+    forthcoming privacy retention policy, not indefinite financial retention.
+  '''
+
+}
+
+Table account_deletion_requests {
+  id uuid [pk]
+  account_id uuid [not null]
+  request_key uuid [not null, unique]
+  state deletion_request_state [not null, default: 'requested']
+  confirmed_bank integer
+  requested_at timestamptz [not null]
+  funding_cleared_at timestamptz
+  confirmed_at timestamptz
+  completed_at timestamptz
+  cancelled_at timestamptz
+
+  indexes {
+    (id, account_id) [unique, name: 'account_deletion_requests_account_identity']
+    (account_id, requested_at, id) [name: 'account_deletion_requests_account_history']
+    (state, requested_at, id) [name: 'account_deletion_requests_pending_work']
+  }
+
+  checks {
+    `(confirmed_bank IS NULL) = (confirmed_at IS NULL)` [name: 'account_deletion_requests_confirmation_pair']
+    `confirmed_bank IS NULL OR confirmed_bank >= 0` [name: 'account_deletion_requests_bank_bounds']
+    `state NOT IN ('confirmed', 'completed') OR confirmed_at IS NOT NULL` [name: 'account_deletion_requests_confirmation_required']
+    `(state = 'completed') = (completed_at IS NOT NULL)` [name: 'account_deletion_requests_completion_pair']
+    `(state = 'cancelled') = (cancelled_at IS NOT NULL)` [name: 'account_deletion_requests_cancellation_pair']
+    `confirmed_at IS NULL OR confirmed_at >= requested_at` [name: 'account_deletion_requests_confirmation_order']
+    `completed_at IS NULL OR (confirmed_at IS NOT NULL AND completed_at >= confirmed_at)` [name: 'account_deletion_requests_completion_order']
+    `cancelled_at IS NULL OR cancelled_at >= requested_at` [name: 'account_deletion_requests_cancellation_order']
+  }
+
+  Note: '''
+    Authenticated explicit deletion request/consent, including the exact nonnegative
+    bank the player agreed to forfeit. Leave/end active play first, using its normal
+    game restoration rules. Serialize final deletion with funding and the wallet;
+    a changed balance requires reconfirmation, not silently forfeiting extra credits.
+    A positive confirmed bank gets one deletion_forfeiture ledger entry; zero needs no
+    ledger row. Clear bank/profile/credentials and schedule external cleanup while
+    retaining required financial IDs/evidence and valid gifts for other recipients.
+    Add a partial unique open request per account in supplementary PostgreSQL DDL.
+    Detailed unresolved-funding gating follows the pending Q86 answer; retention/
+    anonymization work must not be confused with physical deletion of referenced IDs.
+  '''
+
+}
+
+Table categories {
+  id uuid [pk]
+  name_ar text [not null]
+  name_franco text
+  display_order integer [not null, default: 0]
+  archived_at timestamptz
+
+  checks {
+    `display_order >= 0` [name: 'categories_display_order_bounds']
+  }
+
+  Note: 'A selectable grouping containing authored six-question packs. Order by display_order/id; about twenty categories need no extra sort-only index. Archived categories hide all their packs from new games without rewriting pack publication/archival state. Restoration exposes otherwise playable packs again; existing games retain copied content.'
+
+}
+
+Table question_packs {
+  id uuid [pk]
+  category_id uuid [not null]
+  pack_number integer [not null]
+  content_revision bigint [not null, default: 1]
+  publication_state pack_publication_state [not null, default: 'draft']
+  archived_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (category_id, pack_number) [unique, name: 'question_packs_category_number']
+  }
+
+  checks {
+    `pack_number > 0 AND content_revision > 0` [name: 'question_packs_positive_number_revision']
+    `updated_at >= created_at` [name: 'question_packs_update_order']
+  }
+
+  Note: '''
+    A stable authored pack belongs to one category. It is included through game tokens,
+    not sold as an additional product. Stable per-category positive pack numbers are
+    display labels, never per-user random mappings or global identity. Allocate under
+    the category lock; retain archived numbers. Category/number uniqueness also serves
+    ordered category lists, replacing a redundant category/id index. content_revision
+    advances for any accepted pack/question/stage/media edit and supports stale-editor
+    detection; it does not classify ordinary typo edits as new unseen questions.
+    Staff can edit published content after a warning and confirmation. New games use
+    its current six slots; existing games use their copied question snapshots.
+    Incomplete drafts are allowed. A playable published pack must contain six valid
+    questions and ready required media; publication and public edits validate/save
+    the complete set atomically under the pack lock. No reviewer approval is required.
+    CHECKs cannot prove six rows or media readiness. An archived pack/category is
+    excluded from new games while existing games/progress remain intact. Restoring
+    a pack does not bypass its current six-question/media publication validation.
+  '''
+
+}
+
+Table questions {
+  id uuid [pk]
+  pack_id uuid [not null]
+  slot_number smallint [not null]
+  prompt_ar text [not null]
+  prompt_franco text
+  answer_ar text [not null]
+  answer_franco text
+  format question_format [not null]
+  format_config jsonb [not null, default: `'{}'::jsonb`]
+  retired_at timestamptz
+
+  indexes {
+    (pack_id, retired_at, slot_number) [name: 'questions_pack_current_list']
+  }
+
+  checks {
+    `jsonb_typeof(format_config) = 'object'` [name: 'questions_format_config_object']
+    `slot_number BETWEEN 1 AND 6` [name: 'questions_slot_bounds']
+  }
+
+  Note: '''
+    One authored question identity belongs to one pack and retains its slot number after retirement. The supplementary partial unique current pack/slot index permits replacement: retire the old row and insert a new identity atomically under the pack lock. Six active valid questions are required for playable publication; incomplete drafts are allowed. Ordinary edits retain identity and seen history; explicit replacement creates a new ID. Arabic is required for play, Franco falls back field by field. Ten formats have strictly validated bounded config; no signed URLs/secrets. No text/hash duplicate detector is required. Current content editing increments pack revision; running games use their own snapshots.
+  '''
+}
+
+Table media_assets {
+  id uuid [pk]
+  media_kind media_kind [not null]
+  state media_asset_state [not null, default: 'pending']
+  access_scope media_access_scope [not null, default: 'private']
+  storage_provider text [not null]
+  storage_namespace text [not null]
+  storage_key text [not null]
+  content_type text
+  byte_size bigint
+  width_px integer
+  height_px integer
+  duration_ms integer
+  sha256 bytea
+  source_asset_id uuid
+  transform_spec jsonb [not null, default: `'{}'::jsonb`]
+  uploaded_by_staff_id uuid [not null]
+  created_at timestamptz [not null, default: `now()`]
+  ready_at timestamptz
+  archived_at timestamptz
+
+  indexes {
+    (storage_provider, storage_namespace, storage_key) [unique, name: 'media_assets_storage_identity']
+    (source_asset_id, id) [name: 'media_assets_derivatives']
+  }
+
+  checks {
+    `length(btrim(storage_provider)) > 0 AND octet_length(storage_provider) <= 32` [name: 'media_assets_provider_bounds']
+    `length(btrim(storage_namespace)) > 0 AND octet_length(storage_namespace) <= 128` [name: 'media_assets_namespace_bounds']
+    `length(btrim(storage_key)) > 0 AND octet_length(storage_key) <= 1024` [name: 'media_assets_key_bounds']
+    `(state = 'ready') = (ready_at IS NOT NULL)` [name: 'media_assets_ready_time_pair']
+    `ready_at IS NULL OR ready_at >= created_at` [name: 'media_assets_ready_order']
+    `byte_size IS NULL OR byte_size > 0` [name: 'media_assets_positive_bytes']
+    `(width_px IS NULL) = (height_px IS NULL)` [name: 'media_assets_dimension_pair']
+    `width_px IS NULL OR (width_px > 0 AND height_px > 0)` [name: 'media_assets_positive_dimensions']
+    `duration_ms IS NULL OR duration_ms > 0` [name: 'media_assets_positive_duration']
+    `sha256 IS NULL OR octet_length(sha256) = 32` [name: 'media_assets_checksum_shape']
+    `source_asset_id IS NULL OR source_asset_id <> id` [name: 'media_assets_no_direct_self_source']
+    `jsonb_typeof(transform_spec) = 'object'` [name: 'media_assets_transform_object']
+    `state <> 'ready' OR (content_type IS NOT NULL AND byte_size IS NOT NULL AND ((media_kind = 'image' AND left(content_type, 6) = 'image/' AND width_px IS NOT NULL AND height_px IS NOT NULL AND duration_ms IS NULL) OR (media_kind = 'audio' AND left(content_type, 6) = 'audio/' AND duration_ms IS NOT NULL AND width_px IS NULL AND height_px IS NULL)))` [name: 'media_assets_ready_metadata']
+  }
+
+  Note: '''
+    One immutable physical image/audio object per upload or generated rendition;
+    bytes live in Cloudflare, not PostgreSQL. Storage adapter/namespace/key are durable
+    private references, never signed URLs. Backend selection/credentials are deployment
+    configuration, not embedded in question JSON. Allocate server-controlled fresh keys
+    for every revision/variant and prevent overwriting ready bytes. Required metadata
+    becomes authoritative only after byte/type/dimension/duration validation.
+    Reuse one asset in many questions; there is no unique checksum or semantic question
+    duplication rule. Derived assets reference their retained source with a bounded,
+    versioned transform spec. Source acyclicity and correct media-kind roles are write
+    validation. Archive hides from new authoring, not deletion of objects used by games.
+    Durable processing/retry leases use outbox_events; retention/cleanup handlers
+    recheck references and readiness before changing metadata or deleting objects.
+  '''
+
+}
+
+Table question_media {
+  question_id uuid [not null]
+  media_role question_media_role [not null]
+  variant_number smallint [not null, default: 0]
+  suggested_points smallint
+  media_asset_id uuid [not null]
+
+  indexes {
+    (question_id, media_role, variant_number) [pk, name: 'question_media_role_variant']
+    (media_asset_id, question_id) [name: 'question_media_asset_references']
+  }
+
+  checks {
+    `(media_role = 'hint_image' AND variant_number BETWEEN 0 AND 2 AND suggested_points IS NOT NULL AND suggested_points BETWEEN 1 AND 600) OR (media_role <> 'hint_image' AND variant_number = 0 AND suggested_points IS NULL)` [name: 'question_media_variant_shape']
+  }
+
+  Note: '''
+    Current media roles and three optional hint variants share one link table. Blur/zoom uses exactly three hint_image rows, numbered 0..2 with positive strictly decreasing suggested points beginning at the tile cap. Other roles use variant 0 and no hint points. Validate ready asset type, required roles and completeness at publication. Originals and answer-only files remain private; game snapshots pin the selected files separately. Optional ordinary question/answer images and all ten formats remain in scope.
+  '''
+}
+
+Table rooms {
+  id uuid [pk]
+  owner_account_id uuid [not null]
+  current_game_id uuid
+  lobby_generation integer [not null, default: 1]
+  team_one_name text [not null]
+  team_two_name text [not null]
+  created_at timestamptz [not null, default: `now()`]
+  closed_at timestamptz
+  invitation_code char(6) [unique]
+  invitation_issued_at timestamptz
+  invitation_expires_at timestamptz
+  invitation_revoked_at timestamptz
+
+  indexes {
+    (id, owner_account_id) [unique, name: 'rooms_owner_identity']
+    (invitation_expires_at, id) [name: 'rooms_expired_code_cleanup']
+  }
+
+  checks {
+    `lobby_generation > 0` [name: 'rooms_positive_lobby_generation']
+    `length(btrim(team_one_name)) > 0 AND length(btrim(team_two_name)) > 0` [name: 'rooms_nonblank_team_names']
+    `closed_at IS NULL OR closed_at >= created_at` [name: 'rooms_close_order']
+    `(invitation_code IS NULL) = (invitation_issued_at IS NULL) AND (invitation_code IS NULL) = (invitation_expires_at IS NULL)` [name: 'rooms_invitation_presence']
+    `invitation_code IS NULL OR invitation_code ~ '^[0-9]{6}$'` [name: 'rooms_six_digit_code']
+    `invitation_expires_at IS NULL OR invitation_expires_at = invitation_issued_at + interval '24 hours'` [name: 'rooms_invitation_lifetime']
+    `invitation_revoked_at IS NULL OR (invitation_code IS NOT NULL AND invitation_revoked_at >= invitation_issued_at)` [name: 'rooms_invitation_revocation']
+  }
+
+  Note: '''
+    Reusable room/lobby owned by one signed-in host; at most six people including host. Current invitation fields replace issuance/registry tables. Code remains unique until cleared; admission rechecks exact code, revocation, room state and fresh expiry after locking the room. Expired-code cleanup is a separate transaction before any different-room assignment; do not lock another room after the new room. Random collision retries may select another code. Rotation writes a new code/window; old issuance has no dedicated retained history. QR/share links use the same locator. Existing-member recovery uses credentials/account identity independently of code expiry. Start advances lobby_generation to invalidate old Ready values; terminal game processing does not acquire room lock. Ordinary game commands never take room lock after game lock.
+  '''
+}
+
+Table room_memberships {
+  id uuid [pk]
+  room_id uuid [not null]
+  account_id uuid
+  display_name text [not null]
+  lobby_team_number smallint
+  ready_for_generation integer
+  ready_at timestamptz
+  joined_at timestamptz [not null]
+  left_at timestamptz
+  removed_at timestamptz
+  reconnect_credential_hash bytea [unique]
+  reconnect_issued_at timestamptz
+  reconnect_revoked_at timestamptz
+
+  indexes {
+    (room_id, id) [unique, name: 'room_memberships_room_identity']
+    (account_id, room_id) [name: 'room_memberships_account_recovery']
+  }
+
+  checks {
+    `length(btrim(display_name)) > 0` [name: 'room_memberships_nonblank_name']
+    `lobby_team_number IS NULL OR lobby_team_number IN (1, 2)` [name: 'room_memberships_team_bounds']
+    `(ready_for_generation IS NULL) = (ready_at IS NULL)` [name: 'room_memberships_ready_pair']
+    `ready_for_generation IS NULL OR ready_for_generation > 0` [name: 'room_memberships_ready_generation']
+    `ready_at IS NULL OR ready_at >= joined_at` [name: 'room_memberships_ready_order']
+    `left_at IS NULL OR left_at >= joined_at` [name: 'room_memberships_leave_order']
+    `removed_at IS NULL OR removed_at >= joined_at` [name: 'room_memberships_removal_order']
+    `(reconnect_credential_hash IS NULL) = (reconnect_issued_at IS NULL)` [name: 'room_memberships_credential_pair']
+    `reconnect_credential_hash IS NULL OR octet_length(reconnect_credential_hash) = 32` [name: 'room_memberships_credential_hash']
+    `reconnect_revoked_at IS NULL OR (reconnect_issued_at IS NOT NULL AND reconnect_revoked_at >= reconnect_issued_at)` [name: 'room_memberships_credential_revocation']
+  }
+
+  Note: '''
+    Room identity and next-game team/name/readiness, with optional current high-entropy anonymous reconnect credential stored as a hash. Immediate join checks capacity under room lock; no OTP for anonymous guests. Non-host Ready must match lobby generation; team changes clear Ready. Same-device refresh restores this seat; lost anonymous secret cannot be recovered by name/code. Signed-in recovery uses account auth. Start freezes identity in game_players, including guests who later sign in. Leave/removal revokes access without deleting history. Partial current account/room uniqueness is in supplementary SQL. Removal/rejoin rules Q84 remain open; no active-game kicking is added.
+  '''
+}
+
+Table games {
+  id uuid [pk]
+  room_id uuid [not null]
+  sequence_number integer [not null]
+  status game_status [not null, default: 'active']
+  state_version bigint [not null, default: 0]
+  start_request_id uuid [not null, unique]
+  start_request_digest bytea [not null]
+  started_at timestamptz [not null]
+  ended_at timestamptz
+  end_reason game_end_reason
+  last_gameplay_at timestamptz [not null]
+  idle_expires_at timestamptz [not null]
+  first_question_opened_at timestamptz
+  content_purge_after timestamptz
+  content_purged_at timestamptz
+  host_account_id uuid [not null]
+  team_one_name text [not null]
+  team_two_name text [not null]
+  team_one_score bigint [not null, default: 0]
+  team_two_score bigint [not null, default: 0]
+  active_board_position smallint
+  active_question_position smallint
+  controller_generation bigint [not null, default: 1]
+  controller_credential_hash bytea [not null]
+  controller_acquired_at timestamptz [not null]
+
+  indexes {
+    (id, room_id) [unique, name: 'games_room_membership_identity']
+    (room_id, sequence_number) [unique, name: 'games_room_sequence']
+    (status, idle_expires_at, id) [name: 'games_due_expiry']
+    (content_purged_at, content_purge_after, id) [name: 'games_due_content_purge']
+    (id, host_account_id) [unique, name: 'games_host_identity']
+  }
+
+  checks {
+    `sequence_number > 0` [name: 'games_positive_sequence']
+    `state_version >= 0` [name: 'games_nonnegative_version']
+    `octet_length(start_request_digest) = 32` [name: 'games_start_request_digest_shape']
+    `(status IN ('finished', 'expired', 'failed')) = (ended_at IS NOT NULL)` [name: 'games_terminal_time']
+    `(ended_at IS NULL) = (end_reason IS NULL)` [name: 'games_end_reason_pair']
+    `last_gameplay_at >= started_at` [name: 'games_activity_order']
+    `ended_at IS NULL OR ended_at >= last_gameplay_at` [name: 'games_end_order']
+    `idle_expires_at = last_gameplay_at + interval '24 hours'` [name: 'games_fixed_idle_window']
+    `end_reason IS NULL OR (status = 'finished' AND end_reason IN ('completed', 'host_ended', 'host_left')) OR (status = 'expired' AND end_reason = 'idle_timeout') OR (status = 'failed' AND end_reason = 'platform_failure')` [name: 'games_reason_matches_state']
+    `status <> 'expired' OR ended_at = idle_expires_at` [name: 'games_effective_expiry_time']
+    `first_question_opened_at IS NULL OR (started_at IS NOT NULL AND first_question_opened_at >= started_at AND (ended_at IS NULL OR first_question_opened_at <= ended_at))` [name: 'games_first_open_time']
+    `end_reason IS DISTINCT FROM 'completed' OR first_question_opened_at IS NOT NULL` [name: 'games_completion_requires_opening']
+    `(ended_at IS NULL) = (content_purge_after IS NULL)` [name: 'games_content_retention_presence']
+    `content_purge_after IS NULL OR content_purge_after = ended_at + interval '12 months'` [name: 'games_content_retention_window']
+    `content_purged_at IS NULL OR (content_purge_after IS NOT NULL AND content_purged_at >= content_purge_after)` [name: 'games_content_purge_order']
+    `length(btrim(team_one_name)) > 0 AND length(btrim(team_two_name)) > 0` [name: 'games_team_names']
+    `team_one_score >= 0 AND team_two_score >= 0` [name: 'games_nonnegative_scores']
+    `(active_board_position IS NULL) = (active_question_position IS NULL)` [name: 'games_active_pointer_pair']
+    `active_board_position IS NULL OR (active_board_position BETWEEN 1 AND 6 AND active_question_position BETWEEN 1 AND 6)` [name: 'games_active_pointer_bounds']
+    `status = 'active' OR active_board_position IS NULL` [name: 'games_terminal_board']
+    `controller_generation > 0 AND octet_length(controller_credential_hash) = 32` [name: 'games_controller_shape']
+    `controller_acquired_at >= started_at` [name: 'games_controller_acquisition']
+  }
+
+  Note: '''
+    One accepted 36-question game, including two fixed scoring sides, current-question pointer and host/controller fields. Replay creates a new game; unpaid lobby is only a room. Start snapshots all packs/questions/players, claims signed-in accounts and debits host once in one transaction. Host must be in that frozen roster, checked at start; host/room ownership is relational. Controller takeover by the same host rotates hash/generation without charging. Teams are fixed 1/2, not reusable clubs; scores project game_actions. Game ends automatically at resolution 36, or host end/leave, with locked scores. Meaningful gameplay alone extends the 24 elapsed-hour inactivity deadline. First opening is sticky: unopened terminal game restores once; other platform restoration requires audit. Terminal processing releases matching account pointers and stops timers without taking room lock. Keep copied content 12 months after end, then purge payloads/media pins while preserving compact IDs/results/progress. No cache-only accepted state.
+  '''
+}
+
+Table game_packs {
+  game_id uuid [not null]
+  category_id uuid [not null]
+  pack_id uuid [not null]
+  board_position smallint [not null]
+  pack_number integer [not null]
+  source_content_revision bigint [not null]
+  category_name_ar text [not null]
+  category_name_franco text
+  repeat_accepted_at timestamptz
+  repeat_accepted_by_seat smallint
+
+  indexes {
+    (game_id, board_position) [pk, name: 'game_packs_position']
+    (game_id, category_id) [unique, name: 'game_packs_distinct_categories']
+  }
+
+  checks {
+    `board_position BETWEEN 1 AND 6` [name: 'game_packs_position_bounds']
+    `pack_number > 0 AND source_content_revision > 0` [name: 'game_packs_source_revision_bounds']
+    `(repeat_accepted_at IS NULL) = (repeat_accepted_by_seat IS NULL)` [name: 'game_packs_repeat_consent_pair']
+  }
+
+  Note: '''
+    One chosen pack for each of six distinct category columns. Category/pack membership
+    is validated against the current catalog in the game-start transaction and then
+    preserved as historical data; it is not tied to later catalog reassignment by a
+    composite FK. Bounds/uniqueness alone do not ensure six columns: game start must
+    validate all six packs and copy all 36 questions. Repeat consent records a host
+    decision for the selected game content and fixed roster; host authorization and
+    consent validity are application transaction rules, not supplied by the actor FK.
+  '''
+
+}
+
+Table game_questions {
+  game_id uuid [not null]
+  board_position smallint [not null]
+  question_position smallint [not null]
+  source_question_id uuid [not null]
+  base_points smallint [not null]
+  format question_format [not null]
+  snapshot_schema_version smallint [not null, default: 1]
+  content_snapshot jsonb
+  content_purged_at timestamptz
+  first_opened_at timestamptz
+  revealed_at timestamptz
+  stage_index smallint [not null, default: 0]
+  timer_state question_timer_state [not null, default: 'ready']
+  remaining_ms integer [not null, default: 60000]
+  timer_deadline_at timestamptz
+  resume_timer_on_reopen boolean [not null, default: false]
+  memory_first_shown_at timestamptz
+  memory_first_hidden_at timestamptz
+  memory_image_visible boolean [not null, default: false]
+  winning_team_number smallint
+  awarded_points smallint
+  resolved_by_account_id uuid
+  resolution_command_id uuid
+  resolved_at timestamptz
+  feedback_vote feedback_vote
+  feedback_by_account_id uuid
+  feedback_created_at timestamptz
+  feedback_updated_at timestamptz
+
+  indexes {
+    (game_id, board_position, question_position) [pk, name: 'game_questions_position']
+    (game_id, source_question_id) [unique, name: 'game_questions_distinct_question']
+    (game_id, resolution_command_id) [unique, name: 'game_questions_resolution_command']
+    (source_question_id, game_id) [name: 'game_questions_source_history']
+  }
+
+  checks {
+    `question_position BETWEEN 1 AND 6` [name: 'game_questions_snapshot_question_bounds']
+    `base_points = CASE WHEN question_position IN (1, 2) THEN 200 WHEN question_position IN (3, 4) THEN 400 ELSE 600 END` [name: 'game_questions_snapshot_point_band']
+    `snapshot_schema_version > 0` [name: 'game_questions_snapshot_schema_version']
+    `jsonb_typeof(content_snapshot) = 'object'` [name: 'game_questions_snapshot_snapshot_object']
+    `(content_snapshot IS NULL) = (content_purged_at IS NOT NULL)` [name: 'game_questions_snapshot_content_presence']
+    `stage_index >= 0` [name: 'game_questions_runtime_nonnegative_stage']
+    `remaining_ms BETWEEN 0 AND 60000` [name: 'game_questions_runtime_timer_bounds']
+    `(timer_state = 'running') = (timer_deadline_at IS NOT NULL)` [name: 'game_questions_runtime_timer_deadline_pair']
+    `timer_state <> 'ready' OR remaining_ms = 60000` [name: 'game_questions_runtime_ready_duration']
+    `(timer_state = 'elapsed') = (remaining_ms = 0)` [name: 'game_questions_runtime_elapsed_zero']
+    `timer_state <> 'running' OR (first_opened_at IS NOT NULL AND revealed_at IS NULL)` [name: 'game_questions_runtime_running_eligible']
+    `NOT resume_timer_on_reopen OR (timer_state = 'paused' AND revealed_at IS NULL)` [name: 'game_questions_runtime_reopen_pause']
+    `revealed_at IS NULL OR (first_opened_at IS NOT NULL AND revealed_at >= first_opened_at)` [name: 'game_questions_runtime_reveal_order']
+    `memory_first_shown_at IS NULL OR (first_opened_at IS NOT NULL AND memory_first_shown_at >= first_opened_at)` [name: 'game_questions_runtime_memory_show_order']
+    `memory_first_hidden_at IS NULL OR (memory_first_shown_at IS NOT NULL AND memory_first_hidden_at >= memory_first_shown_at)` [name: 'game_questions_runtime_memory_hide_order']
+    `NOT memory_image_visible OR memory_first_shown_at IS NOT NULL` [name: 'game_questions_runtime_memory_visibility']
+    `first_opened_at IS NOT NULL OR (revealed_at IS NULL AND stage_index = 0 AND timer_state = 'ready' AND NOT resume_timer_on_reopen AND memory_first_shown_at IS NULL AND memory_first_hidden_at IS NULL AND NOT memory_image_visible)` [name: 'game_questions_runtime_unopened_defaults']
+    `winning_team_number IS NULL OR winning_team_number IN (1, 2)` [name: 'game_questions_winner_bounds']
+    `awarded_points IS NULL OR awarded_points BETWEEN 0 AND base_points` [name: 'game_questions_award_cap']
+    `(resolved_at IS NULL AND winning_team_number IS NULL AND awarded_points IS NULL AND resolved_by_account_id IS NULL AND resolution_command_id IS NULL) OR (resolved_at IS NOT NULL AND awarded_points IS NOT NULL AND resolved_by_account_id IS NOT NULL AND resolution_command_id IS NOT NULL AND revealed_at IS NOT NULL AND resolved_at >= revealed_at AND (winning_team_number IS NOT NULL OR awarded_points = 0))` [name: 'game_questions_resolution_shape']
+    `resolved_at IS NULL OR timer_state <> 'running'` [name: 'game_questions_resolved_timer_stopped']
+    `(feedback_vote IS NULL AND feedback_by_account_id IS NULL AND feedback_created_at IS NULL AND feedback_updated_at IS NULL) OR (feedback_vote IS NOT NULL AND feedback_by_account_id IS NOT NULL AND feedback_created_at IS NOT NULL AND feedback_updated_at IS NOT NULL AND revealed_at IS NOT NULL AND feedback_created_at >= revealed_at AND feedback_updated_at >= feedback_created_at)` [name: 'game_questions_feedback_shape']
+  }
+
+  Note: '''
+    One row per starting question combines immutable content_snapshot, typed mutable runtime, optional once-only resolution and optional host feedback. Create all 36 at accepted start. Write services whitelist fields: game actions cannot edit snapshots; feedback cannot alter resolution/scores. First opening records exposure for eligible signed-in start roster despite temporary disconnects. Explicit leave stops future credit. Ordinary timer starts at opening; memory starts on first hide. Navigate to board checkpoints/pauses, reopening resumes only navigation-paused clocks; explicit pause remains paused. Reset restores 60 seconds without erasing hints/reveal/exposure. No per-second writes; elapsed deadline does not auto-reveal/award. Unlimited audio replay remains available. Resolve after reveal once, winner 0..tile cap or nobody/0; save matching action/score/progress atomically and finish at 36. Same-game six resolutions credit completion; games never combine partial packs. First milestones and resolution are immutable under normal handlers. Host can edit Like/Dislike after reveal, including retained history independently of score locking. Q85 post-purge voting remains open. Purge removes only copied payload/pins after 12 months and retains source IDs/results/vote. Never serialize private answers/unrevealed originals to unauthorized clients.
+  '''
+}
+
+Table game_question_media {
+  game_id uuid [not null]
+  board_position smallint [not null]
+  question_position smallint [not null]
+  media_role question_media_role [not null]
+  variant_number smallint [not null, default: 0]
+  media_asset_id uuid [not null]
+
+  indexes {
+    (game_id, board_position, question_position, media_role, variant_number) [pk, name: 'game_question_media_identity']
+    (media_asset_id, game_id) [name: 'game_question_media_asset_references']
+  }
+
+  checks {
+    `(media_role = 'hint_image' AND variant_number BETWEEN 0 AND 2) OR (media_role <> 'hint_image' AND variant_number = 0)` [name: 'game_question_media_variant_role']
+  }
+
+  Note: '''
+    Immutable relational pins for every starting snapshot asset, including private
+    originals, answer-only media and three numbered hint images. These FKs support
+    retention/garbage-collection checks that opaque JSON references cannot provide.
+    Copy with the 36 starting snapshots and validate role/assets against the typed
+    snapshot. A media response checks membership, active question, stage, reveal and
+    memory visibility before issuing a short-lived delivery URL. Never send private
+    source or unrevealed variants in a public snapshot. Ready assets/keys remain
+    unchanged while any retained catalog, derivative or game reference needs them.
+    The agreed 12-month game content policy governs retained game pins.
+  '''
+
+}
+
+Table game_players {
+  game_id uuid [not null]
+  room_id uuid [not null]
+  room_member_id uuid [not null]
+  seat_number smallint [not null]
+  account_id uuid
+  team_number smallint
+  display_name text [not null]
+  joined_at timestamptz [not null]
+  left_at timestamptz
+
+  indexes {
+    (game_id, seat_number) [pk, name: 'game_players_seat']
+    (game_id, account_id) [unique, name: 'game_players_account']
+    (game_id, room_member_id) [unique, name: 'game_players_room_member']
+    (account_id, joined_at, game_id) [name: 'game_players_account_history']
+  }
+
+  checks {
+    `seat_number BETWEEN 1 AND 6` [name: 'game_players_seat_bounds']
+    `left_at IS NULL OR left_at >= joined_at` [name: 'game_players_departure_order']
+    `team_number IS NULL OR team_number IN (1, 2)` [name: 'game_players_team_bounds']
+  }
+
+  Note: '''
+    Starting roster, fixed at game start, with at most six people including the host.
+        Null account IDs permit anonymous people; ordinary PostgreSQL unique semantics
+        allow multiple nulls while preventing a signed-in account occupying two seats.
+        Identity/account binding freezes at start. Signing in later does not attach an
+        account retroactively; account progress starts next game. Disconnects preserve
+        participation/credit; explicit guest departure sets left_at, releases their claim
+        and stops future exposure/credit without deleting the historical seat. A seat is
+        not an authorization credential. Host identity is in games. Guests
+        must choose one of this game's teams before start; only the host may be neutral
+        with a null team. The nullable team column permits that shape, while start validation
+        checks that only the host is neutral. Team assignments freeze at start; account
+        exposure/completion also includes an eligible neutral host. Reconnect uses the
+        retained room credential or authenticated account mapping. Host departure ends the game
+        for all players rather than using the guest-only leave transition.
+        Cross-row roster freeze/host-count rules require transaction/write-path enforcement.
+        room_id is deliberate composite-FK data: the selected room membership and game
+        must belong to the same room. Names/team/account bindings are copied at start,
+        not permanently tied to mutable lobby preferences. A member occupies at most one
+        historical seat per game. Lobby readiness is rechecked for the current generation.
+    Two fixed teams live on games; nullable host neutrality is checked at start. Set joined_at to the accepted start instant for account history pagination.
+  '''
+}
+
+Table account_question_exposures {
+  account_id uuid [not null]
+  question_id uuid [not null]
+  first_exposed_at timestamptz [not null, default: `now()`]
+  first_game_id uuid
+
+  indexes {
+    (account_id, question_id) [pk, name: 'account_question_exposures_identity']
+  }
+
+  Note: '''
+    First exposure of a logical question to an account. On question opening, insert
+    for the game's signed-in starting roster whose left_at is null, including temporary disconnects;
+    duplicate commands do not create additional summary rows. Edits retain identity,
+    while replacements use a new question ID. If first_game_id is present, its FK
+    proves that account belonged to the game; nullable provenance permits a later
+    explicit retention policy without discarding seen history. Detailed per-game
+    events and retention remain separate work. Signing in mid-game never backfills
+    anonymous exposure; explicit departure stops future writes for that player.
+  '''
+
+}
+
+Table account_pack_completions {
+  account_id uuid [not null]
+  game_id uuid [not null]
+  board_position smallint [not null]
+  completed_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (account_id, game_id, board_position) [pk, name: 'account_pack_completions_identity']
+  }
+
+  Note: '''
+    Historical completion of this game's copied six-question pack by an eligible
+    signed-in starting player. Credit after all six are resolved, including no-winner
+    results in this SAME game; temporary disconnects preserve eligibility. Explicit
+    departure stops future credit while retaining prior completions. FKs establish
+    membership and the game pack but cannot prove six resolutions; the resolution
+    transaction validates that count and eligibility. Preserve historical
+    completion and flag Updated when current pack membership changes; do not combine
+    partial resolutions from different games or mark replacement questions completed.
+  '''
+
+}
+
+Table game_actions {
+  game_id uuid [not null]
+  command_id uuid [not null]
+  host_account_id uuid [not null]
+  command_name varchar(64) [not null]
+  request_digest bytea [not null]
+  controller_generation bigint [not null]
+  expected_version bigint [not null]
+  result_version bigint [not null]
+  result_data jsonb [not null, default: `'{}'::jsonb`]
+  accepted_at timestamptz [not null]
+  score_entry_kind score_entry_kind
+  score_team_number smallint
+  score_delta bigint
+  score_total_before bigint
+  score_total_after bigint
+  score_source_board_position smallint
+  score_source_question_position smallint
+
+  indexes {
+    (game_id, command_id) [pk, name: 'game_actions_command_identity']
+    (game_id, result_version, command_id) [name: 'game_actions_version_history']
+    (game_id, score_source_board_position, score_source_question_position) [unique, name: 'game_actions_question_award']
+    (accepted_at, game_id) [name: 'game_actions_receipt_cleanup']
+  }
+
+  checks {
+    `octet_length(request_digest) = 32 AND length(btrim(command_name)) > 0` [name: 'game_actions_request_shape']
+    `controller_generation > 0 AND expected_version >= 0` [name: 'game_actions_version_bounds']
+    `result_version BETWEEN expected_version AND expected_version + 1` [name: 'game_actions_result_version']
+    `jsonb_typeof(result_data) = 'object'` [name: 'game_actions_result_object']
+    `(score_entry_kind IS NULL AND score_team_number IS NULL AND score_delta IS NULL AND score_total_before IS NULL AND score_total_after IS NULL AND score_source_board_position IS NULL AND score_source_question_position IS NULL) OR (score_entry_kind IS NOT NULL AND score_team_number IS NOT NULL AND score_delta IS NOT NULL AND score_total_before IS NOT NULL AND score_total_after IS NOT NULL)` [name: 'game_actions_score_presence']
+    `score_team_number IS NULL OR score_team_number IN (1, 2)` [name: 'game_actions_team_bounds']
+    `score_entry_kind IS NULL OR (score_total_before >= 0 AND score_total_after >= 0 AND score_delta = score_total_after - score_total_before AND result_version = expected_version + 1)` [name: 'game_actions_score_difference']
+    `(score_source_board_position IS NULL) = (score_source_question_position IS NULL)` [name: 'game_actions_score_source_pair']
+    `score_entry_kind IS NULL OR (score_entry_kind = 'question_award' AND score_source_board_position IS NOT NULL AND score_delta BETWEEN 0 AND 600) OR (score_entry_kind = 'manual_adjustment' AND score_source_board_position IS NULL AND score_delta <> 0)` [name: 'game_actions_score_kind']
+  }
+
+  Note: '''
+    One accepted host command/no-op with request digest and bounded result, plus optional typed score effect. This combines command receipts and append-only score history without full event sourcing. Authenticate current host/controller then deduplicate before stale-version handling; changed payload under same key conflicts. Award fields must match the source question resolution; manual correction records new nonnegative total minus old total. A winner/0 still has one zero award effect; no-winner has none. Scores equal committed deltas. Non-score receipts may expire only after game termination under operational policy; score-effect rows remain compact history. Durable game start/resolution/ledger source keys survive receipt cleanup. No answers, signed URLs or credentials in result_data. Feedback uses a separate host-authorized endpoint and does not touch gameplay deadlines.
+  '''
+}
+
+Table token_ledger_entries {
+  id uuid [pk]
+  account_id uuid [not null]
+  entry_kind token_entry_kind [not null]
+  amount integer [not null]
+  idempotency_key varchar(160) [not null, unique]
+  source_order_id uuid [unique]
+  source_order_settlement_kind settlement_kind
+  deletion_request_id uuid [unique]
+  staff_audit_event_id uuid [unique]
+  game_id uuid
+  source_debit_id uuid
+  source_debit_kind token_entry_kind
+  restoration_reason game_restoration_reason
+  reason_text text
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (game_id, entry_kind) [unique, name: 'token_ledger_entries_game_effect']
+    (account_id, game_id, id, entry_kind) [unique, name: 'token_ledger_entries_typed_source']
+    (account_id, created_at, id) [name: 'token_ledger_entries_account_history']
+  }
+
+  checks {
+    `(entry_kind = 'credit' AND amount > 0 AND game_id IS NULL AND source_debit_id IS NULL AND source_debit_kind IS NULL AND restoration_reason IS NULL AND ((source_order_id IS NOT NULL AND source_order_settlement_kind IS NOT NULL AND staff_audit_event_id IS NULL) OR (source_order_id IS NULL AND source_order_settlement_kind IS NULL AND staff_audit_event_id IS NOT NULL AND reason_text IS NOT NULL AND length(btrim(reason_text)) > 0))) OR (entry_kind = 'game_debit' AND amount = -1 AND source_order_id IS NULL AND source_order_settlement_kind IS NULL AND staff_audit_event_id IS NULL AND game_id IS NOT NULL AND source_debit_id IS NULL AND source_debit_kind IS NULL AND restoration_reason IS NULL) OR (entry_kind = 'game_restoration' AND amount = 1 AND source_order_id IS NULL AND source_order_settlement_kind IS NULL AND game_id IS NOT NULL AND source_debit_id IS NOT NULL AND source_debit_kind IS NOT NULL AND source_debit_kind = 'game_debit' AND restoration_reason IS NOT NULL) OR (entry_kind = 'deletion_forfeiture' AND amount < 0 AND source_order_id IS NULL AND source_order_settlement_kind IS NULL AND staff_audit_event_id IS NULL AND game_id IS NULL AND source_debit_id IS NULL AND source_debit_kind IS NULL AND restoration_reason IS NULL AND reason_text IS NOT NULL AND length(btrim(reason_text)) > 0)` [name: 'token_ledger_entries_effect_shape']
+    `(entry_kind = 'deletion_forfeiture') = (deletion_request_id IS NOT NULL)` [name: 'token_ledger_entries_deletion_source']
+    `restoration_reason IS DISTINCT FROM 'platform_failure' OR (staff_audit_event_id IS NOT NULL AND reason_text IS NOT NULL AND length(btrim(reason_text)) > 0)` [name: 'token_ledger_entries_failure_reason']
+    `restoration_reason IS DISTINCT FROM 'unopened_game' OR staff_audit_event_id IS NULL` [name: 'token_ledger_entries_automatic_restore']
+  }
+
+  Note: '''
+    Append-only signed movements into one account token_balance. Positive credit contains its own unique paid/free order source or privileged audited staff source, replacing a separate grant table. Order-source FK matches beneficiary, quantity and nonnull settlement kind; runtime still validates exact verified financial facts or free authorization. One order credits once even with several payments. No expiry, cash-out, source lots or spending priorities. Accepted start debits host -1; one eligible restoration +1 references that same typed debit/account/game. Unopened terminal game restores automatically; unrecoverable platform failure requires authorized staff audit/reason. Deletion forfeiture is once per confirmed request with exact locked bank. Ledger/balance and source transitions commit together; never edit a balance alone or make it negative after external reversal. Keep financial evidence for reconciliation.
+  '''
+}
+
+Table shop_settings {
+  id smallint [pk, default: 1]
+  currency char(3) [not null, default: 'EGP']
+  base_unit_price_minor bigint [not null, default: 10000]
+  gift_discount_bps smallint [not null, default: 1000]
+  pricing_version bigint [not null, default: 1]
+  updated_at timestamptz [not null, default: `now()`]
+  quantity_tiers jsonb [not null, default: `'[]'::jsonb`]
+  bundles jsonb [not null, default: `'[{"quantity":1,"is_active":true,"display_order":0},{"quantity":2,"is_active":true,"display_order":1},{"quantity":5,"is_active":true,"display_order":2}]'::jsonb`]
+
+  checks {
+    `id = 1` [name: 'shop_settings_singleton']
+    `currency = 'EGP'` [name: 'shop_settings_currency']
+    `base_unit_price_minor > 0` [name: 'shop_settings_positive_price']
+    `gift_discount_bps BETWEEN 0 AND 10000` [name: 'shop_settings_gift_discount']
+    `pricing_version > 0` [name: 'shop_settings_positive_version']
+    `jsonb_typeof(quantity_tiers) = 'array' AND jsonb_array_length(quantity_tiers) <= 20` [name: 'shop_settings_bounded_tiers']
+    `jsonb_typeof(bundles) = 'array' AND jsonb_array_length(bundles) = 3` [name: 'shop_settings_fixed_bundles']
+  }
+
+  Note: '''
+    One validated pricing resource: base 100 EGP/token, editable gift percentage, small tier array and fixed 1/2/5 bundle configuration. JSON tiers have minimum_quantity 1..20, discount_bps 0..10000 and active flag; no duplicate thresholds and validated monotonicity. Bundles have exactly quantities 1,2,5 once each, display order and active flag. AdminJS uses a focused form, not arbitrary JSON. Lock singleton during quote/config changes and advance pricing_version; orders freeze all arithmetic. Same quantity means same price via preset/counter, capped 20. Quantity discount precedes one winning gift/promo discount. Valid zero pricing requires its eligible code/automatic campaign and skips Paymob. Tier percentages are not yet supplied; 10% gift default is an inherited technical proposal, not a newly confirmed business percentage.
+  '''
+}
+
+Table promotions {
+  id uuid [pk]
+  trigger promotion_trigger [not null, default: 'code']
+  code varchar(64) [unique]
+  discount_bps smallint [not null]
+  eligible_bundle_quantity integer [not null]
+  starts_at timestamptz [not null]
+  ends_at timestamptz [not null]
+  maximum_redemptions integer
+  per_buyer_limit integer [default: 1]
+  is_active boolean [not null, default: true]
+
+  indexes {
+    (id, trigger) [unique, name: 'promotions_trigger_identity']
+  }
+
+  checks {
+    `(trigger = 'code' AND code IS NOT NULL AND length(btrim(code)) > 0) OR (trigger = 'automatic_free' AND code IS NULL AND discount_bps = 10000)` [name: 'promotions_trigger_shape']
+    `discount_bps BETWEEN 1 AND 10000` [name: 'promotions_discount']
+    `ends_at > starts_at` [name: 'promotions_valid_window']
+    `maximum_redemptions IS NULL OR maximum_redemptions > 0` [name: 'promotions_global_limit']
+    `per_buyer_limit IS NULL OR per_buyer_limit > 0` [name: 'promotions_buyer_limit']
+    `eligible_bundle_quantity IN (1, 2, 5)` [name: 'promotions_fixed_bundle']
+  }
+
+  Note: '''
+    AdminJS-configured validity and optional global cap; per-buyer successful-use limit
+        defaults to one. Gifted-order use belongs to its buyer. Current scope uses percentage
+        codes; fixed-value coupons are not required. Each code targets one fixed bundle
+        and requires an end date. Validate target at quote/admission and freeze eligibility;
+        later scope edits must not rewrite an accepted order. The exact target quantity
+        qualifies through either selector; other quantities do not. Code normalization
+        is server-controlled. Automatic free campaigns have no entered code, use 100%
+        authorization, target a fixed bundle/end date and share buyer/global admission
+        controls. A zero price from configured quantity/gift discounts requires an eligible
+        automatic campaign unless an applied entered code already authorizes that order.
+        Skip ineligible automatic-free offers when computing ordinary purchasable pricing.
+        Preserve campaign trigger identity once referenced; scope/price edits do not rewrite
+        accepted orders. Matching late payments may exceed a released hold's quota only
+        with a recorded reconciliation exception, never by hiding the actual payment.
+        100% codes settle locally; they consume their allowed use atomically. Only the
+        winning effective code is applied/reserved; an unused entered code does not consume
+        a redemption. Compare eligibility and actual savings after quantity pricing.
+    Exact active bundle configuration is validated against shop_settings under the pricing lock. Q87 account-recreation allowance remains pending.
+  '''
+}
+
+Table token_orders {
+  id uuid [pk]
+  buyer_account_id uuid [not null]
+  order_kind token_order_kind [not null]
+  beneficiary_account_id uuid
+  token_quantity integer [not null]
+  currency char(3) [not null, default: 'EGP']
+  pricing_version bigint [not null]
+  price_tier_minimum_quantity smallint
+  base_unit_price_minor bigint [not null]
+  quantity_discount_bps smallint [not null, default: 0]
+  list_subtotal_minor bigint [not null]
+  quantity_discount_minor bigint [not null]
+  offer_subtotal_minor bigint [not null]
+  additional_discount_kind applied_discount_kind [not null, default: 'none']
+  additional_discount_bps smallint [not null, default: 0]
+  applied_promotion_id uuid
+  applied_promotion_trigger promotion_trigger
+  additional_discount_minor bigint [not null]
+  total_minor bigint [not null]
+  payment_state order_payment_state [not null, default: 'pending']
+  verified_paid_at timestamptz
+  zero_total_accepted_at timestamptz
+  idempotency_key uuid [not null]
+  created_at timestamptz [not null, default: `now()`]
+  recipient_phone_e164 varchar(20)
+  gift_note text
+  recipient_bound_at timestamptz
+  settlement_kind settlement_kind
+  settlement_payment_transaction_id uuid [unique]
+  settlement_payment_kind payment_transaction_kind
+  settlement_verification_event_id uuid
+  settled_at timestamptz
+
+  indexes {
+    (buyer_account_id, idempotency_key) [unique, name: 'token_orders_buyer_request']
+    (buyer_account_id, created_at, id) [name: 'token_orders_buyer_history']
+    (id, buyer_account_id, applied_promotion_id) [unique, name: 'token_orders_promo_identity']
+    (id, beneficiary_account_id, token_quantity, settlement_kind) [unique, name: 'token_orders_credit_source_identity']
+    (recipient_phone_e164, id) [name: 'token_orders_gift_claim_lookup']
+    (beneficiary_account_id, created_at, id) [name: 'token_orders_beneficiary_history']
+  }
+
+  checks {
+    `token_quantity BETWEEN 1 AND 20` [name: 'token_orders_quantity_cap']
+    `currency = 'EGP'` [name: 'token_orders_currency']
+    `pricing_version > 0 AND base_unit_price_minor > 0` [name: 'token_orders_price_basis']
+    `quantity_discount_bps BETWEEN 0 AND 10000 AND additional_discount_bps BETWEEN 0 AND 10000` [name: 'token_orders_discount_bounds']
+    `list_subtotal_minor = token_quantity::numeric * base_unit_price_minor` [name: 'token_orders_list_total']
+    `quantity_discount_minor = round(list_subtotal_minor::numeric * quantity_discount_bps / 10000)` [name: 'token_orders_quantity_reduction']
+    `offer_subtotal_minor = list_subtotal_minor - quantity_discount_minor` [name: 'token_orders_offer_total']
+    `additional_discount_minor = round(offer_subtotal_minor::numeric * additional_discount_bps / 10000)` [name: 'token_orders_extra_reduction']
+    `total_minor = offer_subtotal_minor - additional_discount_minor AND total_minor >= 0` [name: 'token_orders_payable_total']
+    `(order_kind = 'personal' AND beneficiary_account_id IS NOT NULL AND beneficiary_account_id = buyer_account_id) OR (order_kind = 'gift' AND (beneficiary_account_id IS NULL OR beneficiary_account_id <> buyer_account_id))` [name: 'token_orders_beneficiary_shape']
+    `(additional_discount_kind = 'none' AND additional_discount_bps = 0) OR (additional_discount_kind = 'gift' AND order_kind = 'gift' AND additional_discount_bps > 0) OR (additional_discount_kind = 'promo_code' AND additional_discount_bps > 0 AND applied_promotion_id IS NOT NULL)` [name: 'token_orders_one_extra_discount']
+    `(applied_promotion_id IS NULL) = (applied_promotion_trigger IS NULL)` [name: 'token_orders_promotion_trigger_pair']
+    `(applied_promotion_trigger IS NULL AND additional_discount_kind <> 'promo_code') OR (applied_promotion_trigger = 'code' AND additional_discount_kind = 'promo_code') OR (applied_promotion_trigger = 'automatic_free' AND additional_discount_kind <> 'promo_code' AND total_minor = 0)` [name: 'token_orders_promotion_application']
+    `applied_promotion_id IS NULL OR token_quantity IN (1, 2, 5)` [name: 'token_orders_promo_fixed_bundle']
+    `total_minor <> 0 OR applied_promotion_id IS NOT NULL` [name: 'token_orders_free_campaign_required']
+    `(payment_state = 'paid') = (verified_paid_at IS NOT NULL)` [name: 'token_orders_payment_marker']
+    `(payment_state = 'not_required') = (zero_total_accepted_at IS NOT NULL)` [name: 'token_orders_zero_marker']
+    `(total_minor = 0 AND payment_state IN ('not_required', 'cancelled')) OR (total_minor > 0 AND payment_state IN ('pending', 'paid', 'cancelled'))` [name: 'token_orders_settlement_amount']
+    `zero_total_accepted_at IS NULL OR zero_total_accepted_at >= created_at` [name: 'token_orders_zero_acceptance_order']
+    `price_tier_minimum_quantity IS NULL OR price_tier_minimum_quantity BETWEEN 1 AND token_quantity` [name: 'token_orders_tier_snapshot']
+    `(order_kind = 'personal' AND recipient_phone_e164 IS NULL AND gift_note IS NULL AND recipient_bound_at IS NULL) OR (order_kind = 'gift' AND recipient_phone_e164 IS NOT NULL AND recipient_phone_e164 ~ '^\+[1-9][0-9]{7,14}$' AND left(recipient_phone_e164, 3) = '+20' AND ((beneficiary_account_id IS NULL) = (recipient_bound_at IS NULL)))` [name: 'token_orders_gift_fields']
+    `recipient_bound_at IS NULL OR recipient_bound_at >= created_at` [name: 'token_orders_gift_binding_order']
+    `(settlement_kind IS NULL AND settled_at IS NULL AND settlement_payment_transaction_id IS NULL AND settlement_payment_kind IS NULL AND settlement_verification_event_id IS NULL) OR (settlement_kind IS NOT NULL AND settled_at IS NOT NULL AND ((settlement_kind = 'payment' AND total_minor > 0 AND payment_state = 'paid' AND settlement_payment_transaction_id IS NOT NULL AND settlement_payment_kind IS NOT NULL AND settlement_payment_kind IN ('payment', 'capture') AND settlement_verification_event_id IS NOT NULL) OR (settlement_kind = 'zero_cost' AND total_minor = 0 AND payment_state = 'not_required' AND settlement_payment_transaction_id IS NULL AND settlement_payment_kind IS NULL AND settlement_verification_event_id IS NULL)))` [name: 'token_orders_settlement_source_shape']
+    `(payment_state IN ('paid', 'not_required')) = (settlement_kind IS NOT NULL)` [name: 'token_orders_settlement_presence']
+    `settled_at IS NULL OR settled_at >= created_at` [name: 'token_orders_settlement_order']
+  }
+
+  Note: '''
+    One frozen personal/gift token purchase, with optional gift fields and one accepted funding field group. No basket/items or source wallets. Server computes exact minor-unit price and preserves accepted configuration; 1..20 quantity, fixed-bundle promos, quantity discount then better gift/code. Gifts cannot target buyer account/verified phone. Bind existing recipient account at checkout or once at verified claim; no relookup/rerouting on retries. Unclaimed gifts never expire. Admin may correct unbound phone only after verified buyer request; append structured staff audit with old/new phone, requester/proof IDs and reason in same transaction. Existing bound ownership is stable through phone changes. Valid zero order settles locally with promo consumption and any available credit, no provider attempt. Positive settlement references exact payment/capture and proof; verify amount/currency/integration before committing. Distinct additional payments open cases and never grant twice. Matching late payments are honored once with exceptions recorded. Wrong/deleted beneficiary and reversals require reconciliation. Accepted settlement survives later provider reversal; source is not rewritten. Deletion/funding boundary Q86 remains pending.
+  '''
+}
+
+Table promo_usages {
+  order_id uuid [pk]
+  promotion_id uuid [not null]
+  buyer_account_id uuid [not null]
+  state promo_usage_state [not null, default: 'held']
+  held_at timestamptz [not null, default: `now()`]
+  consumed_at timestamptz
+  released_at timestamptz
+  release_reason text
+
+  indexes {
+    (promotion_id, state) [name: 'promo_usages_global_counts']
+    (promotion_id, buyer_account_id, state) [name: 'promo_usages_buyer_counts']
+  }
+
+  checks {
+    `(state = 'held' AND consumed_at IS NULL AND released_at IS NULL) OR (state = 'consumed' AND consumed_at IS NOT NULL AND released_at IS NULL) OR (state = 'released' AND consumed_at IS NULL AND released_at IS NOT NULL)` [name: 'promo_usages_state_times']
+    `consumed_at IS NULL OR consumed_at >= held_at` [name: 'promo_usages_consumption_order']
+    `released_at IS NULL OR (released_at >= held_at AND (consumed_at IS NULL OR released_at >= consumed_at))` [name: 'promo_usages_release_order']
+    `state <> 'released' OR (release_reason IS NOT NULL AND length(btrim(release_reason)) > 0)` [name: 'promo_usages_release_reason']
+  }
+
+  Note: '''
+    Usage belongs to the buyer and actual applied code/automatic free campaign,
+    enforced by the order FK.
+    Reserve allowance at checkout, consume on verified payment OR valid zero-cost
+    acceptance, and release only after confirming the payment path closed unpaid.
+    Unknown outcomes stay held for reconciliation; browser closure/local timeout is
+    insufficient evidence. A zero-cost order can hold and consume in one transaction.
+    No provider attempt is made for it. A consumed use is never released because of
+    an unused game or token restoration. Preserve its consumption marker; transition
+    guards are required in addition to row shape. Late verified settlement can consume
+    a previously released use only with its prior release evidence recorded in a
+    reconciliation case. Admission locks the promotion and counts held plus consumed
+    capacity; row CHECK cannot count other rows.
+  '''
+
+}
+
+Table payment_attempts {
+  id uuid [pk]
+  order_id uuid [not null]
+  provider varchar(24) [not null, default: 'paymob']
+  environment payment_environment [not null]
+  provider_merchant_id varchar(160) [not null]
+  configuration_key varchar(80) [not null]
+  request_key uuid [not null]
+  state payment_attempt_state [not null, default: 'initializing']
+  special_reference varchar(160) [not null]
+  allowed_integration_ids text[] [not null]
+  checkout_credentials_ciphertext bytea
+  encryption_key_version smallint
+  created_at timestamptz [not null]
+  provider_expires_at timestamptz
+  confirmed_unpaid_at timestamptz
+  closure_verification_event_id uuid
+  last_inquired_at timestamptz
+
+  indexes {
+    (order_id, request_key) [unique, name: 'payment_attempts_order_request']
+    (id, order_id, provider, environment, provider_merchant_id) [unique, name: 'payment_attempts_financial_identity']
+    (provider, environment, provider_merchant_id, special_reference) [unique, name: 'payment_attempts_correlation_reference']
+    (order_id, created_at, id) [name: 'payment_attempts_order_history']
+  }
+
+  checks {
+    `length(btrim(special_reference)) > 0` [name: 'payment_attempts_nonblank_reference']
+    `cardinality(allowed_integration_ids) > 0 AND array_position(allowed_integration_ids, NULL) IS NULL` [name: 'payment_attempts_integrations_present']
+    `(checkout_credentials_ciphertext IS NULL) = (encryption_key_version IS NULL)` [name: 'payment_attempts_encryption_pair']
+    `encryption_key_version IS NULL OR encryption_key_version > 0` [name: 'payment_attempts_encryption_version']
+    `(state = 'closed_unpaid') = (confirmed_unpaid_at IS NOT NULL)` [name: 'payment_attempts_unpaid_confirmation']
+    `(confirmed_unpaid_at IS NULL) = (closure_verification_event_id IS NULL)` [name: 'payment_attempts_closure_proof_pair']
+    `confirmed_unpaid_at IS NULL OR confirmed_unpaid_at >= created_at` [name: 'payment_attempts_confirmation_order']
+    `provider_expires_at IS NULL OR provider_expires_at > created_at` [name: 'payment_attempts_expiry_order']
+    `length(btrim(provider)) > 0 AND length(btrim(provider_merchant_id)) > 0 AND length(btrim(configuration_key)) > 0` [name: 'payment_attempts_namespace']
+  }
+
+  Note: '''
+    Hosted-checkout creation attempt for a positive-price frozen order. Merchant/environment/config key and allowed integrations are frozen metadata; configuration resolves external secrets and retains historical key versions outside ordinary DB JSON. There is no merchant dashboard/config CRUD table. Keep provider references separately without assuming their cardinality. Unknown create outcome requires inquiry/reconciliation before another creation; correlation is not native provider idempotency. External HTTP occurs outside database locks. Retained resumable credentials are encrypted with external keys. Expiry/local timeout is not final-unpaid proof. A closure event must belong to this attempt AND actually confirm authoritative final-unpaid state; the FK alone does not prove the latter. Late success can settle once and records the exception.
+  '''
+}
+
+Table payment_provider_references {
+  provider varchar(24) [not null, default: 'paymob']
+  environment payment_environment [not null]
+  provider_merchant_id varchar(160) [not null]
+  reference_kind provider_reference_kind [not null]
+  provider_reference text [not null]
+  attempt_id uuid [not null]
+  order_id uuid [not null]
+
+  indexes {
+    (provider, environment, provider_merchant_id, reference_kind, provider_reference) [pk, name: 'payment_provider_references_identity']
+    (attempt_id, reference_kind) [name: 'payment_provider_references_attempt_lookup']
+  }
+
+  checks {
+    `length(btrim(provider_reference)) > 0` [name: 'payment_provider_references_nonblank']
+  }
+
+  Note: '''
+    Map every actual provider order/intention reference into its exact attempt/order and immutable merchant/environment namespace. Keep this small relation instead of imposing an undocumented one-reference-per-kind assumption. Callback resolution uses stored references and trusted merchant configuration, never customer phone alone. Composite FK prevents namespace/order mismatch.
+  '''
+}
+
+Table payment_transactions {
+  id uuid [pk]
+  provider varchar(24) [not null, default: 'paymob']
+  environment payment_environment [not null]
+  provider_merchant_id varchar(160) [not null]
+  provider_transaction_id text [not null]
+  transaction_kind payment_transaction_kind [not null, default: 'payment']
+  parent_transaction_id uuid
+  attempt_id uuid [not null]
+  order_id uuid [not null]
+  integration_id text [not null]
+  amount_minor bigint [not null]
+  currency char(3) [not null]
+  outcome payment_outcome [not null, default: 'pending']
+  captured_minor bigint [not null, default: 0]
+  refunded_minor bigint [not null, default: 0]
+  last_verification_event_id uuid
+  last_verified_at timestamptz
+  created_at timestamptz [not null]
+
+  indexes {
+    (provider, environment, provider_merchant_id, provider_transaction_id) [unique, name: 'payment_transactions_provider_identity']
+    (id, order_id, transaction_kind) [unique, name: 'payment_transactions_order_identity']
+    (order_id, created_at, id) [name: 'payment_transactions_order_history']
+  }
+
+  checks {
+    `length(btrim(provider_transaction_id)) > 0 AND length(btrim(integration_id)) > 0` [name: 'payment_transactions_nonblank_references']
+    `amount_minor > 0 AND captured_minor BETWEEN 0 AND amount_minor AND refunded_minor BETWEEN 0 AND captured_minor` [name: 'payment_transactions_amount_bounds']
+    `(last_verification_event_id IS NULL) = (last_verified_at IS NULL)` [name: 'payment_transactions_verification_pair']
+    `last_verified_at IS NULL OR last_verified_at >= created_at` [name: 'payment_transactions_verification_order']
+    `transaction_kind = 'payment' OR parent_transaction_id IS NOT NULL` [name: 'payment_transactions_action_parent']
+    `parent_transaction_id IS NULL OR parent_transaction_id <> id` [name: 'payment_transactions_no_self_parent']
+  }
+
+  Note: '''
+    One actual payment transaction in its merchant/environment namespace. Distinct
+        successful provider transactions are distinct facts, even for one local order.
+        The attempt FK binds exact order/merchant. Currency deliberately need not be EGP:
+        retain mismatched real payments for reconciliation rather than rejecting evidence.
+        Positive fulfillment requires verified correct integration, exact order amount/EGP
+        and successful sale/capture, not pending authorization or browser success.
+        captured/refunded are confirmed cumulative financial facts; unsigned reversal
+        details require authenticated inquiry. Do not infer callback ordering/finality.
+        Later reversal never deletes the original settlement/grant or automatically
+        makes the permanent token bank negative. Record a staff reconciliation case.
+        Actual separately identified capture/refund/void transactions reference their
+        original mapped transaction; validate same merchant/order and acyclic ancestry.
+        An update to the original transaction's refund total remains a new verified
+        observation of that original ID. Reversal transactions cannot fund a settlement.
+        Unmapped verified notifications remain in the durable receipt inbox until matched.
+    Provider merchant/environment is frozen on the row and bound to the exact attempt. The last verification pointer references a typed payment_events proof.
+  '''
+}
+
+Table payment_events {
+  id uuid [pk]
+  provider varchar(24) [not null, default: 'paymob']
+  environment payment_environment [not null]
+  provider_merchant_id varchar(160) [not null]
+  configuration_key varchar(80) [not null]
+  verification_method payment_verification_method [not null]
+  fingerprint bytea
+  notification_type varchar(40)
+  provider_transaction_id text
+  provider_order_reference text
+  attempt_id uuid
+  transaction_id uuid
+  facts_hash bytea [not null]
+  verified_facts jsonb [not null]
+  confirms_closed_unpaid boolean [not null, default: false]
+  received_at timestamptz [not null]
+  verified_at timestamptz [not null]
+  state payment_receipt_state [not null, default: 'queued']
+  processed_at timestamptz
+  last_error_code varchar(80)
+
+  indexes {
+    (provider, environment, provider_merchant_id, fingerprint) [unique, name: 'payment_events_exact_delivery']
+    (id, transaction_id) [unique, name: 'payment_events_transaction_identity']
+    (id, attempt_id) [unique, name: 'payment_events_attempt_identity']
+    (state, received_at, id) [name: 'payment_events_pending_work']
+    (attempt_id, verified_at, id) [name: 'payment_events_attempt_history']
+  }
+
+  checks {
+    `(verification_method = 'hmac_callback' AND fingerprint IS NOT NULL AND notification_type IS NOT NULL AND length(btrim(notification_type)) > 0) OR (verification_method = 'authenticated_inquiry' AND fingerprint IS NULL AND notification_type IS NULL AND attempt_id IS NOT NULL)` [name: 'payment_events_method_shape']
+    `fingerprint IS NULL OR octet_length(fingerprint) = 32` [name: 'payment_events_fingerprint_shape']
+    `octet_length(facts_hash) = 32 AND jsonb_typeof(verified_facts) = 'object'` [name: 'payment_events_facts_shape']
+    `length(btrim(provider)) > 0 AND length(btrim(provider_merchant_id)) > 0 AND length(btrim(configuration_key)) > 0` [name: 'payment_events_namespace']
+    `verified_at >= received_at` [name: 'payment_events_verification_order']
+    `(state IN ('processed', 'ignored')) = (processed_at IS NOT NULL)` [name: 'payment_events_processing_pair']
+    `processed_at IS NULL OR processed_at >= verified_at` [name: 'payment_events_processing_order']
+    `transaction_id IS NULL OR attempt_id IS NOT NULL` [name: 'payment_events_transaction_attempt']
+    `verification_method <> 'hmac_callback' OR state <> 'processed' OR transaction_id IS NOT NULL` [name: 'payment_events_processed_callback_mapping']
+    `NOT confirms_closed_unpaid OR (verification_method = 'authenticated_inquiry' AND transaction_id IS NULL)` [name: 'payment_events_closure_shape']
+  }
+
+  Note: '''
+    Typed durable financial evidence inbox/history combining verified incoming callbacks and authenticated provider inquiries. Verify event-specific HMAC before saving callback, sanitize facts, then persist before acknowledgement. Callback fingerprint deduplicates exact deliveries only; transaction IDs are not unique here because later observations may change. Unknown callback mappings remain queued/needs_review. An inquiry binds an attempt and optionally its transaction; supplementary partial uniqueness deduplicates identical inquiry facts. Immutable trusted facts coexist with mutable mapping/processing status. Funding references an exact mapped event/transaction and checks proof state, namespace, integration, amount, currency and successful sale/capture; unprocessed/ignored/unmapped/card-token evidence cannot authorize credit. Closure proof also needs supported final-unpaid semantics. Keep unsigned fields out of trusted decisions; inquire when necessary. Never store raw card data, bearer secrets, contact payloads or assume provider ordering/native idempotency.
+  '''
+}
+
+Table payment_reconciliation_cases {
+  id uuid [pk]
+  case_key varchar(160) [not null, unique]
+  case_type varchar(48) [not null]
+  state reconciliation_state [not null, default: 'open']
+  order_id uuid
+  attempt_id uuid
+  transaction_id uuid
+  payment_event_id uuid
+  details jsonb [not null, default: `'{}'::jsonb`]
+  opened_at timestamptz [not null]
+  resolved_at timestamptz
+  resolution_audit_event_id uuid
+
+  indexes {
+    (state, opened_at, id) [name: 'payment_reconciliation_cases_staff_queue']
+    (order_id, opened_at, id) [name: 'payment_reconciliation_cases_order_history']
+  }
+
+  checks {
+    `length(btrim(case_type)) > 0 AND jsonb_typeof(details) = 'object'` [name: 'payment_reconciliation_cases_details_shape']
+    `order_id IS NOT NULL OR attempt_id IS NOT NULL OR transaction_id IS NOT NULL OR payment_event_id IS NOT NULL` [name: 'payment_reconciliation_cases_evidence_present']
+    `(state = 'resolved') = (resolved_at IS NOT NULL)` [name: 'payment_reconciliation_cases_resolution_time']
+    `(resolved_at IS NULL) = (resolution_audit_event_id IS NULL)` [name: 'payment_reconciliation_cases_resolution_actor']
+    `resolved_at IS NULL OR resolved_at >= opened_at` [name: 'payment_reconciliation_cases_time_order']
+  }
+
+  Note: '''
+    Admin exceptions: extra distinct payments, late closed-order settlement,
+        released-promo quota exception, mismatched amount/currency, deleted beneficiary,
+        actual provider reversal, unknown create outcome or unmapped verified notification.
+        case_key prevents duplicate issue creation. Validate provided evidence links belong
+        together; each optional FK proves existence, not agreement among all supplied IDs.
+        Matching late payment fulfills the original order once, with any case recorded;
+        wrong/deleted-recipient cases require review rather than automatic rerouting.
+        Resolution requires role, reason and audit of the actual action/evidence. This is
+        not a customer cash-out/refund API, source-lot allocation or negative-wallet policy.
+    One ordinary Admin list/status/action view suffices; no ticketing or permission framework is added. Incoming/inquiry evidence uses payment_events.
+  '''
+}
+
+Table staff_accounts {
+  id uuid [pk]
+  role staff_role [not null]
+  normalized_email text [not null, unique]
+  password_hash text [not null]
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+
+  checks {
+    `length(btrim(normalized_email)) > 0 AND normalized_email = lower(btrim(normalized_email))` [name: 'staff_accounts_normalized_email']
+    `length(btrim(password_hash)) > 0` [name: 'staff_accounts_password_hash_present']
+  }
+
+  Note: '''
+    Separate staff email identity with two fixed roles: admin and super_admin.
+    Both manage all operational content, pricing, promotions, complimentary credits,
+    support and financial cases through validated audited actions. Only Super Admin
+    manages staff accounts/roles. Q89 supersedes the former content-only Q40 policy.
+    Hash passwords; persistent sessions and one audit log are the other staff tables.
+    Recheck active flag/current role per action. Ledger/balance/proof fields remain
+    read-only resources with focused service actions; a staff role never fabricates
+    payment verification. No dynamic permission-management framework is required.
+  '''
+}
+
+Table staff_sessions {
+  session_hash bytea [pk]
+  staff_account_id uuid [not null]
+  session_data jsonb [not null, default: `'{}'::jsonb`]
+  created_at timestamptz [not null]
+  expires_at timestamptz [not null]
+  revoked_at timestamptz
+
+  indexes {
+    (staff_account_id, expires_at) [name: 'staff_sessions_account_revocation']
+    expires_at [name: 'staff_sessions_expiry_cleanup']
+  }
+
+  checks {
+    `octet_length(session_hash) = 32` [name: 'staff_sessions_hash_shape']
+    `jsonb_typeof(session_data) = 'object'` [name: 'staff_sessions_data_object']
+    `expires_at > created_at` [name: 'staff_sessions_expiry_order']
+    `revoked_at IS NULL OR revoked_at >= created_at` [name: 'staff_sessions_revocation_order']
+  }
+
+  Note: '''
+    Persistent AdminJS staff-session store, replacing the starter's memory sessions.
+    Proposed adapter hashes an opaque cookie token before lookup; session_data holds
+    bounded nonsecret middleware state, never password hashes or raw credentials.
+    Match actual session-store adapter serialization in implementation; this is not
+    claimed as an unmodified third-party package's table schema. Recheck current staff
+    activity/role for every protected action. Logout/deactivation/password reset revoke
+    affected sessions; no player Firebase identity gains staff access. Use a fixed
+    expiry or bounded renewal cadence, avoiding a database write for every admin asset.
+    Self-service staff MFA/reset is not added launch scope; Super Admin manages staff.
+  '''
+
+}
+
+Table staff_audit_events {
+  id uuid [pk]
+  staff_account_id uuid [not null]
+  action_code varchar(80) [not null]
+  target_kind varchar(48) [not null]
+  target_key varchar(160) [not null]
+  request_key uuid [not null, unique]
+  reason text
+  details jsonb
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (staff_account_id, created_at, id) [name: 'staff_audit_events_actor_history']
+    (target_kind, target_key, created_at, id) [name: 'staff_audit_events_target_history']
+  }
+
+  checks {
+    `details IS NULL OR jsonb_typeof(details) = 'object'` [name: 'staff_audit_events_details_object']
+    `length(btrim(action_code)) > 0 AND length(btrim(target_kind)) > 0 AND length(btrim(target_key)) > 0` [name: 'staff_audit_events_nonblank_target_action']
+  }
+
+  Note: '''
+    Append-only actor/action evidence committed with a privileged effect. Target kind/key
+    are generic audit metadata, not a cross-table FK; financial sources below keep
+    explicit references to this event. Verify role/actor/action/target/payload in the
+    write transaction; an audit FK alone proves neither permission nor correct action.
+    Reuse request_key on retry and validate scope. Store sanitized relevant changes,
+    not credentials/secrets or an unbounded request dump. Retention remains pending.
+    target_key canonically represents UUID, singleton integer or composite resource
+    keys; do not force every audited resource to have a UUID primary key. In particular,
+    price/branding settings use key 1 and fixed token bundles use their quantity.
+  '''
+
+}
+
+Table contact_submissions {
+  id uuid [pk]
+  request_key uuid [not null, unique]
+  request_digest bytea [not null]
+  account_id uuid
+  kind contact_kind [not null]
+  support_reason varchar(24)
+  business_kind varchar(24)
+  name text
+  email text
+  handle text
+  message text
+  rating smallint
+  state contact_state [not null, default: 'open']
+  created_at timestamptz [not null]
+  closed_at timestamptz
+  closed_by_staff_id uuid
+
+  indexes {
+    (state, created_at, id) [name: 'contact_submissions_staff_inbox']
+    (account_id, created_at, id) [name: 'contact_submissions_account_cleanup']
+  }
+
+  checks {
+    `octet_length(request_digest) = 32` [name: 'contact_submissions_request_digest']
+    `message IS NULL OR length(message) <= 1000` [name: 'contact_submissions_message_bounds']
+    `rating IS NULL OR rating BETWEEN 1 AND 5` [name: 'contact_submissions_rating_bounds']
+    `(kind = 'support' AND support_reason IS NOT NULL AND support_reason IN ('technical', 'purchase', 'account') AND business_kind IS NULL AND email IS NOT NULL AND message IS NOT NULL AND length(btrim(message)) >= 5 AND rating IS NULL) OR (kind = 'business' AND business_kind IS NOT NULL AND business_kind IN ('business', 'influencer') AND support_reason IS NULL AND email IS NOT NULL AND message IS NOT NULL AND length(btrim(message)) >= 5 AND rating IS NULL) OR (kind = 'experience' AND support_reason IS NULL AND business_kind IS NULL AND (rating IS NOT NULL OR (message IS NOT NULL AND length(btrim(message)) > 0)))` [name: 'contact_submissions_form_shape']
+    `(state = 'closed') = (closed_at IS NOT NULL)` [name: 'contact_submissions_closed_time']
+    `(closed_at IS NULL) = (closed_by_staff_id IS NULL)` [name: 'contact_submissions_closing_actor']
+    `closed_at IS NULL OR closed_at >= created_at` [name: 'contact_submissions_closing_order']
+  }
+
+  Note: '''
+    Real persistent Support/Experience/Business inbox replacing browser-only storage.
+    Admin and Super Admin may inspect/close this inbox.
+    Normalize optional blanks, validate email syntax and bound all text on the server;
+    user-entered contact email is not a verified player identity. Public submissions
+    need abuse controls and key/digest retry handling without exposing stored PII.
+    No automatic outbound mail, reply thread or ticketing integration is in scope.
+    Personal-data/contact retention is separate from retained payment evidence.
+  '''
+
+}
+
+Table public_pages {
+  id uuid [pk]
+  slug varchar(80) [not null, unique]
+  content_schema_version smallint [not null, default: 1]
+  content jsonb [not null]
+  is_published boolean [not null, default: false]
+  updated_by_staff_id uuid [not null]
+  updated_at timestamptz [not null]
+
+  checks {
+    `slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'` [name: 'public_pages_slug_shape']
+    `content_schema_version > 0 AND jsonb_typeof(content) = 'object'` [name: 'public_pages_content_shape']
+  }
+
+  Note: '''
+    Admin-editable approved informational/legal/home page content using fixed renderer
+    schemas and Arabic/optional Franco fields. Not arbitrary executable HTML/JS or a
+    general page builder. Publication validates required fields/locales and ready public
+    media. Admin/Super Admin can edit with audit. Slug is stable route identity;
+    actual approved legal copy is supplied by the project, not invented by this schema.
+    Images/covers use public_page_media references instead of untracked IDs inside JSON.
+  '''
+
+}
+
+Table public_page_media {
+  page_id uuid [not null]
+  slot_key varchar(80) [not null]
+  media_asset_id uuid [not null]
+  alt_ar text
+  alt_franco text
+
+  indexes {
+    (page_id, slot_key) [pk, name: 'public_page_media_slot']
+    (media_asset_id, page_id) [name: 'public_page_media_asset_references']
+  }
+
+  checks {
+    `length(btrim(slot_key)) > 0` [name: 'public_page_media_nonblank_slot']
+  }
+
+  Note: 'Typed template media slots for public pages. Publication requires ready public-scope assets and appropriate image alternative text. Private question originals must not accidentally become branding assets; publish a deliberate public copy when needed. Slot vocabulary/required roles belong to the page schema.'
+
+}
+
+Table site_settings {
+  id smallint [pk, default: 1]
+  settings_schema_version smallint [not null, default: 1]
+  logo_asset_id uuid
+  branding jsonb [not null]
+  updated_by_staff_id uuid [not null]
+  updated_at timestamptz [not null]
+
+  checks {
+    `id = 1 AND settings_schema_version > 0` [name: 'site_settings_singleton_version']
+    `jsonb_typeof(branding) = 'object'` [name: 'site_settings_branding_object']
+  }
+
+  Note: '''
+    One validated branding/contact/social configuration, including approved colors and
+    localized labels. Logo FK participates in asset retention. No API credentials or
+    arbitrary scripts in this public data. Branding edits do not change fixed launch
+    gameplay rules (six people, two teams, 36 tiles, 60-second answering clock); those
+    accepted rules must not silently change through a generic JSON dashboard field.
+  '''
+
+}
+
+Table outbox_events {
+  id uuid [pk]
+  deduplication_key varchar(160) [not null, unique]
+  topic varchar(80) [not null]
+  resource_kind varchar(48) [not null]
+  resource_id uuid [not null]
+  payload jsonb [not null, default: `'{}'::jsonb`]
+  state work_state [not null, default: 'pending']
+  attempt_count integer [not null, default: 0]
+  max_attempts smallint [not null, default: 10]
+  available_at timestamptz [not null]
+  lease_token uuid
+  lease_until timestamptz
+  created_at timestamptz [not null]
+  finished_at timestamptz
+  last_error_code varchar(80)
+
+  indexes {
+    (state, available_at, id) [name: 'outbox_events_pending_work']
+    (state, lease_until, id) [name: 'outbox_events_stale_leases']
+    (resource_kind, resource_id, created_at, id) [name: 'outbox_events_resource_history']
+  }
+
+  checks {
+    `length(btrim(topic)) > 0 AND length(btrim(resource_kind)) > 0` [name: 'outbox_events_nonblank_routing']
+    `jsonb_typeof(payload) = 'object'` [name: 'outbox_events_payload_object']
+    `max_attempts > 0 AND attempt_count BETWEEN 0 AND max_attempts` [name: 'outbox_events_attempt_bounds']
+    `(state = 'running') = (lease_token IS NOT NULL)` [name: 'outbox_events_lease_token_pair']
+    `(lease_token IS NULL) = (lease_until IS NULL)` [name: 'outbox_events_lease_time_pair']
+    `state <> 'running' OR attempt_count > 0` [name: 'outbox_events_claim_attempt']
+    `(state IN ('succeeded', 'dead')) = (finished_at IS NOT NULL)` [name: 'outbox_events_finish_pair']
+    `finished_at IS NULL OR finished_at >= created_at` [name: 'outbox_events_finish_order']
+  }
+
+  Note: '''
+    Durable post-commit work inside the existing NestJS/PostgreSQL topology: game
+    version-change hints, media processing/cleanup, receipt processing/inquiry,
+    external auth revocation/deletion and account cleanup. Commit with the source
+    transition; bounded workers claim with SKIP LOCKED, commit a lease, perform I/O
+    outside locks, then conditionally acknowledge the matching lease token. Recover
+    expired leases and alert on dead work. Retrying does not imply provider-native
+    exactly-once creation: unknown payment effects require inquiry/reconciliation.
+    Routing target is explicit generic metadata, not a polymorphic FK; each topic
+    validates its bounded payload/resource and reloads authoritative state. Store
+    IDs/config versions only, not secrets, signed URLs, raw PII or question answers.
+    Media writes use fresh immutable keys/conditional creation before ready state.
+    Game fan-out carries a version hint; authorized clients resync state after gaps.
+    No permanent per-socket event log or Redis service is required at launch.
+  '''
+
+}
+
+Ref packs_category: question_packs.category_id > categories.id [delete: no action, update: no action]
+Ref questions_pack: questions.pack_id > question_packs.id [delete: no action, update: no action]
+Ref media_assets_source: media_assets.source_asset_id > media_assets.id [delete: no action, update: no action]
+Ref media_assets_staff: media_assets.uploaded_by_staff_id > staff_accounts.id [delete: no action, update: no action]
+Ref question_media_question: question_media.question_id > questions.id [delete: no action, update: no action]
+Ref question_media_asset: question_media.media_asset_id > media_assets.id [delete: no action, update: no action]
+Ref game_question_media_asset: game_question_media.media_asset_id > media_assets.id [delete: no action, update: no action]
+Ref rooms_owner: rooms.owner_account_id > accounts.id [delete: no action, update: no action]
+Ref rooms_current_game: rooms.(current_game_id, id) > games.(id, room_id) [delete: no action, update: no action]
+Ref room_memberships_room: room_memberships.room_id > rooms.id [delete: no action, update: no action]
+Ref room_memberships_account: room_memberships.account_id > accounts.id [delete: no action, update: no action]
+Ref game_players_room_membership: game_players.(room_id, room_member_id) > room_memberships.(room_id, id) [delete: no action, update: no action]
+Ref game_players_game_room: game_players.(game_id, room_id) > games.(id, room_id) [delete: no action, update: no action]
+Ref game_packs_game: game_packs.game_id > games.id [delete: no action, update: no action]
+Ref game_packs_category: game_packs.category_id > categories.id [delete: no action, update: no action]
+Ref game_packs_source: game_packs.pack_id > question_packs.id [delete: no action, update: no action]
+Ref game_packs_repeat_actor: game_packs.(game_id, repeat_accepted_by_seat) > game_players.(game_id, seat_number) [delete: no action, update: no action]
+Ref game_players_account: game_players.account_id > accounts.id [delete: no action, update: no action]
+Ref phone_verification_challenges_account: phone_verification_challenges.account_id > accounts.id [delete: no action, update: no action]
+Ref account_phone_changes_account: account_phone_changes.account_id > accounts.id [delete: no action, update: no action]
+Ref account_phone_changes_old_proof: account_phone_changes.old_phone_challenge_id > phone_verification_challenges.id [delete: no action, update: no action]
+Ref account_phone_changes_new_proof: account_phone_changes.new_phone_challenge_id > phone_verification_challenges.id [delete: no action, update: no action]
+Ref exposure_account: account_question_exposures.account_id > accounts.id [delete: no action, update: no action]
+Ref exposure_question: account_question_exposures.question_id > questions.id [delete: no action, update: no action]
+Ref exposure_first_membership: account_question_exposures.(first_game_id, account_id) > game_players.(game_id, account_id) [delete: no action, update: no action]
+Ref completion_membership: account_pack_completions.(game_id, account_id) > game_players.(game_id, account_id) [delete: no action, update: no action]
+Ref completion_game_pack: account_pack_completions.(game_id, board_position) > game_packs.(game_id, board_position) [delete: no action, update: no action]
+Ref token_ledger_restored_debit: token_ledger_entries.(account_id, game_id, source_debit_id, source_debit_kind) > token_ledger_entries.(account_id, game_id, id, entry_kind) [delete: no action, update: no action]
+Ref staff_audit_events_actor: staff_audit_events.staff_account_id > staff_accounts.id [delete: no action, update: no action]
+Ref token_orders_buyer: token_orders.buyer_account_id > accounts.id [delete: no action, update: no action]
+Ref token_orders_beneficiary: token_orders.beneficiary_account_id > accounts.id [delete: no action, update: no action]
+Ref token_orders_promotion: token_orders.(applied_promotion_id, applied_promotion_trigger) > promotions.(id, trigger) [delete: no action, update: no action]
+Ref promo_usages_order_identity: promo_usages.(order_id, buyer_account_id, promotion_id) > token_orders.(id, buyer_account_id, applied_promotion_id) [delete: no action, update: no action]
+Ref token_ledger_staff_action: token_ledger_entries.staff_audit_event_id > staff_audit_events.id [delete: no action, update: no action]
+Ref payment_attempts_order: payment_attempts.order_id > token_orders.id [delete: no action, update: no action]
+Ref payment_reconciliation_cases_order: payment_reconciliation_cases.order_id > token_orders.id [delete: no action, update: no action]
+Ref payment_reconciliation_cases_attempt: payment_reconciliation_cases.attempt_id > payment_attempts.id [delete: no action, update: no action]
+Ref payment_reconciliation_cases_transaction: payment_reconciliation_cases.transaction_id > payment_transactions.id [delete: no action, update: no action]
+Ref payment_reconciliation_cases_audit: payment_reconciliation_cases.resolution_audit_event_id > staff_audit_events.id [delete: no action, update: no action]
+Ref payment_transactions_parent: payment_transactions.parent_transaction_id > payment_transactions.id [delete: no action, update: no action]
+Ref account_deletion_requests_account: account_deletion_requests.account_id > accounts.id [delete: no action, update: no action]
+Ref token_ledger_deletion_request: token_ledger_entries.(deletion_request_id, account_id) > account_deletion_requests.(id, account_id) [delete: no action, update: no action]
+Ref staff_sessions_account: staff_sessions.staff_account_id > staff_accounts.id [delete: no action, update: no action]
+Ref contact_submissions_account: contact_submissions.account_id > accounts.id [delete: no action, update: no action]
+Ref contact_submissions_closing_staff: contact_submissions.closed_by_staff_id > staff_accounts.id [delete: no action, update: no action]
+Ref public_pages_editor: public_pages.updated_by_staff_id > staff_accounts.id [delete: no action, update: no action]
+Ref public_page_media_page: public_page_media.page_id > public_pages.id [delete: no action, update: no action]
+Ref public_page_media_asset: public_page_media.media_asset_id > media_assets.id [delete: no action, update: no action]
+Ref site_settings_logo: site_settings.logo_asset_id > media_assets.id [delete: no action, update: no action]
+Ref site_settings_editor: site_settings.updated_by_staff_id > staff_accounts.id [delete: no action, update: no action]
+Ref account_phone_changes_support_audit: account_phone_changes.support_audit_event_id > staff_audit_events.id [delete: no action, update: no action]
+Ref games_room_owner: games.(room_id, host_account_id) > rooms.(id, owner_account_id) [delete: no action, update: no action]
+Ref games_current_question: games.(id, active_board_position, active_question_position) > game_questions.(game_id, board_position, question_position) [delete: no action, update: no action]
+Ref accounts_active_roster: accounts.(active_game_id, id) > game_players.(game_id, account_id) [delete: no action, update: no action]
+Ref game_questions_pack: game_questions.(game_id, board_position) > game_packs.(game_id, board_position) [delete: no action, update: no action]
+Ref game_questions_source: game_questions.source_question_id > questions.id [delete: no action, update: no action]
+Ref game_questions_resolution_host: game_questions.(game_id, resolved_by_account_id) > games.(id, host_account_id) [delete: no action, update: no action]
+Ref game_questions_feedback_host: game_questions.(game_id, feedback_by_account_id) > games.(id, host_account_id) [delete: no action, update: no action]
+Ref game_question_media_question: game_question_media.(game_id, board_position, question_position) > game_questions.(game_id, board_position, question_position) [delete: no action, update: no action]
+Ref game_actions_host: game_actions.(game_id, host_account_id) > games.(id, host_account_id) [delete: no action, update: no action]
+Ref game_actions_award_question: game_actions.(game_id, score_source_board_position, score_source_question_position) > game_questions.(game_id, board_position, question_position) [delete: no action, update: no action]
+Ref token_ledger_account: token_ledger_entries.account_id > accounts.id [delete: no action, update: no action]
+Ref token_ledger_host: token_ledger_entries.(game_id, account_id) > games.(id, host_account_id) [delete: no action, update: no action]
+Ref token_ledger_order_credit: token_ledger_entries.(source_order_id, account_id, amount, source_order_settlement_kind) > token_orders.(id, beneficiary_account_id, token_quantity, settlement_kind) [delete: no action, update: no action]
+Ref payment_provider_references_attempt_namespace: payment_provider_references.(attempt_id, order_id, provider, environment, provider_merchant_id) > payment_attempts.(id, order_id, provider, environment, provider_merchant_id) [delete: no action, update: no action]
+Ref payment_transactions_attempt_namespace: payment_transactions.(attempt_id, order_id, provider, environment, provider_merchant_id) > payment_attempts.(id, order_id, provider, environment, provider_merchant_id) [delete: no action, update: no action]
+Ref payment_transactions_last_event: payment_transactions.(last_verification_event_id, id) > payment_events.(id, transaction_id) [delete: no action, update: no action]
+Ref payment_events_attempt: payment_events.attempt_id > payment_attempts.id [delete: no action, update: no action]
+Ref payment_events_transaction: payment_events.transaction_id > payment_transactions.id [delete: no action, update: no action]
+Ref payment_attempts_closure_event: payment_attempts.(closure_verification_event_id, id) > payment_events.(id, attempt_id) [delete: no action, update: no action]
+Ref token_orders_settlement_payment: token_orders.(settlement_payment_transaction_id, id, settlement_payment_kind) > payment_transactions.(id, order_id, transaction_kind) [delete: no action, update: no action]
+Ref token_orders_settlement_proof: token_orders.(settlement_verification_event_id, settlement_payment_transaction_id) > payment_events.(id, transaction_id) [delete: no action, update: no action]
+Ref payment_cases_event: payment_reconciliation_cases.payment_event_id > payment_events.id [delete: no action, update: no action]
