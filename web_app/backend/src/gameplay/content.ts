@@ -41,9 +41,7 @@ export function settings(
       ];
     requireState(
       suggestions[0] === cap &&
-        suggestions.every(
-          (n, i) => n <= cap && (!i || n <= suggestions[i - 1]),
-        ),
+        suggestions.every((n, i) => n <= cap && (!i || n < suggestions[i - 1])),
       "CONTENT_NOT_READY",
     );
     return { ...config, stageSuggestions: suggestions };

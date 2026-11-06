@@ -5,7 +5,7 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { and, eq, isNull, sql } from "drizzle-orm";
-import { randomInt, randomUUID } from "node:crypto";
+import { createHash, randomInt, randomUUID } from "node:crypto";
 import type { Request } from "express";
 import { DatabaseService } from "../database/database.module.js";
 import * as s from "../database/schema/index.js";
@@ -36,6 +36,7 @@ export interface Actor {
   secret?: string;
   controlSecret?: string;
   generation?: bigint;
+  proofFingerprint?: string;
 }
 
 export async function freshTime(db: Tx): Promise<Date> {
@@ -53,6 +54,38 @@ export class GameplayService implements OnModuleInit, OnModuleDestroy {
   readonly scheduler = new GameplayScheduler();
   readonly metrics = new GameplayMetrics();
   private pressureTimer?: ReturnType<typeof setInterval>;
+  private credentials = new Map<
+    string,
+    { until: number; subject: string; account?: VerifiedAccount }
+  >();
+  private actors = new WeakMap<Request, Actor>();
+  fingerprint(value: string) {
+    return createHash("sha256").update(value).digest("hex");
+  }
+  knownCredential(authorization?: string) {
+    if (!authorization) return undefined;
+    const key = this.fingerprint(authorization),
+      entry = this.credentials.get(key);
+    if (entry && entry.until > Date.now()) return entry;
+    this.credentials.delete(key);
+    return undefined;
+  }
+  forgetCredential(actor: Actor) {
+    if (actor.proofFingerprint) this.credentials.delete(actor.proofFingerprint);
+  }
+  private rememberCredential(
+    key: string,
+    subject: string,
+    account?: VerifiedAccount,
+  ) {
+    if (this.credentials.size >= 4096)
+      this.credentials.delete(this.credentials.keys().next().value!);
+    this.credentials.set(key, {
+      subject,
+      account,
+      until: Math.min(Date.now() + 30000, account?.expiresAt ?? Infinity),
+    });
+  }
   constructor(
     readonly database: DatabaseService,
     private config: ConfigService,
@@ -147,6 +180,11 @@ export class GameplayService implements OnModuleInit, OnModuleDestroy {
   }
   enabled() {
     requireState(this.options.enabled, "GAMEPLAY_DISABLED", 503);
+    try {
+      this.database.db;
+    } catch {
+      throw new GameplayProblem(503, "GAMEPLAY_DATABASE_UNAVAILABLE");
+    }
   }
   operation(req: Request) {
     return id(req.headers["idempotency-key"]);
@@ -180,6 +218,7 @@ export class GameplayService implements OnModuleInit, OnModuleDestroy {
       401,
     );
     const token = authorization.slice(7);
+    const fingerprint = this.fingerprint(authorization);
     if (token.startsWith("g.")) {
       const parts = token.split(".");
       requireState(parts.length === 3, "INVALID_PROOF", 401);
@@ -189,18 +228,20 @@ export class GameplayService implements OnModuleInit, OnModuleDestroy {
           .from(s.roomMemberships)
           .where(eq(s.roomMemberships.id, id(parts[1])))
       )[0];
-      requireState(
+      const valid =
         member &&
-          equalProof(
-            member.reconnectCredentialHash,
-            proof("guest", member.id, parts[2]),
-          ),
-        "INVALID_PROOF",
-        401,
-      );
-      return { member, secret: parts[2] };
+        equalProof(
+          member.reconnectCredentialHash,
+          proof("guest", member.id, parts[2]),
+        );
+      if (!valid) this.credentials.delete(fingerprint);
+      requireState(valid, "INVALID_PROOF", 401);
+      this.rememberCredential(fingerprint, `guest:${member.id}`);
+      return { member, secret: parts[2], proofFingerprint: fingerprint };
     }
-    const account = await this.options.verifyAccount?.(token);
+    const cached = this.knownCredential(authorization);
+    const account =
+      cached?.account ?? (await this.options.verifyAccount?.(token));
     requireState(
       account && account.expiresAt > Date.now(),
       "UNAUTHENTICATED",
@@ -212,10 +253,18 @@ export class GameplayService implements OnModuleInit, OnModuleDestroy {
         .from(s.accounts)
         .where(eq(s.accounts.id, account.accountId))
     )[0];
-    requireState(row?.state === "active", "UNAUTHENTICATED", 401);
-    return { account: { ...account, accountId: row.id } };
+    if (row?.state !== "active") {
+      this.credentials.delete(fingerprint);
+      throw new GameplayProblem(401, "UNAUTHENTICATED");
+    }
+    const verified = { ...account, accountId: row.id };
+    if (!cached?.account)
+      this.rememberCredential(fingerprint, `account:${row.id}`, verified);
+    return { account: verified, proofFingerprint: fingerprint };
   }
   async actor(req: Request): Promise<Actor> {
+    const known = this.actors.get(req);
+    if (known) return known;
     const actor = await this.identity(req.headers.authorization);
     actor.controlSecret =
       typeof req.headers["x-control-secret"] === "string"
@@ -225,6 +274,7 @@ export class GameplayService implements OnModuleInit, OnModuleDestroy {
       req.headers["x-controller-generation"] === undefined
         ? undefined
         : revision(req.headers["x-controller-generation"]);
+    this.actors.set(req, actor);
     return actor;
   }
   host(room: Room, actor: Actor, control = true) {
@@ -306,15 +356,15 @@ export class GameplayService implements OnModuleInit, OnModuleDestroy {
         )
     )[0];
     requireState(member, "NOT_FOUND", 404);
-    if (live)
-      requireState(
+    if (live) {
+      const permitted =
         !room.closedAt &&
-          !member.leftAt &&
-          !member.removedAt &&
-          (!actor.member || (!member.accountId && !member.reconnectRevokedAt)),
-        "MEMBERSHIP_REVOKED",
-        403,
-      );
+        !member.leftAt &&
+        !member.removedAt &&
+        (!actor.member || (!member.accountId && !member.reconnectRevokedAt));
+      if (!permitted) this.forgetCredential(actor);
+      requireState(permitted, "MEMBERSHIP_REVOKED", 403);
+    }
     return member;
   }
   async receipt(

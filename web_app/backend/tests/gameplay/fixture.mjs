@@ -4,7 +4,10 @@ import { cluster } from "../database/cluster.mjs";
 import { createApplication } from "../../dist/application.js";
 
 export const secret = () => randomBytes(32).toString("base64url");
-export async function gameplayFixture(t, { hosts = 3, tokens = 3 } = {}) {
+export async function gameplayFixture(
+  t,
+  { hosts = 3, tokens = 3, verifyUnknown } = {},
+) {
   process.env.NODE_ENV = "test";
   process.env.ADMIN_ENABLED = "false";
   const cleanup = [];
@@ -68,13 +71,15 @@ export async function gameplayFixture(t, { hosts = 3, tokens = 3 } = {}) {
   app = await createApplication({
     gameplay: {
       enabled: true,
-      verifyAccount: async (token) =>
-        /^a\d+$/.test(token) && accounts[Number(token.slice(1))]
-          ? {
-              accountId: accounts[Number(token.slice(1))],
-              expiresAt: Date.now() + 3600000,
-            }
-          : undefined,
+      verifyAccount: async (token) => {
+        if (/^a\d+$/.test(token) && accounts[Number(token.slice(1))])
+          return {
+            accountId: accounts[Number(token.slice(1))],
+            expiresAt: Date.now() + 3600000,
+          };
+        await verifyUnknown?.(token);
+        return undefined;
+      },
       pressure: async () => ({
         api: pressure,
         database: pressure,

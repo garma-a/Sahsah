@@ -69,78 +69,82 @@ export class MediaService {
       "DUPLICATE_MEDIA_REF",
       400,
     );
-    const result = await this.core.database.transaction(async (db) => {
-      await db.execute(
-        sql`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY`,
-      );
-      const game = await this.games.game(db, gameId, false),
-        now = await freshTime(db);
-      requireState(!game.contentPurgedAt, "CONTENT_PURGED", 410);
-      requireState(
-        game.status === "active" &&
-          now.getTime() < new Date(game.idleExpiresAt).getTime(),
-        "MEDIA_PHASE_UNAVAILABLE",
-        409,
-      );
-      await this.projections.authorize(db, game, actor, false);
-      requireState(
-        game.activeBoardPosition !== null,
-        "MEDIA_PHASE_UNAVAILABLE",
-      );
-      const q = (
-        await db
-          .select()
-          .from(s.gameQuestions)
-          .where(
-            this.games.slot({
-              gameId,
-              boardPosition: game.activeBoardPosition,
-              questionPosition: game.activeQuestionPosition!,
-            }),
-          )
-      )[0];
-      const media = await db
-        .select({ pin: s.gameQuestionMedia, asset: s.mediaAssets })
-        .from(s.gameQuestionMedia)
-        .innerJoin(
-          s.mediaAssets,
-          eq(s.mediaAssets.id, s.gameQuestionMedia.mediaAssetId),
-        )
-        .where(
-          and(
-            eq(s.gameQuestionMedia.gameId, gameId),
-            eq(s.gameQuestionMedia.boardPosition, q.boardPosition),
-            eq(s.gameQuestionMedia.questionPosition, q.questionPosition),
-          ),
-        );
-      const pins: Pin[] = media.map(({ pin, asset }) => ({
-        ...pin,
-        durationMs: asset.durationMs,
-      }));
-      const host = actor.account?.accountId === game.hostAccountId;
-      const allowed = refs({
-        question: questionView(q, pins, host, "ar"),
-        ...(q.revealedAt ? { answer: answerView(q, pins, host, "ar") } : {}),
-      }).map(canonical);
-      const objects = requested.map((ref) => {
-        requireState(allowed.includes(canonical(ref)), "MEDIA_FORBIDDEN", 403);
-        const row = media.find(
-          ({ pin }) =>
-            pin.mediaRole === ref.role &&
-            pin.variantNumber === ref.variantNumber,
-        )!;
+    const result = await this.core.database.transaction(
+      async (db) => {
+        const game = await this.games.game(db, gameId, false),
+          now = await freshTime(db);
+        requireState(!game.contentPurgedAt, "CONTENT_PURGED", 410);
         requireState(
-          row &&
-            row.asset.storageProvider === "r2" &&
-            row.asset.accessScope === "private" &&
-            row.asset.state === "ready",
-          "MEDIA_UNAVAILABLE",
-          503,
+          game.status === "active" &&
+            now.getTime() < new Date(game.idleExpiresAt).getTime(),
+          "MEDIA_PHASE_UNAVAILABLE",
+          409,
         );
-        return { ref, asset: row.asset };
-      });
-      return { objects, serverTime: now.toISOString() };
-    });
+        await this.projections.authorize(db, game, actor, false);
+        requireState(
+          game.activeBoardPosition !== null,
+          "MEDIA_PHASE_UNAVAILABLE",
+        );
+        const q = (
+          await db
+            .select()
+            .from(s.gameQuestions)
+            .where(
+              this.games.slot({
+                gameId,
+                boardPosition: game.activeBoardPosition,
+                questionPosition: game.activeQuestionPosition!,
+              }),
+            )
+        )[0];
+        const media = await db
+          .select({ pin: s.gameQuestionMedia, asset: s.mediaAssets })
+          .from(s.gameQuestionMedia)
+          .innerJoin(
+            s.mediaAssets,
+            eq(s.mediaAssets.id, s.gameQuestionMedia.mediaAssetId),
+          )
+          .where(
+            and(
+              eq(s.gameQuestionMedia.gameId, gameId),
+              eq(s.gameQuestionMedia.boardPosition, q.boardPosition),
+              eq(s.gameQuestionMedia.questionPosition, q.questionPosition),
+            ),
+          );
+        const pins: Pin[] = media.map(({ pin, asset }) => ({
+          ...pin,
+          durationMs: asset.durationMs,
+        }));
+        const host = actor.account?.accountId === game.hostAccountId;
+        const allowed = refs({
+          question: questionView(q, pins, host, "ar"),
+          ...(q.revealedAt ? { answer: answerView(q, pins, host, "ar") } : {}),
+        }).map(canonical);
+        const objects = requested.map((ref) => {
+          requireState(
+            allowed.includes(canonical(ref)),
+            "MEDIA_FORBIDDEN",
+            403,
+          );
+          const row = media.find(
+            ({ pin }) =>
+              pin.mediaRole === ref.role &&
+              pin.variantNumber === ref.variantNumber,
+          )!;
+          requireState(
+            row &&
+              row.asset.storageProvider === "r2" &&
+              row.asset.accessScope === "private" &&
+              row.asset.state === "ready",
+            "MEDIA_UNAVAILABLE",
+            503,
+          );
+          return { ref, asset: row.asset };
+        });
+        return { objects, serverTime: now.toISOString() };
+      },
+      { consistentRead: true },
+    );
     const signer = this.core.options.signMedia;
     requireState(signer, "MEDIA_UNAVAILABLE", 503);
     const links = await Promise.all(

@@ -227,46 +227,54 @@ export class GameplayRealtime
           throw new GameplayProblem(400, "INVALID_FRAME");
         }
         const message = frame(parsed);
-        await this.core.scheduler.run(
-          c.actor ? "protected" : "public",
-          async () => {
-            if (!c.actor) {
+        if (
+          message.event === "authenticate" ||
+          message.event === "reauthenticate"
+        ) {
+          const refresh = message.event === "reauthenticate";
+          requireState(
+            refresh ? !!c.actor : !c.actor,
+            refresh ? "AUTHENTICATE_FIRST" : "ALREADY_AUTHENTICATED",
+            401,
+          );
+          if (refresh)
+            await this.core.scheduler.run("protected", () => this.authority(c));
+          const actor = await this.core.scheduler.run(
+            this.core.knownCredential(String(message.data.authorization))
+              ? "protected"
+              : "public",
+            () => this.core.identity(String(message.data.authorization)),
+          );
+          await this.core.scheduler.run("protected", () =>
+            this.authenticate(
+              c,
+              refresh
+                ? { ...message.data, roomId: c.roomId, language: c.language }
+                : message.data,
+              refresh,
+              actor,
+            ),
+          );
+        } else {
+          requireState(c.actor, "AUTHENTICATE_FIRST", 401);
+          await this.core.scheduler.run("protected", async () => {
+            await this.authority(c);
+            if (!this.current(c)) return;
+            if (message.event === "set_language") {
+              c.language = String(message.data.language);
+              this.invalidate(c.roomId!);
+            } else if (message.event === "resync") {
               requireState(
-                message.event === "authenticate",
-                "AUTHENTICATE_FIRST",
-                401,
+                Date.now() - c.lastResync >= 1000,
+                "RATE_LIMITED",
+                429,
               );
-              await this.authenticate(c, message.data, false);
-            } else {
-              requireState(
-                message.event !== "authenticate",
-                "ALREADY_AUTHENTICATED",
-                409,
-              );
-              await this.authority(c);
-              if (!this.current(c)) return;
-              if (message.event === "reauthenticate")
-                await this.authenticate(
-                  c,
-                  { ...message.data, roomId: c.roomId, language: c.language },
-                  true,
-                );
-              else if (message.event === "set_language") {
-                c.language = String(message.data.language);
-                this.invalidate(c.roomId!);
-              } else if (message.event === "resync") {
-                requireState(
-                  Date.now() - c.lastResync >= 1000,
-                  "RATE_LIMITED",
-                  429,
-                );
-                c.lastResync = Date.now();
-                this.invalidate(c.roomId!);
-              } else if (message.event === "playback_status")
-                await this.playback(c, message.data);
-            }
-          },
-        );
+              c.lastResync = Date.now();
+              this.invalidate(c.roomId!);
+            } else if (message.event === "playback_status")
+              await this.playback(c, message.data);
+          });
+        }
       }
     } catch (error) {
       this.stop(
@@ -278,8 +286,12 @@ export class GameplayRealtime
       c.busy = false;
     }
   }
-  private async authenticate(c: Connection, data: Data, refresh: boolean) {
-    const actor = await this.core.identity(String(data.authorization));
+  private async authenticate(
+    c: Connection,
+    data: Data,
+    refresh: boolean,
+    actor: Actor,
+  ) {
     const room = await this.core.room(
       this.core.database.db,
       String(data.roomId),
@@ -576,11 +588,55 @@ export class GameplayRealtime
         stream.published = generation;
         if (stream.dirty === generation) break;
       }
-    } catch (e) {
-      for (const c of this.members.values())
-        if (c.roomId === roomId) this.revoke(c, e);
+    } catch (error) {
+      // A representative can lose authority during a consistent projection
+      // read. Recheck every grant; one member leaving must not evict teammates.
+      stream.cache?.clear();
+      try {
+        const latest = await this.fence(roomId);
+        let survivors = 0;
+        for (const c of [...this.members.values()])
+          if (c.roomId === roomId && this.current(c)) {
+            try {
+              this.check(c.actor!, c.memberId!, latest);
+              survivors++;
+            } catch (revoked) {
+              this.core.forgetCredential(c.actor!);
+              this.revoke(c, revoked);
+            }
+          }
+        const authorizationFailure =
+          error instanceof GameplayProblem &&
+          [
+            "FORBIDDEN",
+            "CONTROLLER_FENCED",
+            "MEMBERSHIP_REVOKED",
+            "PARTICIPATION_ENDED",
+            "CREDENTIAL_EXPIRED",
+            "ROOM_CLOSED",
+            "NOT_FOUND",
+          ].includes(error.code);
+        if (survivors && authorizationFailure) stream.dirty++;
+        else {
+          stream.published = stream.dirty;
+          for (const c of this.members.values())
+            if (c.roomId === roomId)
+              this.send(c, "resync_required", {
+                code: "PROJECTION_UNAVAILABLE",
+              });
+        }
+      } catch {
+        stream.published = stream.dirty;
+        for (const c of [...this.members.values()])
+          if (c.roomId === roomId) {
+            this.send(c, "resync_required", { code: "SERVICE_UNAVAILABLE" });
+            this.cleanup(c);
+            c.socket.close(1013, "Service unavailable");
+          }
+      }
     }
   }
+
   private presence(c: Connection, members: Member[], room: RoomStream) {
     this.send(c, "presence", {
       processEpoch: this.epoch,

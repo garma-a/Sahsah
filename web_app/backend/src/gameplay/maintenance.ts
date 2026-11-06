@@ -53,15 +53,36 @@ export class GameplayMaintenance implements OnModuleInit, OnModuleDestroy {
           for (const row of rooms.rows)
             await this.rooms.expireRoom(String(row.id));
           await this.purge();
-          await this.core.database.db.execute(
-            sql`DELETE FROM room_actions WHERE operation_id IN (SELECT operation_id FROM room_actions WHERE expires_at<=clock_timestamp() ORDER BY expires_at,operation_id LIMIT 100)`,
-          );
-          await this.core.database.db.execute(
-            sql`DELETE FROM game_actions WHERE (game_id,command_id) IN (SELECT game_id,command_id FROM game_actions WHERE score_entry_kind IS NULL AND accepted_at<=clock_timestamp()-interval '7 days' ORDER BY accepted_at,game_id LIMIT 100)`,
-          );
-          await this.core.database.db.execute(
-            sql`DELETE FROM outbox_events WHERE id IN (SELECT id FROM outbox_events WHERE state='succeeded' AND finished_at<=clock_timestamp()-interval '7 days' ORDER BY finished_at,id LIMIT 100)`,
-          );
+          await this.core.database.transaction(async (db) => {
+            const dueCodes = await db.execute(
+              sql`SELECT id FROM rooms WHERE invitation_code IS NOT NULL AND invitation_expires_at<=clock_timestamp() ORDER BY invitation_expires_at,id FOR UPDATE SKIP LOCKED LIMIT 100`,
+            );
+            for (const row of dueCodes.rows) {
+              const [room] = await db
+                .update(s.rooms)
+                .set({
+                  invitationCode: null,
+                  invitationIssuedAt: null,
+                  invitationExpiresAt: null,
+                  invitationRevokedAt: null,
+                  stateVersion: sql`${s.rooms.stateVersion}+1`,
+                })
+                .where(eq(s.rooms.id, String(row.id)))
+                .returning();
+              await this.core.hint(db, room.id, room.stateVersion);
+            }
+          });
+          await this.core.database.transaction(async (db) => {
+            await db.execute(
+              sql`DELETE FROM room_actions WHERE operation_id IN (SELECT operation_id FROM room_actions WHERE expires_at<=clock_timestamp() ORDER BY expires_at,operation_id LIMIT 100)`,
+            );
+            await db.execute(
+              sql`DELETE FROM game_actions WHERE (game_id,command_id) IN (SELECT game_id,command_id FROM game_actions WHERE score_entry_kind IS NULL AND accepted_at<=clock_timestamp()-interval '7 days' ORDER BY accepted_at,game_id LIMIT 100)`,
+            );
+            await db.execute(
+              sql`DELETE FROM outbox_events WHERE id IN (SELECT id FROM outbox_events WHERE state='succeeded' AND finished_at<=clock_timestamp()-interval '7 days' ORDER BY finished_at,id LIMIT 100)`,
+            );
+          });
           await this.core.reconcileOccupancy();
         });
       }
@@ -91,16 +112,20 @@ export class GameplayMaintenance implements OnModuleInit, OnModuleDestroy {
     for (const roomId of new Set(events.map((e) => e.payload.roomId)))
       this.realtime.invalidate(roomId);
     if (events.length) {
-      await this.core.database.db.execute(
-        sql`UPDATE outbox_events SET state='succeeded',finished_at=clock_timestamp(),lease_token=NULL,lease_until=NULL WHERE lease_token=${lease} AND state='running'`,
+      await this.core.database.transaction((db) =>
+        db.execute(
+          sql`UPDATE outbox_events SET state='succeeded',finished_at=clock_timestamp(),lease_token=NULL,lease_until=NULL WHERE lease_token=${lease} AND state='running'`,
+        ),
       );
       for (const e of events)
         this.core.metrics.dispatched(
           Math.max(0, Date.now() - new Date(e.created_at).getTime()),
         );
     }
-    await this.core.database.db.execute(
-      sql`UPDATE outbox_events SET state='dead',finished_at=clock_timestamp(),lease_token=NULL,lease_until=NULL,last_error_code='RETRY_EXHAUSTED' WHERE topic IN ('room.changed','game.changed','account.gameplay.changed') AND attempt_count=max_attempts AND ((state='pending') OR (state='running' AND lease_until<=clock_timestamp()))`,
+    await this.core.database.transaction((db) =>
+      db.execute(
+        sql`UPDATE outbox_events SET state='dead',finished_at=clock_timestamp(),lease_token=NULL,lease_until=NULL,last_error_code='RETRY_EXHAUSTED' WHERE topic IN ('room.changed','game.changed','account.gameplay.changed') AND attempt_count=max_attempts AND ((state='pending') OR (state='running' AND lease_until<=clock_timestamp()))`,
+      ),
     );
   }
   private async purge() {

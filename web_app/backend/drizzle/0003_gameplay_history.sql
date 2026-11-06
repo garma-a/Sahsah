@@ -15,7 +15,9 @@ SET search_path = pg_catalog, public, pg_temp AS $$
 BEGIN
   IF ROW(NEW.id,NEW.owner_account_id,NEW.created_at,NEW.create_request_id,NEW.create_request_digest)
      IS DISTINCT FROM ROW(OLD.id,OLD.owner_account_id,OLD.created_at,OLD.create_request_id,OLD.create_request_digest)
-     OR (OLD.closed_at IS NOT NULL AND NEW IS DISTINCT FROM OLD) THEN
+     OR (OLD.closed_at IS NOT NULL AND NEW IS DISTINCT FROM OLD AND (
+       (to_jsonb(NEW)-ARRAY['state_version','invitation_code','invitation_issued_at','invitation_expires_at','invitation_revoked_at']) IS DISTINCT FROM (to_jsonb(OLD)-ARRAY['state_version','invitation_code','invitation_issued_at','invitation_expires_at','invitation_revoked_at'])
+       OR NEW.invitation_code IS NOT NULL OR OLD.invitation_expires_at IS NULL OR OLD.invitation_expires_at>clock_timestamp())) THEN
     RAISE EXCEPTION 'room source and closure are permanent' USING ERRCODE='23514';
   END IF;
   IF NEW.lobby_generation NOT BETWEEN OLD.lobby_generation AND OLD.lobby_generation+1

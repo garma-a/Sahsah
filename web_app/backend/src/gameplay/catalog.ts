@@ -172,88 +172,88 @@ export class CatalogService {
       400,
     );
     const roomId = query.roomId === undefined ? undefined : id(query.roomId);
-    return this.core.database.transaction(async (db) => {
-      await db.execute(
-        sql`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY`,
-      );
-      let members: Member[] = [];
-      if (roomId) {
-        requireState(actor, "UNAUTHENTICATED", 401);
-        const room = await this.core.room(db, roomId, false);
-        await this.core.membership(db, room, actor);
-        members = await this.core.members(db, roomId);
-      } else if (actor?.account)
-        members = [
-          {
-            id: actor.account.accountId,
-            accountId: actor.account.accountId,
-            lobbyTeamNumber: null,
-          } as Member,
-        ];
-      const rows = await db
-        .select()
-        .from(s.questionPacks)
-        .where(
-          and(
-            eq(s.questionPacks.categoryId, categoryId),
-            eq(s.questionPacks.publicationState, "published"),
-            isNull(s.questionPacks.archivedAt),
-            sql`(${s.questionPacks.packNumber},${s.questionPacks.id}) > (${cursor[0]},${cursor[1]}::uuid)`,
-          ),
-        )
-        .orderBy(s.questionPacks.packNumber, s.questionPacks.id)
-        .limit(50);
-      const eligibility = await this.eligibilities(db, rows, members);
-      const own = actor?.account?.accountId;
-      const history =
-        own && rows.length
-          ? await db.execute(sql`SELECT p.pack_id, bool_or(NOT EXISTS(SELECT 1 FROM questions q WHERE q.pack_id=p.pack_id AND q.retired_at IS NULL AND NOT EXISTS(SELECT 1 FROM game_questions gq WHERE gq.game_id=c.game_id AND gq.board_position=c.board_position AND gq.source_question_id=q.id))) AS current
+    return this.core.database.transaction(
+      async (db) => {
+        let members: Member[] = [];
+        if (roomId) {
+          requireState(actor, "UNAUTHENTICATED", 401);
+          const room = await this.core.room(db, roomId, false);
+          await this.core.membership(db, room, actor);
+          members = await this.core.members(db, roomId);
+        } else if (actor?.account)
+          members = [
+            {
+              id: actor.account.accountId,
+              accountId: actor.account.accountId,
+              lobbyTeamNumber: null,
+            } as Member,
+          ];
+        const rows = await db
+          .select()
+          .from(s.questionPacks)
+          .where(
+            and(
+              eq(s.questionPacks.categoryId, categoryId),
+              eq(s.questionPacks.publicationState, "published"),
+              isNull(s.questionPacks.archivedAt),
+              sql`(${s.questionPacks.packNumber},${s.questionPacks.id}) > (${cursor[0]},${cursor[1]}::uuid)`,
+            ),
+          )
+          .orderBy(s.questionPacks.packNumber, s.questionPacks.id)
+          .limit(50);
+        const eligibility = await this.eligibilities(db, rows, members);
+        const own = actor?.account?.accountId;
+        const history =
+          own && rows.length
+            ? await db.execute(sql`SELECT p.pack_id, bool_or(NOT EXISTS(SELECT 1 FROM questions q WHERE q.pack_id=p.pack_id AND q.retired_at IS NULL AND NOT EXISTS(SELECT 1 FROM game_questions gq WHERE gq.game_id=c.game_id AND gq.board_position=c.board_position AND gq.source_question_id=q.id))) AS current
         FROM account_pack_completions c JOIN game_packs p USING(game_id,board_position) WHERE c.account_id=${own} AND p.pack_id IN (${sql.join(
           rows.map((p) => sql`${p.id}::uuid`),
           sql`,`,
         )}) GROUP BY p.pack_id`)
-          : { rows: [] };
-      const items: Data[] = [];
-      let scanned: (typeof rows)[number] | undefined;
-      for (const pack of rows) {
-        scanned = pack;
-        const e = eligibility.get(pack.id)!;
-        if (e.questions.length !== 6) continue;
-        if (query.freshOnly !== "false" && !e.fresh) continue;
-        let progress: Data | undefined;
-        if (own) {
-          const row = history.rows.find((r) => r.pack_id === pack.id) as
-            | { current: boolean }
-            | undefined;
-          progress = {
-            completed: row?.current ?? false,
-            updated: !!row && !row.current,
-            exposed: e.exposures.some((x) => x.accountId === own),
-          };
+            : { rows: [] };
+        const items: Data[] = [];
+        let scanned: (typeof rows)[number] | undefined;
+        for (const pack of rows) {
+          scanned = pack;
+          const e = eligibility.get(pack.id)!;
+          if (e.questions.length !== 6) continue;
+          if (query.freshOnly !== "false" && !e.fresh) continue;
+          let progress: Data | undefined;
+          if (own) {
+            const row = history.rows.find((r) => r.pack_id === pack.id) as
+              | { current: boolean }
+              | undefined;
+            progress = {
+              completed: row?.current ?? false,
+              updated: !!row && !row.current,
+              exposed: e.exposures.some((x) => x.accountId === own),
+            };
+          }
+          items.push({
+            id: pack.id,
+            categoryId,
+            packNumber: pack.packNumber,
+            contentRevision: String(pack.contentRevision),
+            questionCount: 6,
+            ...(progress ? { progress } : {}),
+            ...(roomId
+              ? {
+                  freshForGroup: e.fresh,
+                  repeatRequired: !e.fresh,
+                  eligibilityBasis: e.basis,
+                }
+              : {}),
+          });
+          if (items.length === limit) break;
         }
-        items.push({
-          id: pack.id,
-          categoryId,
-          packNumber: pack.packNumber,
-          contentRevision: String(pack.contentRevision),
-          questionCount: 6,
-          ...(progress ? { progress } : {}),
-          ...(roomId
-            ? {
-                freshForGroup: e.fresh,
-                repeatRequired: !e.fresh,
-                eligibilityBasis: e.basis,
-              }
+        return {
+          items,
+          ...(scanned && (rows.length === 50 || scanned.id !== rows.at(-1)?.id)
+            ? { nextCursor: next(scanned.packNumber, scanned.id) }
             : {}),
-        });
-        if (items.length === limit) break;
-      }
-      return {
-        items,
-        ...(scanned && (rows.length === 50 || scanned.id !== rows.at(-1)?.id)
-          ? { nextCursor: next(scanned.packNumber, scanned.id) }
-          : {}),
-      };
-    });
+        };
+      },
+      { consistentRead: true },
+    );
   }
 }

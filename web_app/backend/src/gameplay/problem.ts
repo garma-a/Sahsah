@@ -46,7 +46,7 @@ export class GameplayProblemFilter implements ExceptionFilter {
     if (
       !problem &&
       code &&
-      ["40001", "40P01", "57014", "55P03", "53300"].includes(code)
+      ["40001", "40P01", "57014", "55P03", "53300", "08006"].includes(code)
     )
       problem = new GameplayProblem(503, "SERVICE_BUSY");
     const status =

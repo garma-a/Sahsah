@@ -332,7 +332,7 @@ export class RoomOperations {
           invitationExpiresAt: plusDay(now),
           invitationRevokedAt: null,
         },
-        false,
+        true,
       );
       return this.core.saveReceipt(
         db,

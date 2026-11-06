@@ -39,6 +39,118 @@ test("PostgreSQL 18 migrations, runtime permissions and transactions", { timeout
   t.after(() => database.close());
   await database.initialize();
 
+  await t.test(
+      "gameplay process handoff drains transactions and fences work after lease loss",
+      async () => {
+        const setup = async () => {
+          const db = new DatabaseConnection(
+            config(pg.url(), { DATABASE_POOL_MAX: "3" }),
+          );
+          await db.initialize();
+          return db;
+        };
+        const first = await setup(),
+          next = await setup();
+        let release = () => {};
+        let work;
+        try {
+          assert.equal(await first.claimGameplayProcess(), true);
+          let started;
+          const began = new Promise((r) => {
+            started = r;
+          });
+          const barrier = new Promise((r) => {
+            release = r;
+          });
+          work = first.transaction(async (db) => {
+            started();
+            await barrier;
+            await db.execute(sql`SELECT 1`);
+          });
+          await began;
+          const closing = first.close();
+          assert.equal(
+            await next.claimGameplayProcess(),
+            false,
+            "replacement admitted while graceful old work was active",
+          );
+          release();
+          await work;
+          await closing;
+          assert.equal(await next.claimGameplayProcess(), true);
+        } finally {
+          release();
+          await work?.catch(() => {});
+          await first.close();
+          await next.close();
+        }
+
+        const old = await setup(),
+          replacement = await setup();
+        let finish = () => {};
+        let pending;
+        try {
+          assert.equal(await old.claimGameplayProcess(), true);
+          let started;
+          const began = new Promise((r) => {
+            started = r;
+          });
+          const barrier = new Promise((r) => {
+            finish = r;
+          });
+          const category = randomUUID();
+          pending = old.transaction(async (db) => {
+            started();
+            await barrier;
+            await db
+              .insert(schema.categories)
+              .values({ id: category, nameAr: "Must roll back" });
+          });
+          pending.catch(() => {});
+          await began;
+          const lease = (
+            await owner.query(
+              "SELECT pid FROM pg_locks WHERE locktype='advisory' AND classid=1935763505 AND objid=1 AND objsubid=2 AND granted",
+            )
+          ).rows[0];
+          await runtime.query("SELECT pg_terminate_backend($1)", [lease.pid]);
+          const admission = replacement.claimGameplayProcess();
+          const deadline = Date.now() + 5000;
+          while (
+            !(
+              await owner.query(
+                "SELECT EXISTS(SELECT 1 FROM pg_locks WHERE locktype='advisory' AND classid=1935763505 AND objid=2 AND NOT granted) AS waiting",
+              )
+            ).rows[0].waiting
+          ) {
+            assert.ok(
+              Date.now() < deadline,
+              "replacement did not wait for old writers",
+            );
+            await new Promise((r) => setTimeout(r, 5));
+          }
+          finish();
+          await assert.rejects(pending, /lease was lost|lease was replaced/);
+          assert.equal(await admission, true);
+          assert.equal(
+            (
+              await owner.query(
+                "SELECT count(*)::int AS n FROM categories WHERE id=$1",
+                [category],
+              )
+            ).rows[0].n,
+            0,
+          );
+        } finally {
+          finish();
+          await pending?.catch(() => {});
+          await old.close();
+          await replacement.close();
+        }
+      },
+    );
+
+
   await t.test("fresh and repeat migrations preserve the complete schema", async () => {
     assert.equal((await migrationStatus(owner)).filter((entry) => entry.applied).length, 4);
     await applyMigrations(owner);

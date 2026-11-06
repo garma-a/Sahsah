@@ -1,6 +1,6 @@
 {
   "kind": "local-smoke-not-railway-certification",
-  "timestamp": "2026-11-06T12:56:07.156Z",
+  "timestamp": "2026-11-06T13:28:14.188Z",
   "runtime": "v24.22.0",
   "postgres": "18 disposable",
   "profile": {
@@ -14,18 +14,18 @@
     "steadyState": "bounded command bursts, not the required 15-minute acceptance run"
   },
   "acceptedCommands": 700,
-  "durationSeconds": 4.9685156090000016,
-  "p95HttpMs": 257.48613399999886,
-  "p99HttpMs": 320.2224069999975,
-  "p95VisibleMs": 708.9555689999979,
-  "p99VisibleMs": 768.1881639999992,
+  "durationSeconds": 5.324349557999998,
+  "p95HttpMs": 281.1387289999984,
+  "p99HttpMs": 321.8692689999989,
+  "p95VisibleMs": 779.5519139999997,
+  "p99VisibleMs": 844.3814169999969,
   "measurements": {
     "commands": 700,
-    "p95CommandMs": 234.356735,
-    "p99CommandMs": 250.347519,
-    "p95OutboxDispatchMs": 249.036799,
-    "eventLoopP99Ms": 21.610495,
-    "rssBytes": 519892992,
+    "p95CommandMs": 244.187135,
+    "p99CommandMs": 279.445503,
+    "p95OutboxDispatchMs": 282.066943,
+    "eventLoopP99Ms": 22.151167,
+    "rssBytes": 535044096,
     "projections": 800,
     "refusals": 0
   },

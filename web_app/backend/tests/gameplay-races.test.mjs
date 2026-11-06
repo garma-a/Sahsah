@@ -6,6 +6,74 @@ import { GameplayService } from "../dist/gameplay/service.js";
 import { createApplication } from "../dist/application.js";
 
 test(
+  "slow unverified new callers do not consume the active game's reserved work",
+  { timeout: 180000 },
+  async (t) => {
+    let release = () => {},
+      notify;
+    const held = new Promise((r) => {
+        release = r;
+      }),
+      twoStarted = new Promise((r) => {
+        notify = r;
+      });
+    let started = 0;
+    const f = await gameplayFixture(t, {
+        verifyUnknown: async () => {
+          if (++started === 2) notify();
+          await held;
+        },
+      }),
+      room = await f.create(),
+      headers = { control: room.control };
+    const game = await f.call(
+      "POST",
+      `/rooms/${room.roomId}/games`,
+      {
+        expectedRoomVersion: room.roomVersion,
+        expectedReadyGeneration: room.readyGeneration,
+      },
+      headers,
+    );
+    assert.equal(game.status, 201, JSON.stringify(game.body));
+    const slow = [];
+    try {
+      for (let i = 0; i < 2; i++)
+        slow.push(
+          f.call(
+            "POST",
+            "/rooms",
+            { ...room.body, proposedControlSecret: secret() },
+            { authorization: `Bearer unverified-${i}` },
+          ),
+        );
+      await twoStarted;
+      for (let i = 2; i < 4; i++)
+        slow.push(
+          f.call(
+            "POST",
+            "/rooms",
+            { ...room.body, proposedControlSecret: secret() },
+            { authorization: `Bearer unverified-${i}` },
+          ),
+        );
+      await new Promise((r) => setTimeout(r, 50));
+      const end = await f.call(
+        "POST",
+        `/games/${game.body.gameId}/commands`,
+        { name: "end_game", expectedGameVersion: "0" },
+        headers,
+      );
+      assert.equal(end.status, 200, JSON.stringify(end.body));
+      assert.equal(started, 2, "new verification exceeded its ordinary share");
+    } finally {
+      release();
+      await Promise.all(slow);
+    }
+  },
+);
+
+test(
   "gameplay admission, source recovery and row locks serialize competing intents",
   { timeout: 180000 },
   async (t) => {

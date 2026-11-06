@@ -696,6 +696,12 @@ test(
       409,
     );
     await hostStream.until((m) => m.event === "control_revoked");
+    await replacement.until(
+      (m) =>
+        m.event === "state" &&
+        m.data.source.roomVersion === takeover.body.roomVersion,
+    );
+    assert.equal(replacement.ws.readyState, WebSocket.OPEN);
     const locator = await call("GET", "/rooms/current");
     assert.equal(locator.body.room.roomId, roomId);
     const closed = await call("POST", `/rooms/${roomId}/closure`, {

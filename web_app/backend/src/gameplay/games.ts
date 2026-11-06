@@ -311,6 +311,11 @@ export class GameOperations {
       false,
     );
     this.core.host(initialRoom, actor);
+    requireState(
+      this.core.admission.availability().admission === "open",
+      "SERVER_AT_CAPACITY",
+      503,
+    );
     await this.preflight(roomId);
     return this.core.admission.allocate(`start:${operationId}`, hash, () =>
       this.core.transaction(async (db) => {

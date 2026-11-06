@@ -23,6 +23,7 @@ export class RoomLifecycle {
     private games: GameOperations,
   ) {}
   async prepareCreate(actor: Actor, operationId: string) {
+    this.core.enabled();
     if (!actor.account) return;
     const source = (
       await this.core.database.db
@@ -31,6 +32,11 @@ export class RoomLifecycle {
         .where(eq(s.rooms.createRequestId, operationId))
     )[0];
     if (source) return;
+    requireState(
+      this.core.admission.availability().admission === "open",
+      "SERVER_AT_CAPACITY",
+      503,
+    );
     const existing = (
       await this.core.database.db
         .select({ id: s.rooms.id })
@@ -45,6 +51,7 @@ export class RoomLifecycle {
     if (existing) await this.expireRoom(existing.id);
   }
   async prepareJoin(code: string, operationId: string) {
+    this.core.enabled();
     const source = (
       await this.core.database.db
         .select({ id: s.roomMemberships.id })
@@ -52,6 +59,11 @@ export class RoomLifecycle {
         .where(eq(s.roomMemberships.joinRequestId, operationId))
     )[0];
     if (source) return;
+    requireState(
+      this.core.admission.availability().admission === "open",
+      "SERVER_AT_CAPACITY",
+      503,
+    );
     const room = (
       await this.core.database.db
         .select({ id: s.rooms.id })

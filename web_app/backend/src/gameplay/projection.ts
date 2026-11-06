@@ -66,72 +66,76 @@ export class ProjectionService {
     requestedLanguage?: string,
   ): Promise<Data> {
     const language = validLanguage(requestedLanguage);
-    return this.core.database.transaction(async (db) => {
-      await db.execute(
-        sql`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY`,
-      );
-      const room = await this.core.room(db, roomId, false);
-      await this.core.membership(db, room, actor);
-      const audience =
-        actor.account?.accountId === room.ownerAccountId ? "host" : "viewer";
-      if (audience === "host") this.core.host(room, actor);
-      const now = await freshTime(db);
-      if (room.currentGameId && room.presentationMode === "game")
-        return this.snapshot(
-          db,
-          room,
-          await this.games.game(db, room.currentGameId, false),
-          actor,
-          language,
-          now,
+    return this.core.database.transaction(
+      async (db) => {
+        const room = await this.core.room(db, roomId, false);
+        await this.core.membership(db, room, actor);
+        const audience =
+          actor.account?.accountId === room.ownerAccountId ? "host" : "viewer";
+        if (audience === "host") this.core.host(room, actor);
+        const now = await freshTime(db);
+        if (room.currentGameId && room.presentationMode === "game")
+          return this.snapshot(
+            db,
+            room,
+            await this.games.game(db, room.currentGameId, false),
+            actor,
+            language,
+            now,
+          );
+        const previous = room.currentGameId
+          ? await this.games.game(db, room.currentGameId, false)
+          : undefined;
+        const base = Math.max(
+          new Date(room.lastLobbyActivityAt).getTime(),
+          previous?.endedAt ? new Date(previous.endedAt).getTime() : 0,
         );
-      const previous = room.currentGameId
-        ? await this.games.game(db, room.currentGameId, false)
-        : undefined;
-      const base = Math.max(
-        new Date(room.lastLobbyActivityAt).getTime(),
-        previous?.endedAt ? new Date(previous.endedAt).getTime() : 0,
-      );
-      requireState(now.getTime() < base + 86400000, "ROOM_EXPIRED", 410);
-      const members = await this.core.members(db, roomId);
-      const selections = await db
-        .select()
-        .from(s.roomPackSelections)
-        .where(eq(s.roomPackSelections.roomId, roomId))
-        .orderBy(s.roomPackSelections.boardPosition);
-      return {
-        source: { roomVersion: String(room.stateVersion) },
-        serverTime: now.toISOString(),
-        language,
-        view: {
-          phase: "lobby",
-          audience,
-          roomId,
-          teamOneName: room.teamOneName,
-          teamTwoName: room.teamTwoName,
-          members: members.map((member) => ({
-            id: member.id,
-            displayName: member.displayName,
-            teamNumber: member.lobbyTeamNumber,
-            host: member.accountId === room.ownerAccountId,
-            memberVersion: String(member.stateVersion),
-            ready: member.readyForGeneration === room.lobbyGeneration,
-          })),
-          selections: selections.map((item) => ({
-            boardPosition: item.boardPosition,
-            categoryId: item.categoryId,
-            packId: item.packId,
-            observedRevision: String(item.observedRevision),
-            ...(item.repeatConsentBasis
-              ? { repeatConsentBasis: item.repeatConsentBasis.toString("hex") }
+        requireState(now.getTime() < base + 86400000, "ROOM_EXPIRED", 410);
+        const members = await this.core.members(db, roomId);
+        const selections = await db
+          .select()
+          .from(s.roomPackSelections)
+          .where(eq(s.roomPackSelections.roomId, roomId))
+          .orderBy(s.roomPackSelections.boardPosition);
+        return {
+          source: { roomVersion: String(room.stateVersion) },
+          serverTime: now.toISOString(),
+          language,
+          view: {
+            phase: "lobby",
+            audience,
+            roomId,
+            teamOneName: room.teamOneName,
+            teamTwoName: room.teamTwoName,
+            members: members.map((member) => ({
+              id: member.id,
+              displayName: member.displayName,
+              teamNumber: member.lobbyTeamNumber,
+              host: member.accountId === room.ownerAccountId,
+              memberVersion: String(member.stateVersion),
+              ready: member.readyForGeneration === room.lobbyGeneration,
+            })),
+            selections: selections.map((item) => ({
+              boardPosition: item.boardPosition,
+              categoryId: item.categoryId,
+              packId: item.packId,
+              observedRevision: String(item.observedRevision),
+              ...(item.repeatConsentBasis
+                ? {
+                    repeatConsentBasis: item.repeatConsentBasis.toString("hex"),
+                  }
+                : {}),
+            })),
+            readyGeneration: room.lobbyGeneration,
+            idleExpiresAt: plusDay(new Date(base)),
+            ...(room.currentGameId
+              ? { previousGameId: room.currentGameId }
               : {}),
-          })),
-          readyGeneration: room.lobbyGeneration,
-          idleExpiresAt: plusDay(new Date(base)),
-          ...(room.currentGameId ? { previousGameId: room.currentGameId } : {}),
-        },
-      };
-    });
+          },
+        };
+      },
+      { consistentRead: true },
+    );
   }
   async game(
     actor: Actor,
@@ -152,20 +156,20 @@ export class ProjectionService {
       Date.now() >= new Date(initial.idleExpiresAt).getTime()
     )
       await this.games.expire(gameId);
-    return this.core.database.transaction(async (db) => {
-      await db.execute(
-        sql`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY`,
-      );
-      const game = await this.games.game(db, gameId, false),
-        room = await this.core.room(db, game.roomId, false),
-        now = await freshTime(db);
-      await this.authorize(db, game, actor, game.status !== "active");
-      if (resultOnly) {
-        requireState(game.status !== "active", "RESULT_NOT_READY");
-        return this.result(db, game, language);
-      }
-      return this.snapshot(db, room, game, actor, language, now);
-    });
+    return this.core.database.transaction(
+      async (db) => {
+        const game = await this.games.game(db, gameId, false),
+          room = await this.core.room(db, game.roomId, false),
+          now = await freshTime(db);
+        await this.authorize(db, game, actor, game.status !== "active");
+        if (resultOnly) {
+          requireState(game.status !== "active", "RESULT_NOT_READY");
+          return this.result(db, game, language);
+        }
+        return this.snapshot(db, room, game, actor, language, now);
+      },
+      { consistentRead: true },
+    );
   }
   async result(db: Tx, game: Game, language: string): Promise<Data> {
     const questions = await db

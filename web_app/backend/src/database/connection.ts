@@ -5,6 +5,9 @@ import { assertMigrationsCurrent } from "./migrations.js";
 import * as schema from "./schema/index.js";
 
 export type SahsahDatabase = NodePgDatabase<typeof schema>;
+class DatabaseDrainingError extends Error {
+  readonly code = "08006";
+}
 
 export class DatabaseConnection {
   private readonly pool: Pool | undefined;
@@ -12,6 +15,9 @@ export class DatabaseConnection {
   private initialized = false;
   private closing: Promise<void> | undefined;
   private gameplayLease?: PoolClient;
+  private leaseBackendId?: number;
+  private leaseLost = false;
+  private transactions = new Set<Promise<void>>();
 
   constructor(
     config: DatabaseConfig | undefined,
@@ -39,19 +45,30 @@ export class DatabaseConnection {
     if (!this.pool || !this.initialized) return false;
     const client = await this.pool.connect();
     try {
-      const result = await client.query<{ acquired: boolean }>(
-        "SELECT pg_try_advisory_lock(1935763505, 1) AS acquired",
+      const result = await client.query<{ acquired: boolean; pid: number }>(
+        "SELECT pg_try_advisory_lock(1935763505, 1) AS acquired,pg_backend_pid() AS pid",
       );
       if (!result.rows[0].acquired) {
         client.release();
         return false;
       }
       this.gameplayLease = client;
+      this.leaseBackendId = result.rows[0].pid;
       client.on("error", () => {
         this.initialized = false;
+        this.leaseLost = true;
       });
+      // A failed previous lease session may have surviving writer transactions.
+      // Their shared transaction locks must drain before occupancy/admission.
+      await client.query("SELECT pg_advisory_lock(1935763505,2)");
+      await client.query("SELECT pg_advisory_unlock(1935763505,2)");
       return true;
     } catch (error) {
+      if (this.gameplayLease === client) {
+        this.gameplayLease = undefined;
+        this.leaseLost = true;
+        this.initialized = false;
+      }
       client.release(true);
       throw error;
     }
@@ -98,14 +115,49 @@ export class DatabaseConnection {
     }
   }
 
-  async transaction<T>(work: (db: SahsahDatabase) => Promise<T>): Promise<T> {
+  async transaction<T>(
+    work: (db: SahsahDatabase) => Promise<T>,
+    options: { consistentRead?: boolean } = {},
+  ): Promise<T> {
     if (!this.pool || !this.initialized)
       throw new Error("Database is not ready.");
-    const client = await this.pool.connect();
+    let complete!: () => void;
+    const drained = new Promise<void>((resolve) => {
+      complete = resolve;
+    });
+    this.transactions.add(drained);
+    let client: PoolClient | undefined;
     let discard = false;
     try {
-      await client.query("BEGIN");
+      client = await this.pool.connect();
+      if (!this.initialized || this.closing || this.leaseLost)
+        throw new DatabaseDrainingError(
+          "Database is draining or gameplay lease was lost.",
+        );
+      const begin = options.consistentRead
+        ? "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY"
+        : "BEGIN";
+      await client.query(
+        this.leaseBackendId
+          ? `${begin}; SELECT pg_advisory_xact_lock_shared(1935763505,2)`
+          : begin,
+      );
+      if (this.leaseBackendId) {
+        const owned = await client.query<{ owned: boolean }>(
+          "SELECT EXISTS(SELECT 1 FROM pg_locks WHERE locktype='advisory' AND classid=1935763505 AND objid=1 AND objsubid=2 AND pid=$1 AND mode='ExclusiveLock' AND granted) AS owned",
+          [this.leaseBackendId],
+        );
+        if (!owned.rows[0].owned || this.leaseLost) {
+          this.leaseLost = true;
+          this.initialized = false;
+          throw new DatabaseDrainingError(
+            "Gameplay process lease was replaced.",
+          );
+        }
+      }
       const result = await work(drizzle(client, { schema }));
+      if (this.leaseLost)
+        throw new DatabaseDrainingError("Gameplay process lease was lost.");
       const commit = await client.query("COMMIT");
       // PostgreSQL can answer ROLLBACK when a callback swallowed a statement error.
       if (commit.command !== "COMMIT")
@@ -115,23 +167,28 @@ export class DatabaseConnection {
       return result;
     } catch (error) {
       try {
-        await client.query("ROLLBACK");
+        await client?.query("ROLLBACK");
       } catch {
         discard = true;
       }
       throw error;
     } finally {
-      client.release(discard);
+      client?.release(discard);
+      this.transactions.delete(drained);
+      complete();
     }
   }
 
   async close(): Promise<void> {
     this.initialized = false;
-    if (this.gameplayLease) {
-      this.gameplayLease.release(true);
-      this.gameplayLease = undefined;
-    }
-    this.closing ??= this.pool?.end() ?? Promise.resolve();
+    this.closing ??= (async () => {
+      await Promise.all([...this.transactions]);
+      if (this.gameplayLease) {
+        this.gameplayLease.release(true);
+        this.gameplayLease = undefined;
+      }
+      await this.pool?.end();
+    })();
     await this.closing;
   }
 }

@@ -19,7 +19,11 @@ export async function createApplication(
   app.getHttpAdapter().getInstance().disable("x-powered-by");
   app.get(GameplayService).configure({
     ...options.gameplay,
-    signMedia: options.gameplay?.signMedia ?? r2Signer(process.env),
+    signMedia:
+      options.gameplay?.signMedia ??
+      ((options.gameplay?.enabled ?? process.env.GAMEPLAY_ENABLED === "true")
+        ? r2Signer(process.env)
+        : undefined),
   });
   app.setGlobalPrefix("api");
   app.useWebSocketAdapter(
