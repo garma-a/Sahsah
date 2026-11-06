@@ -1,0 +1,196 @@
+{
+  "date": "2026-11-06",
+  "kind": "planning artifact validation only",
+  "openapi_schema": "https://spec.openapis.org/oas/3.0/schema/2024-10-18",
+  "openapi_schema_sha256": "dc46c43b53d1793797d2c09017739b477702dceb92cce10fc395f931773a8599",
+  "openapi_errors": 0,
+  "operations": 27,
+  "unique_operation_ids": 27,
+  "schemas": 157,
+  "realtime_definitions": 123,
+  "local_refs_checked": 1233,
+  "unresolved_refs": [],
+  "discriminator_errors": [],
+  "json_schema_meta_valid": true,
+  "markdown_links_checked": 101,
+  "missing_markdown_links": [],
+  "trailing_whitespace": [],
+  "fixtures": [
+    {
+      "name": "open tile",
+      "expected_valid": true,
+      "actual_valid": true,
+      "passed": true
+    },
+    {
+      "name": "zero team award",
+      "expected_valid": true,
+      "actual_valid": true,
+      "passed": true
+    },
+    {
+      "name": "no winner",
+      "expected_valid": true,
+      "actual_valid": true,
+      "passed": true
+    },
+    {
+      "name": "manual cap",
+      "expected_valid": true,
+      "actual_valid": true,
+      "passed": true
+    },
+    {
+      "name": "manual exceeds cap",
+      "expected_valid": false,
+      "actual_valid": false,
+      "passed": true
+    },
+    {
+      "name": "manual float",
+      "expected_valid": false,
+      "actual_valid": false,
+      "passed": true
+    },
+    {
+      "name": "unsafe numeric revision",
+      "expected_valid": false,
+      "actual_valid": false,
+      "passed": true
+    },
+    {
+      "name": "valid viewer audio",
+      "expected_valid": true,
+      "actual_valid": true,
+      "passed": true
+    },
+    {
+      "name": "viewer audio reference leak",
+      "expected_valid": false,
+      "actual_valid": false,
+      "passed": true
+    },
+    {
+      "name": "valid first memory",
+      "expected_valid": true,
+      "actual_valid": true,
+      "passed": true
+    },
+    {
+      "name": "early memory detail leak",
+      "expected_valid": false,
+      "actual_valid": false,
+      "passed": true
+    },
+    {
+      "name": "question phase answer leak",
+      "expected_valid": false,
+      "actual_valid": false,
+      "passed": true
+    },
+    {
+      "name": "source media denial shape",
+      "expected_valid": false,
+      "actual_valid": false,
+      "passed": true
+    },
+    {
+      "name": "unknown command",
+      "expected_valid": false,
+      "actual_valid": false,
+      "passed": true
+    },
+    {
+      "name": "receipt without secret",
+      "expected_valid": true,
+      "actual_valid": true,
+      "passed": true
+    },
+    {
+      "name": "receipt secret leak",
+      "expected_valid": false,
+      "actual_valid": false,
+      "passed": true
+    },
+    {
+      "name": "minimal resync",
+      "expected_valid": true,
+      "actual_valid": true,
+      "passed": true
+    },
+    {
+      "name": "business WS mutation forbidden",
+      "expected_valid": false,
+      "actual_valid": false,
+      "passed": true
+    },
+    {
+      "name": "complete state",
+      "expected_valid": true,
+      "actual_valid": true,
+      "passed": true
+    },
+    {
+      "name": "valid host answer",
+      "expected_valid": true,
+      "actual_valid": true,
+      "passed": true
+    },
+    {
+      "name": "mismatched answer format",
+      "expected_valid": false,
+      "actual_valid": false,
+      "passed": true
+    },
+    {
+      "name": "viewer color swatch before reveal",
+      "expected_valid": false,
+      "actual_valid": false,
+      "passed": true
+    },
+    {
+      "name": "unknown membership body account id",
+      "expected_valid": false,
+      "actual_valid": false,
+      "passed": true
+    },
+    {
+      "name": "independent Ready intention",
+      "expected_valid": true,
+      "actual_valid": true,
+      "passed": true
+    },
+    {
+      "name": "host close version",
+      "expected_valid": true,
+      "actual_valid": true,
+      "passed": true
+    },
+    {
+      "name": "game source vector required",
+      "expected_valid": false,
+      "actual_valid": false,
+      "passed": true
+    },
+    {
+      "name": "revision exceeds int64",
+      "expected_valid": false,
+      "actual_valid": false,
+      "passed": true
+    },
+    {
+      "name": "largest revision",
+      "expected_valid": true,
+      "actual_valid": true,
+      "passed": true
+    },
+    {
+      "name": "empty membership patch rejected",
+      "expected_valid": false,
+      "actual_valid": false,
+      "passed": true
+    }
+  ],
+  "runtime_integration_tests_run": false,
+  "railway_load_tests_run": false
+}

@@ -1,5 +1,7 @@
 # Sahsah repository
 
+After planning, implement each agreed change set on a new branch and open a new PR for the user's review before merging into `main`. Keep implementation changes off `main`; merge only after the user's approval.
+
 - `sahsah_prototype/`: existing React/Vite presentation app. Its own `AGENTS.md` applies there. Keep its assets, behavior and independent lockfile intact.
 - `web_app/frontend/`: Next.js 16 App Router, React, Tailwind CSS v4, shadcn/ui and Zustand.
 - `web_app/backend/`: independent NestJS API, including the authenticated AdminJS dashboard under `src/admin/` at `/admin`.

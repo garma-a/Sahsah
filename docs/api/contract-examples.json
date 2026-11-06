@@ -1,0 +1,689 @@
+[
+  {
+    "name": "open tile",
+    "schema": "OpenQuestionCommand",
+    "valid": true,
+    "value": {
+      "name": "open_question",
+      "expectedGameVersion": "0",
+      "boardPosition": 1,
+      "questionPosition": 1
+    }
+  },
+  {
+    "name": "zero team award",
+    "schema": "ResolveQuestionCommand",
+    "valid": true,
+    "value": {
+      "name": "resolve_question",
+      "expectedGameVersion": "3",
+      "boardPosition": 1,
+      "questionPosition": 1,
+      "winningTeamNumber": 1,
+      "awardedPoints": 0
+    }
+  },
+  {
+    "name": "no winner",
+    "schema": "ResolveQuestionCommand",
+    "valid": true,
+    "value": {
+      "name": "resolve_question",
+      "expectedGameVersion": "3",
+      "boardPosition": 1,
+      "questionPosition": 1,
+      "winningTeamNumber": null
+    }
+  },
+  {
+    "name": "manual cap",
+    "schema": "AdjustScoreCommand",
+    "valid": true,
+    "value": {
+      "name": "adjust_score",
+      "expectedGameVersion": "4",
+      "teamNumber": 1,
+      "targetTotal": "1000000"
+    }
+  },
+  {
+    "name": "manual exceeds cap",
+    "schema": "AdjustScoreCommand",
+    "valid": false,
+    "value": {
+      "name": "adjust_score",
+      "expectedGameVersion": "4",
+      "teamNumber": 1,
+      "targetTotal": "1000001"
+    }
+  },
+  {
+    "name": "manual float",
+    "schema": "AdjustScoreCommand",
+    "valid": false,
+    "value": {
+      "name": "adjust_score",
+      "expectedGameVersion": "4",
+      "teamNumber": 1,
+      "targetTotal": 1.5
+    }
+  },
+  {
+    "name": "unsafe numeric revision",
+    "schema": "OpenQuestionCommand",
+    "valid": false,
+    "value": {
+      "name": "open_question",
+      "expectedGameVersion": 9007199254740992,
+      "boardPosition": 1,
+      "questionPosition": 1
+    }
+  },
+  {
+    "name": "valid viewer audio",
+    "schema": "ViewerQuestionView",
+    "valid": true,
+    "value": {
+      "phase": "question",
+      "audience": "viewer",
+      "roomId": "11111111-1111-4111-8111-111111111111",
+      "gameId": "22222222-2222-4222-8222-222222222222",
+      "boardPosition": 1,
+      "questionPosition": 1,
+      "basePoints": 200,
+      "suggestedPoints": 200,
+      "teams": [
+        {
+          "number": 1,
+          "name": "الفراعنة",
+          "score": "0"
+        },
+        {
+          "number": 2,
+          "name": "الجدعان",
+          "score": "0"
+        }
+      ],
+      "timer": {
+        "state": "running",
+        "remainingMs": 59900,
+        "deadlineAt": "2026-11-06T12:01:00Z"
+      },
+      "idleExpiresAt": "2026-11-07T12:00:00Z",
+      "question": {
+        "format": "AUDIO_GUESS",
+        "prompt": "اسم الأغنية؟",
+        "durationMs": 12000
+      }
+    }
+  },
+  {
+    "name": "viewer audio reference leak",
+    "schema": "ViewerQuestionView",
+    "valid": false,
+    "value": {
+      "phase": "question",
+      "audience": "viewer",
+      "roomId": "11111111-1111-4111-8111-111111111111",
+      "gameId": "22222222-2222-4222-8222-222222222222",
+      "boardPosition": 1,
+      "questionPosition": 1,
+      "basePoints": 200,
+      "suggestedPoints": 200,
+      "teams": [
+        {
+          "number": 1,
+          "name": "الفراعنة",
+          "score": "0"
+        },
+        {
+          "number": 2,
+          "name": "الجدعان",
+          "score": "0"
+        }
+      ],
+      "timer": {
+        "state": "running",
+        "remainingMs": 59900,
+        "deadlineAt": "2026-11-06T12:01:00Z"
+      },
+      "idleExpiresAt": "2026-11-07T12:00:00Z",
+      "question": {
+        "format": "AUDIO_GUESS",
+        "prompt": "اسم الأغنية؟",
+        "durationMs": 12000,
+        "audio": {
+          "kind": "audio",
+          "boardPosition": 1,
+          "questionPosition": 1,
+          "role": "question_audio",
+          "variantNumber": 0
+        }
+      }
+    }
+  },
+  {
+    "name": "valid first memory",
+    "schema": "HostQuestionView",
+    "valid": true,
+    "value": {
+      "phase": "question",
+      "audience": "host",
+      "roomId": "11111111-1111-4111-8111-111111111111",
+      "gameId": "22222222-2222-4222-8222-222222222222",
+      "boardPosition": 1,
+      "questionPosition": 1,
+      "basePoints": 200,
+      "suggestedPoints": 200,
+      "teams": [
+        {
+          "number": 1,
+          "name": "الفراعنة",
+          "score": "0"
+        },
+        {
+          "number": 2,
+          "name": "الجدعان",
+          "score": "0"
+        }
+      ],
+      "timer": {
+        "state": "ready",
+        "remainingMs": 60000
+      },
+      "idleExpiresAt": "2026-11-07T12:00:00Z",
+      "question": {
+        "format": "IMAGE_MEMORY",
+        "memoryPhase": "viewing_first",
+        "instruction": "بص للصورة كويس",
+        "image": {
+          "kind": "image",
+          "boardPosition": 1,
+          "questionPosition": 1,
+          "role": "prompt_image",
+          "variantNumber": 0
+        }
+      },
+      "controls": [
+        "hide_memory",
+        "return_to_board",
+        "end_game",
+        "adjust_score"
+      ]
+    }
+  },
+  {
+    "name": "early memory detail leak",
+    "schema": "HostQuestionView",
+    "valid": false,
+    "value": {
+      "phase": "question",
+      "audience": "host",
+      "roomId": "11111111-1111-4111-8111-111111111111",
+      "gameId": "22222222-2222-4222-8222-222222222222",
+      "boardPosition": 1,
+      "questionPosition": 1,
+      "basePoints": 200,
+      "suggestedPoints": 200,
+      "teams": [
+        {
+          "number": 1,
+          "name": "الفراعنة",
+          "score": "0"
+        },
+        {
+          "number": 2,
+          "name": "الجدعان",
+          "score": "0"
+        }
+      ],
+      "timer": {
+        "state": "ready",
+        "remainingMs": 60000
+      },
+      "idleExpiresAt": "2026-11-07T12:00:00Z",
+      "question": {
+        "format": "IMAGE_MEMORY",
+        "memoryPhase": "viewing_first",
+        "instruction": "بص للصورة كويس",
+        "image": {
+          "kind": "image",
+          "boardPosition": 1,
+          "questionPosition": 1,
+          "role": "prompt_image",
+          "variantNumber": 0
+        },
+        "prompt": "السؤال السري"
+      },
+      "controls": [
+        "hide_memory",
+        "return_to_board",
+        "end_game",
+        "adjust_score"
+      ]
+    }
+  },
+  {
+    "name": "question phase answer leak",
+    "schema": "ViewerQuestionView",
+    "valid": false,
+    "value": {
+      "phase": "question",
+      "audience": "viewer",
+      "roomId": "11111111-1111-4111-8111-111111111111",
+      "gameId": "22222222-2222-4222-8222-222222222222",
+      "boardPosition": 1,
+      "questionPosition": 1,
+      "basePoints": 200,
+      "suggestedPoints": 200,
+      "teams": [
+        {
+          "number": 1,
+          "name": "الفراعنة",
+          "score": "0"
+        },
+        {
+          "number": 2,
+          "name": "الجدعان",
+          "score": "0"
+        }
+      ],
+      "timer": {
+        "state": "running",
+        "remainingMs": 59900,
+        "deadlineAt": "2026-11-06T12:01:00Z"
+      },
+      "idleExpiresAt": "2026-11-07T12:00:00Z",
+      "question": {
+        "format": "AUDIO_GUESS",
+        "prompt": "اسم الأغنية؟",
+        "durationMs": 12000
+      },
+      "answer": {
+        "text": "الإجابة"
+      }
+    }
+  },
+  {
+    "name": "source media denial shape",
+    "schema": "MediaRequest",
+    "valid": false,
+    "value": {
+      "refs": [
+        {
+          "kind": "audio",
+          "boardPosition": 1,
+          "questionPosition": 1,
+          "role": "source_audio",
+          "variantNumber": 0
+        }
+      ]
+    }
+  },
+  {
+    "name": "unknown command",
+    "schema": "GameCommand",
+    "valid": false,
+    "value": {
+      "name": "set_tokens",
+      "expectedGameVersion": "1",
+      "amount": 100
+    }
+  },
+  {
+    "name": "receipt without secret",
+    "schema": "Receipt",
+    "valid": true,
+    "value": {
+      "operationId": "44444444-4444-4444-8444-444444444444",
+      "roomId": "11111111-1111-4111-8111-111111111111",
+      "roomVersion": "1",
+      "acceptedAt": "2026-11-06T12:00:00Z",
+      "effect": "changed"
+    }
+  },
+  {
+    "name": "receipt secret leak",
+    "schema": "Receipt",
+    "valid": false,
+    "value": {
+      "operationId": "44444444-4444-4444-8444-444444444444",
+      "roomId": "11111111-1111-4111-8111-111111111111",
+      "acceptedAt": "2026-11-06T12:00:00Z",
+      "effect": "changed",
+      "secret": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    }
+  },
+  {
+    "name": "minimal resync",
+    "schema": "ClientResyncFrame",
+    "valid": true,
+    "value": {
+      "event": "resync",
+      "data": {}
+    }
+  },
+  {
+    "name": "business WS mutation forbidden",
+    "schema": null,
+    "valid": false,
+    "value": {
+      "event": "resolve_question",
+      "data": {}
+    }
+  },
+  {
+    "name": "complete state",
+    "schema": "ServerStateFrame",
+    "valid": true,
+    "value": {
+      "event": "state",
+      "data": {
+        "protocolVersion": 1,
+        "streamId": "44444444-4444-4444-8444-444444444444",
+        "sequence": "1",
+        "serverTime": "2026-11-06T12:00:00Z",
+        "source": {
+          "roomVersion": "7",
+          "gameId": "22222222-2222-4222-8222-222222222222",
+          "gameVersion": "1",
+          "gameProjectionVersion": "1"
+        },
+        "language": "ar",
+        "view": {
+          "phase": "question",
+          "audience": "viewer",
+          "roomId": "11111111-1111-4111-8111-111111111111",
+          "gameId": "22222222-2222-4222-8222-222222222222",
+          "boardPosition": 1,
+          "questionPosition": 1,
+          "basePoints": 200,
+          "suggestedPoints": 200,
+          "teams": [
+            {
+              "number": 1,
+              "name": "الفراعنة",
+              "score": "0"
+            },
+            {
+              "number": 2,
+              "name": "الجدعان",
+              "score": "0"
+            }
+          ],
+          "timer": {
+            "state": "running",
+            "remainingMs": 59900,
+            "deadlineAt": "2026-11-06T12:01:00Z"
+          },
+          "idleExpiresAt": "2026-11-07T12:00:00Z",
+          "question": {
+            "format": "AUDIO_GUESS",
+            "prompt": "اسم الأغنية؟",
+            "durationMs": 12000
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "valid host answer",
+    "schema": "HostAnswerView",
+    "valid": true,
+    "value": {
+      "phase": "answer",
+      "audience": "host",
+      "roomId": "11111111-1111-4111-8111-111111111111",
+      "gameId": "22222222-2222-4222-8222-222222222222",
+      "boardPosition": 1,
+      "questionPosition": 1,
+      "basePoints": 200,
+      "suggestedPoints": 200,
+      "teams": [
+        {
+          "number": 1,
+          "name": "الفراعنة",
+          "score": "0"
+        },
+        {
+          "number": 2,
+          "name": "الجدعان",
+          "score": "0"
+        }
+      ],
+      "timer": {
+        "state": "paused",
+        "remainingMs": 59000
+      },
+      "idleExpiresAt": "2026-11-07T12:00:00Z",
+      "question": {
+        "format": "AUDIO_GUESS",
+        "prompt": "اسم الأغنية؟",
+        "durationMs": 12000,
+        "audio": {
+          "kind": "audio",
+          "boardPosition": 1,
+          "questionPosition": 1,
+          "role": "question_audio",
+          "variantNumber": 0
+        }
+      },
+      "answer": {
+        "format": "AUDIO_GUESS",
+        "text": "الإجابة"
+      },
+      "controls": [
+        "resolve_question",
+        "return_to_board",
+        "end_game",
+        "adjust_score"
+      ],
+      "feedback": {
+        "version": "0"
+      }
+    }
+  },
+  {
+    "name": "mismatched answer format",
+    "schema": "HostAnswerView",
+    "valid": false,
+    "value": {
+      "phase": "answer",
+      "audience": "host",
+      "roomId": "11111111-1111-4111-8111-111111111111",
+      "gameId": "22222222-2222-4222-8222-222222222222",
+      "boardPosition": 1,
+      "questionPosition": 1,
+      "basePoints": 200,
+      "suggestedPoints": 200,
+      "teams": [
+        {
+          "number": 1,
+          "name": "الفراعنة",
+          "score": "0"
+        },
+        {
+          "number": 2,
+          "name": "الجدعان",
+          "score": "0"
+        }
+      ],
+      "timer": {
+        "state": "paused",
+        "remainingMs": 59000
+      },
+      "idleExpiresAt": "2026-11-07T12:00:00Z",
+      "question": {
+        "format": "AUDIO_GUESS",
+        "prompt": "اسم الأغنية؟",
+        "durationMs": 12000,
+        "audio": {
+          "kind": "audio",
+          "boardPosition": 1,
+          "questionPosition": 1,
+          "role": "question_audio",
+          "variantNumber": 0
+        }
+      },
+      "answer": {
+        "format": "AUDIO_VOICE",
+        "text": "غلط"
+      },
+      "controls": [
+        "resolve_question",
+        "return_to_board",
+        "end_game",
+        "adjust_score"
+      ],
+      "feedback": {
+        "version": "0"
+      }
+    }
+  },
+  {
+    "name": "viewer color swatch before reveal",
+    "schema": "ViewerQuestionView",
+    "valid": false,
+    "value": {
+      "phase": "question",
+      "audience": "viewer",
+      "roomId": "11111111-1111-4111-8111-111111111111",
+      "gameId": "22222222-2222-4222-8222-222222222222",
+      "boardPosition": 1,
+      "questionPosition": 1,
+      "basePoints": 200,
+      "suggestedPoints": 200,
+      "teams": [
+        {
+          "number": 1,
+          "name": "الفراعنة",
+          "score": "0"
+        },
+        {
+          "number": 2,
+          "name": "الجدعان",
+          "score": "0"
+        }
+      ],
+      "timer": {
+        "state": "running",
+        "remainingMs": 59900,
+        "deadlineAt": "2026-11-06T12:01:00Z"
+      },
+      "idleExpiresAt": "2026-11-07T12:00:00Z",
+      "question": {
+        "format": "IMAGE_COLOR",
+        "prompt": "اللون؟",
+        "image": {
+          "kind": "image",
+          "boardPosition": 1,
+          "questionPosition": 1,
+          "role": "prompt_image",
+          "variantNumber": 0
+        },
+        "colorHex": "#ff0000"
+      }
+    }
+  },
+  {
+    "name": "unknown membership body account id",
+    "schema": "MemberPatch",
+    "valid": false,
+    "value": {
+      "expectedMembershipVersion": "0",
+      "expectedReadyGeneration": 1,
+      "teamNumber": 1,
+      "accountId": "44444444-4444-4444-8444-444444444444"
+    }
+  },
+  {
+    "name": "independent Ready intention",
+    "schema": "Ready",
+    "valid": true,
+    "value": {
+      "expectedMembershipVersion": "2",
+      "expectedReadyGeneration": 3,
+      "ready": true
+    }
+  },
+  {
+    "name": "host close version",
+    "schema": "HostDeparture",
+    "valid": true,
+    "value": {
+      "expectedRoomVersion": "4"
+    }
+  },
+  {
+    "name": "game source vector required",
+    "schema": "ServerStateFrame",
+    "valid": false,
+    "value": {
+      "event": "state",
+      "data": {
+        "protocolVersion": 1,
+        "streamId": "44444444-4444-4444-8444-444444444444",
+        "sequence": "1",
+        "serverTime": "2026-11-06T12:00:00Z",
+        "source": {
+          "roomVersion": "7"
+        },
+        "language": "ar",
+        "view": {
+          "phase": "question",
+          "audience": "viewer",
+          "roomId": "11111111-1111-4111-8111-111111111111",
+          "gameId": "22222222-2222-4222-8222-222222222222",
+          "boardPosition": 1,
+          "questionPosition": 1,
+          "basePoints": 200,
+          "suggestedPoints": 200,
+          "teams": [
+            {
+              "number": 1,
+              "name": "الفراعنة",
+              "score": "0"
+            },
+            {
+              "number": 2,
+              "name": "الجدعان",
+              "score": "0"
+            }
+          ],
+          "timer": {
+            "state": "running",
+            "remainingMs": 59900,
+            "deadlineAt": "2026-11-06T12:01:00Z"
+          },
+          "idleExpiresAt": "2026-11-07T12:00:00Z",
+          "question": {
+            "format": "AUDIO_GUESS",
+            "prompt": "اسم الأغنية؟",
+            "durationMs": 12000
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "revision exceeds int64",
+    "schema": "Revision",
+    "valid": false,
+    "value": "9223372036854775808"
+  },
+  {
+    "name": "largest revision",
+    "schema": "Revision",
+    "valid": true,
+    "value": "9223372036854775807"
+  },
+  {
+    "name": "empty membership patch rejected",
+    "schema": "MemberPatch",
+    "valid": false,
+    "value": {
+      "expectedMembershipVersion": "0",
+      "expectedReadyGeneration": 1
+    }
+  }
+]
