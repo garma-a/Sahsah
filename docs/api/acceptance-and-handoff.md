@@ -1,6 +1,6 @@
 # Gameplay acceptance and implementation handoff
 
-Design baseline 2026-11-06. The nineteen product decisions are accepted; the complete package still needs the user's final shared-understanding confirmation. These are required implementation checks, not results already obtained. No new runtime code, dependencies, migration, provider configuration, load test, remote PR or merge has been created in planning.
+Design baseline 2026-11-06. The nineteen product decisions and final implementation instruction are accepted. This remains the required acceptance matrix; [implementation evidence and operations](implementation-and-operations.md) records what has run and which production checks remain. The planning phase created no provider configuration or deployment.
 
 ## Deliverables and scope
 

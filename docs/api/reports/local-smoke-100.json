@@ -1,0 +1,33 @@
+{
+  "kind": "local-smoke-not-railway-certification",
+  "timestamp": "2026-11-06T12:56:07.156Z",
+  "runtime": "v24.22.0",
+  "postgres": "18 disposable",
+  "profile": {
+    "rooms": 100,
+    "players": 600,
+    "cycles": 2,
+    "content": "STANDARD text only; no media transfer",
+    "network": "localhost",
+    "pressure": "injected healthy fixture; not container quota telemetry",
+    "warmupSeconds": 0,
+    "steadyState": "bounded command bursts, not the required 15-minute acceptance run"
+  },
+  "acceptedCommands": 700,
+  "durationSeconds": 4.9685156090000016,
+  "p95HttpMs": 257.48613399999886,
+  "p99HttpMs": 320.2224069999975,
+  "p95VisibleMs": 708.9555689999979,
+  "p99VisibleMs": 768.1881639999992,
+  "measurements": {
+    "commands": 700,
+    "p95CommandMs": 234.356735,
+    "p99CommandMs": 250.347519,
+    "p95OutboxDispatchMs": 249.036799,
+    "eventLoopP99Ms": 21.610495,
+    "rssBytes": 519892992,
+    "projections": 800,
+    "refusals": 0
+  },
+  "railwayAcceptance": "not run"
+}

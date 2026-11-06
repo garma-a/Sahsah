@@ -1,5 +1,5 @@
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
-import { Pool } from "pg";
+import { Pool, type PoolClient } from "pg";
 import type { DatabaseConfig } from "./config.js";
 import { assertMigrationsCurrent } from "./migrations.js";
 import * as schema from "./schema/index.js";
@@ -11,10 +11,18 @@ export class DatabaseConnection {
   private readonly orm: SahsahDatabase | undefined;
   private initialized = false;
   private closing: Promise<void> | undefined;
+  private gameplayLease?: PoolClient;
 
-  constructor(config: DatabaseConfig | undefined, onIdleError: () => void = () => {}) {
+  constructor(
+    config: DatabaseConfig | undefined,
+    onIdleError: () => void = () => {},
+  ) {
     if (config) {
-      this.pool = new Pool(config);
+      this.pool = new Pool({
+        ...config,
+        keepAlive: true,
+        keepAliveInitialDelayMillis: 10000,
+      });
       // pg requires an idle-client error listener. The caller logs no SQL/parameters.
       this.pool.on("error", onIdleError);
       this.orm = drizzle(this.pool, { schema });
@@ -22,8 +30,31 @@ export class DatabaseConnection {
   }
 
   get db(): SahsahDatabase {
-    if (!this.orm || !this.initialized) throw new Error("Database is not ready.");
+    if (!this.orm || !this.initialized)
+      throw new Error("Database is not ready.");
     return this.orm;
+  }
+
+  async claimGameplayProcess(): Promise<boolean> {
+    if (!this.pool || !this.initialized) return false;
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query<{ acquired: boolean }>(
+        "SELECT pg_try_advisory_lock(1935763505, 1) AS acquired",
+      );
+      if (!result.rows[0].acquired) {
+        client.release();
+        return false;
+      }
+      this.gameplayLease = client;
+      client.on("error", () => {
+        this.initialized = false;
+      });
+      return true;
+    } catch (error) {
+      client.release(true);
+      throw error;
+    }
   }
 
   async initialize(): Promise<void> {
@@ -31,7 +62,9 @@ export class DatabaseConnection {
     const client = await this.pool.connect();
     try {
       await assertMigrationsCurrent(client);
-      const { rows: [role] } = await client.query<{ unsafe: boolean }>(`
+      const {
+        rows: [role],
+      } = await client.query<{ unsafe: boolean }>(`
         SELECT r.rolsuper OR r.rolcreaterole OR r.rolcreatedb OR r.rolreplication OR r.rolbypassrls
           OR has_schema_privilege(current_user, 'public', 'CREATE')
           OR has_database_privilege(current_user, current_database(), 'CREATE')
@@ -45,7 +78,10 @@ export class DatabaseConnection {
             AND has_function_privilege(current_user, p.oid, 'EXECUTE')) AS unsafe
         FROM pg_roles r WHERE r.rolname=current_user
       `);
-      if (!role || role.unsafe) throw new Error("DATABASE_URL must use the restricted runtime role. Run db:grant-runtime with the migration owner.");
+      if (!role || role.unsafe)
+        throw new Error(
+          "DATABASE_URL must use the restricted runtime role. Run db:grant-runtime with the migration owner.",
+        );
       this.initialized = true;
     } finally {
       client.release();
@@ -63,7 +99,8 @@ export class DatabaseConnection {
   }
 
   async transaction<T>(work: (db: SahsahDatabase) => Promise<T>): Promise<T> {
-    if (!this.pool || !this.initialized) throw new Error("Database is not ready.");
+    if (!this.pool || !this.initialized)
+      throw new Error("Database is not ready.");
     const client = await this.pool.connect();
     let discard = false;
     try {
@@ -71,7 +108,10 @@ export class DatabaseConnection {
       const result = await work(drizzle(client, { schema }));
       const commit = await client.query("COMMIT");
       // PostgreSQL can answer ROLLBACK when a callback swallowed a statement error.
-      if (commit.command !== "COMMIT") throw new Error("Transaction was rolled back; no changes were accepted.");
+      if (commit.command !== "COMMIT")
+        throw new Error(
+          "Transaction was rolled back; no changes were accepted.",
+        );
       return result;
     } catch (error) {
       try {
@@ -87,6 +127,10 @@ export class DatabaseConnection {
 
   async close(): Promise<void> {
     this.initialized = false;
+    if (this.gameplayLease) {
+      this.gameplayLease.release(true);
+      this.gameplayLease = undefined;
+    }
     this.closing ??= this.pool?.end() ?? Promise.resolve();
     await this.closing;
   }

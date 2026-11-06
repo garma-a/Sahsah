@@ -15,6 +15,20 @@
       "when": 1793787575325,
       "tag": "0001_postgresql_integrity",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793962568616,
+      "tag": "0002_gameplay_rooms",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793968219833,
+      "tag": "0003_gameplay_history",
+      "breakpoints": true
     }
   ]
 }

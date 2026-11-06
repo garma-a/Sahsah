@@ -5,10 +5,21 @@ import { sql } from "drizzle-orm";
 import { bytea } from "./types.js";
 import { games } from "./games.js";
 import { accounts } from "./identity.js";
+import { categories, questionPacks } from "./catalog.js";
+import type { JsonObject } from "./types.js";
 
 export const rooms = t.pgTable("rooms", {
   id: t.uuid("id").primaryKey().notNull(),
   ownerAccountId: t.uuid("owner_account_id").notNull(),
+  stateVersion: t.bigint("state_version", { mode: "bigint" }).default(sql`0`).notNull(),
+  presentationMode: t.text("presentation_mode").default("lobby").notNull(),
+  createRequestId: t.uuid("create_request_id").default(sql`gen_random_uuid()`).unique().notNull(),
+  createRequestDigest: bytea("create_request_digest").default(sql`sha256(gen_random_uuid()::text::bytea)`).notNull(),
+  controllerGeneration: t.bigint("controller_generation", { mode: "bigint" }).default(sql`1`).notNull(),
+  controllerCredentialHash: bytea("controller_credential_hash").default(sql`sha256((gen_random_uuid()::text || gen_random_uuid()::text)::bytea)`).notNull(),
+  controllerAcquiredAt: t.timestamp("controller_acquired_at", { withTimezone: true, mode: "string" }).default(sql`now()`).notNull(),
+  lastLobbyActivityAt: t.timestamp("last_lobby_activity_at", { withTimezone: true, mode: "string" }).default(sql`now()`).notNull(),
+  lobbyIdleExpiresAt: t.timestamp("lobby_idle_expires_at", { withTimezone: true, mode: "string" }).default(sql`now() + interval '24 hours'`).notNull(),
   currentGameId: t.uuid("current_game_id"),
   lobbyGeneration: t.integer("lobby_generation").default(1).notNull(),
   teamOneName: t.text("team_one_name").notNull(),
@@ -21,6 +32,11 @@ export const rooms = t.pgTable("rooms", {
   invitationRevokedAt: t.timestamp("invitation_revoked_at", { withTimezone: true, mode: "string" }),
 }, (table): t.PgTableExtraConfigValue[] => [
   t.uniqueIndex("rooms_owner_identity").on(table.id, table.ownerAccountId),
+  t.uniqueIndex("rooms_one_open_owner").on(table.ownerAccountId).where(sql`closed_at IS NULL`),
+  t.index("rooms_lobby_expiry").on(table.lobbyIdleExpiresAt, table.id).where(sql`closed_at IS NULL`),
+  t.check("rooms_state_version", sql`state_version >= 0 AND presentation_mode IN ('lobby','game')`),
+  t.check("rooms_control_shape", sql`controller_generation > 0 AND octet_length(controller_credential_hash)=32 AND octet_length(create_request_digest)=32`),
+  t.check("rooms_lobby_window", sql`lobby_idle_expires_at = last_lobby_activity_at + interval '24 hours'`),
   t.index("rooms_expired_code_cleanup").on(table.invitationExpiresAt, table.id).where(sql`invitation_code IS NOT NULL`),
   t.foreignKey({
     name: "rooms_owner",
@@ -44,6 +60,9 @@ export const rooms = t.pgTable("rooms", {
 export const roomMemberships = t.pgTable("room_memberships", {
   id: t.uuid("id").primaryKey().notNull(),
   roomId: t.uuid("room_id").notNull(),
+  stateVersion: t.bigint("state_version", { mode: "bigint" }).default(sql`0`).notNull(),
+  joinRequestId: t.uuid("join_request_id").unique(),
+  joinRequestDigest: bytea("join_request_digest"),
   accountId: t.uuid("account_id"),
   displayName: t.text("display_name").notNull(),
   lobbyTeamNumber: t.smallint("lobby_team_number"),
@@ -59,6 +78,7 @@ export const roomMemberships = t.pgTable("room_memberships", {
   reconnectRevokedAt: t.timestamp("reconnect_revoked_at", { withTimezone: true, mode: "string" }),
 }, (table): t.PgTableExtraConfigValue[] => [
   t.uniqueIndex("room_memberships_room_identity").on(table.roomId, table.id),
+  t.check("room_memberships_revision", sql`state_version >= 0 AND ((join_request_id IS NULL AND join_request_digest IS NULL) OR (join_request_id IS NOT NULL AND octet_length(join_request_digest)=32))`),
   t.uniqueIndex("room_memberships_one_active_account").on(table.roomId, table.accountId).where(sql`account_id IS NOT NULL AND left_at IS NULL AND removed_at IS NULL`),
   t.index("room_memberships_account_recovery").on(table.accountId, table.roomId).where(sql`account_id IS NOT NULL`),
   t.foreignKey({
@@ -89,4 +109,40 @@ export const roomMemberships = t.pgTable("room_memberships", {
   t.check("room_memberships_credential_pair", sql`(reconnect_credential_hash IS NULL) = (reconnect_issued_at IS NULL)`),
   t.check("room_memberships_credential_hash", sql`reconnect_credential_hash IS NULL OR octet_length(reconnect_credential_hash) = 32`),
   t.check("room_memberships_credential_revocation", sql`reconnect_revoked_at IS NULL OR (reconnect_issued_at IS NOT NULL AND reconnect_revoked_at >= reconnect_issued_at)`),
+]);
+
+export const roomPackSelections = t.pgTable("room_pack_selections", {
+  roomId: t.uuid("room_id").notNull(),
+  boardPosition: t.smallint("board_position").notNull(),
+  categoryId: t.uuid("category_id").notNull(),
+  packId: t.uuid("pack_id").notNull(),
+  observedRevision: t.bigint("observed_revision", { mode: "bigint" }).notNull(),
+  repeatConsentBasis: bytea("repeat_consent_basis"),
+  repeatAcceptedAt: t.timestamp("repeat_accepted_at", { withTimezone: true, mode: "string" }),
+}, (table): t.PgTableExtraConfigValue[] => [
+  t.primaryKey({ name: "room_pack_selections_pkey", columns: [table.roomId, table.boardPosition] }),
+  t.uniqueIndex("room_pack_selections_category").on(table.roomId, table.categoryId),
+  t.foreignKey({ name: "room_selection_room", columns: [table.roomId], foreignColumns: [rooms.id] }),
+  t.foreignKey({ name: "room_selection_category", columns: [table.categoryId], foreignColumns: [categories.id] }),
+  t.foreignKey({ name: "room_selection_pack", columns: [table.packId], foreignColumns: [questionPacks.id] }),
+  t.check("room_selection_shape", sql`board_position BETWEEN 1 AND 6 AND observed_revision > 0 AND ((repeat_consent_basis IS NULL AND repeat_accepted_at IS NULL) OR (octet_length(repeat_consent_basis)=32 AND repeat_accepted_at IS NOT NULL))`),
+]);
+
+export const roomActions = t.pgTable("room_actions", {
+  operationId: t.uuid("operation_id").primaryKey().notNull(),
+  roomId: t.uuid("room_id").notNull(),
+  actorAccountId: t.uuid("actor_account_id"),
+  actorMembershipId: t.uuid("actor_membership_id"),
+  actorProofHash: bytea("actor_proof_hash"),
+  operationName: t.varchar("operation_name", { length: 64 }).notNull(),
+  requestDigest: bytea("request_digest").notNull(),
+  resultData: t.jsonb("result_data").$type<JsonObject>().notNull(),
+  acceptedAt: t.timestamp("accepted_at", { withTimezone: true, mode: "string" }).notNull(),
+  expiresAt: t.timestamp("expires_at", { withTimezone: true, mode: "string" }).notNull(),
+}, (table): t.PgTableExtraConfigValue[] => [
+  t.index("room_actions_cleanup").on(table.expiresAt, table.operationId),
+  t.foreignKey({ name: "room_action_room", columns: [table.roomId], foreignColumns: [rooms.id] }),
+  t.foreignKey({ name: "room_action_account", columns: [table.actorAccountId], foreignColumns: [accounts.id] }),
+  t.foreignKey({ name: "room_action_membership", columns: [table.roomId, table.actorMembershipId], foreignColumns: [roomMemberships.roomId, roomMemberships.id] }),
+  t.check("room_action_shape", sql`octet_length(request_digest)=32 AND length(btrim(operation_name))>0 AND jsonb_typeof(result_data)='object' AND pg_column_size(result_data)<=8192 AND expires_at>=accepted_at + interval '7 days' AND (actor_account_id IS NOT NULL OR actor_membership_id IS NOT NULL) AND (actor_proof_hash IS NULL OR octet_length(actor_proof_hash)=32)`),
 ]);

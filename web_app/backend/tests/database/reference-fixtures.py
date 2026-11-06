@@ -206,7 +206,6 @@ class Audit:
           '{account}','Team A','Team B',{digest('controller'+game)},{at});
         INSERT INTO game_players(game_id,room_id,room_member_id,seat_number,account_id,display_name,joined_at)
           VALUES ('{game}','{room}','{member}',1,'{account}','Host',{at});
-        UPDATE rooms SET current_game_id='{game}' WHERE id='{room}';
         UPDATE accounts SET active_game_id='{game}',active_game_claimed_at=now() WHERE id='{account}';
         INSERT INTO token_ledger_entries(id,account_id,entry_kind,amount,idempotency_key,game_id)
           VALUES ('{uid()}','{account}','game_debit',-1,'{uid()}','{game}');
@@ -218,6 +217,7 @@ class Audit:
                 sql += f"""INSERT INTO game_questions(game_id,board_position,question_position,source_question_id,
                   base_points,format,content_snapshot) VALUES ('{game}',{board},{position},'{question}',
                   {200*((position+1)//2)},'STANDARD','{{"prompt_ar":"سؤال","answer_ar":"إجابة"}}');"""
+        sql += f"UPDATE rooms SET current_game_id='{game}' WHERE id='{room}';"
         return game, sql
 
     def end_game(self, game, account, old=False):
@@ -479,10 +479,11 @@ class Audit:
 
     def concurrency_cases(self):
         a,sa=self.account(tokens=1)
-        r1,m1,s1=self.room(a);r2,m2,s2=self.room(a)
-        self.sql(sa+s1+s2)
+        r1,m1,s1=self.room(a)
+        self.sql(sa+s1)
         commands=[]
-        for room,member in [(r1,m1),(r2,m2)]:
+        # One open room per host is now enforced. Race two intents in that room.
+        for room,member in [(r1,m1),(r1,m1)]:
             game,sg=self.game(a,room,member)
             commands.append(f"SELECT id FROM accounts WHERE id='{a}' FOR NO KEY UPDATE; SELECT pg_sleep(0.15);"+
               assertion(f"(SELECT active_game_id IS NULL AND token_balance>=1 FROM accounts WHERE id='{a}')","account already playing or empty")+sg)

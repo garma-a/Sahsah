@@ -104,7 +104,7 @@ The user also requires every implementation change set to use a new branch/PR be
 | API-Q18 | Host disconnect does not pause the answering deadline. Reconnect restores actual remainder; explicit Reset remains available. Timeout does not reveal or resolve. |
 | API-Q19 | Manual target input is 0–1,000,000. Subsequent legal question awards may exceed that input ceiling. Preserve exact decimal-string totals/versions. |
 
-The product frontier is empty. Concrete HTTP/realtime/schema/lifecycle/admission/acceptance specifications and structural validation are complete; final shared-understanding confirmation remains before implementation.
+The product frontier is empty. Concrete HTTP/realtime/schema/lifecycle/admission/acceptance specifications and structural validation are complete; the user supplied final confirmation by invoking `$implement`; runtime work is on `feat/gameplay-api`.
 
 ## Design tree
 
@@ -267,3 +267,5 @@ Additional 2026-11-05 checks are recorded in [the gameplay contract](gameplay-co
 ## Interview record
 
 All three rounds are recorded above; the glossary and ADRs capture their settled terms/trade-offs. The [package index](README.md), [OpenAPI](openapi.json), [realtime schema](realtime.schema.json) and [validation report](validation-results.json) are ready for final shared-understanding review. No Railway capacity measurement or load test has run; no runtime implementation, remote PR or merge has been created during planning.
+
+Implementation status: the user invoked `$implement` after the final accepted recommendations. See [implementation evidence and operations](implementation-and-operations.md) for current runtime work, local verification and outstanding release prerequisites. Earlier evidence tables describe the planning baseline.

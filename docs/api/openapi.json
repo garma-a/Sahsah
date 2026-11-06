@@ -3,7 +3,7 @@
   "info": {
     "title": "Sahsah gameplay API",
     "version": "1.0.0-design",
-    "description": "Reviewable planning contract,2026-11-06. API-Q1–Q19 accepted. Runtime/migrations unimplemented; final shared-understanding review pending. Auth/login/payment/staff/history-browser APIs excluded."
+    "description": "Gameplay v1 contract, 2026-11-06. API-Q1–Q19 accepted and implemented on feat/gameplay-api. Auth/login/payment/staff/history-browser APIs excluded. Production integration and deployment certification are separate release prerequisites."
   },
   "servers": [
     {

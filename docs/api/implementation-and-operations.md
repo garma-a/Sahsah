@@ -1,0 +1,59 @@
+# Gameplay implementation and operations
+
+Implemented on `feat/gameplay-api` after the user's `$implement` confirmation on 2026-11-06. Review and merge are separate: no production deployment or migration is authorized by this document. The prototype/frontend/mobile applications remain independent.
+
+The Nest module in `web_app/backend/src/gameplay/` implements the 27 reviewed HTTP operations, native WS protocol, all 12 game commands, all ten formats, room setup/Ready/replay, progress/results/feedback, private media access and bounded maintenance. The new migrations extend the original schema to 41 tables, 93 deferred-capable foreign keys, 312 checks and 156 indexes (21 partial). The original financial helpers remain protected.
+
+## Contract and integration boundaries
+
+The backend owns deployable copies of the approved HTTP/realtime schemas. Zod exposes their validation through Nest 12's native Standard Schema input/output integration; AJV compiles the detailed schemas. This contract-first implementation avoids maintaining a second permissive DTO model. `tests/gameplay-contracts.test.mjs` checks the actual Nest route metadata, request/output schema identities and status codes against all 27 OpenAPI operations, and checks both deployable schema copies against the reviewed artifacts. Application packages do not import parent/sibling source files at runtime.
+
+Business mutations commit before returning a receipt or emitting an outbox hint. HTTP and WS return authorized projections, never raw database rows. Room locks precede game locks in departure/closure/takeover. Game commands lock the game and sorted roster accounts, without subsequently updating room membership. Source operation identities survive generic receipt cleanup. Scores, original awards and feedback revisions remain distinct.
+
+Identity is consumed through `GameplayOptions.verifyAccount`, or the existing-token JWKS adapter. The adapter validates RS256/ES256 signatures, issuer, audience, `sub`, `iat`, `exp` and the issuer-controlled `account_id` UUID claim, then checks the matching active database account. Do not enable that adapter until the existing identity issuer supplies this trusted mapping. This feature creates no login/OTP/checkout endpoint. Direct account-ID request headers are never identity.
+
+Browser QR clients generate the graphic from `Invitation.joinUrl`. The server returns a canonical six-digit HTTPS locator, without a guest/controller credential. Guests save their 32-byte reconnect secret before joining; hosts save the proposed controller secret before create/takeover. Never log bearer/control/guest proofs, request bodies containing proposals or signed media URLs.
+
+## Authored content and Cloudflare
+
+Published content must contain six current questions per pack, matching the requested revision and category. Start rechecks every source and ready private R2 asset under locks, copies both locales/rules and pins immutable asset identities. Public values have explicit length/dimension/duration bounds. Existing text edits preserve question identity; authored replacement questions need new identities and an incremented pack revision through the content-management boundary.
+
+The strict `format_config` settings are `instructionAr`/`instructionFranco` for memory, `hintAr`/`hintFranco` for voice, `allowForward` for reverse audio, optional `colorHex` for color, and optional three-entry `stageSuggestions`. Hint `question_media.suggested_points` values are authoritative when Start freezes blur/zoom stages. Defaults are the approved 200→150→50, 400→250→150 and 600→400→200 bands when authoring those three rows.
+
+Renditions must be separate ready assets. `source_asset_id` links blur/zoom/person/color question renditions to the answer original, and reversed audio to its private source. `transform_spec.operation` is `blur`, `crop`, `grayscale` or `reverse`, respectively. Originals have retained answer roles only when permitted. Source roles never become runtime client references. The authoring pipeline must produce these ready assets; this gameplay feature does not upload, transform or author content.
+
+Configure a private R2 bucket and a bucket-scoped read credential in secret storage. Never overwrite a ready object/key: database metadata is immutable after ready; a replacement is a new asset/key. Keep objects while any catalog or retained game pin references them. R2 physical garbage collection is a separate content/storage operation.
+
+The SDK signs GET for 300 seconds at the account's S3 endpoint with region `auto`. `R2_GAMEPLAY_BUCKET` must match the pinned namespace. Media authorization checks current membership, controlling host, active slot, stage, memory visibility and reveal. Viewers cannot obtain question or forward audio through a modified request. Each media-access call authorizes/issues fresh links and stores no idempotency receipt. Return metadata rather than issuing HEAD; renew about 60 seconds before expiry. Configure bucket CORS for the actual client origins and Range GET, exposing `Content-Length`, `Content-Range`, `Accept-Ranges` and `ETag`. Verify this against real R2 before release. See [Cloudflare's presigned URL documentation](https://developers.cloudflare.com/r2/api/s3/presigned-urls/).
+
+## Admission, scheduling and measurements
+
+Production enabling requires the real API/DB resource profile, verified identity integration, R2 signer and HTTPS join URL. Missing inputs fail closed. Development fixture ceilings are **not measured Railway limits**. API pressure samples use cgroup CPU/memory limits and current process/cgroup consumption, plus event-loop delay. An explicit API CPU/RAM limit is required if cgroups expose no finite limit.
+
+`GAMEPLAY_DB_PRESSURE_URL` is an operator-controlled HTTPS exporter endpoint, polled outside requests every five seconds, with a 2-second timeout. Its exact JSON is:
+
+```json
+{"cpuUsedCores":0.4,"cpuLimitCores":2,"memoryUsedBytes":536870912,"memoryLimitBytes":2147483648,"sampledAt":"2026-11-06T12:00:00Z"}
+```
+
+These illustrative values are not quota measurements. `cpuLimitCores` and `memoryLimitBytes` must equal the configured effective DB limits. Use a fresh DB container/OS/provider source; pool statistics and successful SQL do not substitute. Its optional bearer token is a deployment secret. Management/exporter calls never execute in gameplay request transactions.
+
+New rooms/seats/games reserve a capacity vector before asynchronous work and before any debit. Admission closes at 85% of configured passing ceilings or observed resource pressure. API samples age out after 5 seconds; DB source samples after 30 seconds; missing required samples pause new admission after a further 15-second grace. Known high pressure closes immediately. Reopening requires all signals at or below 75% continuously for 30 seconds. Existing receipts, authorized games, media renewal and reconnects use protected bounded work.
+
+One expensive new Start runs concurrently, with at most two new allocations total. A synchronous operation-scoped reservation coalesces concurrent duplicates. SQL work stays below the pool size; one connection holds the process lease. The queue allows 128 protected requests and 16 ordinary requests, with a 1.5-second maximum wait; background work only runs with spare scheduling capacity. Two coalescing room projection jobs run at once, sharing bounded source/language caches and rechecking current grants in a single consistent SQL statement before delivery. Socket frames are capped at 8 KiB inbound/64 KiB outbound; buffers at 256 KiB; one stream per membership. Unauthenticated sockets have a 5-second deadline and 64-global/8-source pending limits, with strict origin policy.
+
+Maintenance claims only gameplay outbox topics with `SKIP LOCKED`, expiring leases and bounded retries. Routing hints contain no credentials/media URLs. Delayed dispatch rebuilds the current projection; restart/reconnect takes a new snapshot. Expiry and retention are bounded passes. Generic receipts remain at least seven days; score history remains retained. Due twelve-month purge removes copied content/pins atomically and increments projection revision, retaining compact results/progress/votes.
+
+The [local smoke report](reports/local-smoke-100.json) records 100 rooms/600 native WS clients and 700 accepted commands in simultaneous room bursts, using disposable PostgreSQL 18 on localhost and text-only content. Final p95 server command time was 234.4 ms; p95 request-to-all-viewers visibility was 709.0 ms. HTTP round-trip p95 was 257.5 ms, a different measure. No capacity refusals occurred in that run. The first bounded 64-request queue refused part of a 100-room burst; after tuning the queue, the initial fanout implementation measured 261.5 ms server p95 / 2333.7 ms visible p95. Source-fenced shared projection caching and removal of a per-room scheduler delay produced the recorded improvement.
+
+This short local run does **not** establish Railway capacity, R2 transfer behavior, a 15-minute representative workload, real resource pressure or restart recovery percentage. Run the [accepted staging profile](acceptance-and-handoff.md#performance-and-capacity-evidence) before assigning production ceilings. API internals expose bounded histograms through `GameplayService.metrics.snapshot()` for operator composition, without adding a public metrics endpoint. Server command latency, outbox dispatch delay and client-observed visibility are separate measurements.
+
+## Deployment and review checklist
+
+1. Keep `GAMEPLAY_ENABLED=false` until the real identity/content/R2/exporter/profile inputs are verified. Set the new frontend's canonical join base and exact browser origins; retain the repository's independent deployment boundaries.
+2. Review the forward migrations and back up the target database. Resolve any pre-existing duplicate open rooms per host before the unique owner index can apply. Use the migration-owner commands to migrate and reapply restricted runtime grants; never use the migration credential in the API. No retained environment has been migrated by this work.
+3. Use one admitted API process. Startup rebuilds occupancy and takes a PostgreSQL session advisory lease; another enabled process fails initialization. A lease connection failure makes database access unready. Verify Railway's drain/restart procedure: stop new ingress/admission, finish bounded in-flight work, close streams and pool, then start the replacement. Do not enable rolling writer overlap or replicas without a coordinated fencing design. Clients reconnect with jitter and resync; server sequence/presence epochs are disposable.
+4. Run backend check/build/tests/database checks, frontend check/build, contract validation and the declared staging load/recovery/media tests. Record quotas, region, build, command mix, p95/p99, pressure freshness and refusals. Tune within the passing envelope; no automatic paid scaling is implemented.
+5. Review the implementation PR before merging. Reverting API code is possible; after a retained DB migration use a reviewed forward repair rather than deleting history or rewriting applied migration files.
+
+The runtime feature is reviewable, but production identity/content wiring, private R2 behavior and actual Railway quota/representative-load certification remain release prerequisites.

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://sahsah.invalid/contracts/realtime-v1",
-  "title": "Sahsah realtime v1 planning contract",
+  "title": "Sahsah realtime v1 contract",
   "description": "Framing plus strict schemas; direction/auth/phase/epoch/role checks remain mandatory.",
   "$defs": {
     "Id": {
