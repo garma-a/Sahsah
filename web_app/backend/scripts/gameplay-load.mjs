@@ -209,16 +209,47 @@ try {
     measurements: f.app.get(GameplayService).metrics.snapshot(),
     railwayAcceptance: "not run",
   };
-  if(process.env.LOAD_CAPTURE_PLANS==="1"){
-    await f.owner.query("ANALYZE games,game_questions,rooms,room_memberships,account_question_exposures");
-    const queries=[
-      ["copied-question","SELECT * FROM game_questions WHERE game_id=$1 AND board_position=1 AND question_position=1",games[0].id],
-      ["live-roster","SELECT id FROM room_memberships WHERE room_id=$1 AND left_at IS NULL AND removed_at IS NULL",games[0].room.roomId],
-      ["create-source","SELECT id FROM rooms WHERE create_request_id=$1",games[0].room.operationId],
-      ["account-exposure","SELECT question_id FROM account_question_exposures WHERE account_id=$1",f.accounts[0]],
+  if (process.env.LOAD_CAPTURE_PLANS === "1") {
+    await f.owner.query(
+      "ANALYZE games,game_questions,rooms,room_memberships,account_question_exposures",
+    );
+    const queries = [
+      [
+        "copied-question",
+        "SELECT * FROM game_questions WHERE game_id=$1 AND board_position=1 AND question_position=1",
+        games[0].id,
+      ],
+      [
+        "live-roster",
+        "SELECT id FROM room_memberships WHERE room_id=$1 AND left_at IS NULL AND removed_at IS NULL",
+        games[0].room.roomId,
+      ],
+      [
+        "create-source",
+        "SELECT id FROM rooms WHERE create_request_id=$1",
+        games[0].room.operationId,
+      ],
+      [
+        "account-exposure",
+        "SELECT question_id FROM account_question_exposures WHERE account_id=$1",
+        f.accounts[0],
+      ],
     ];
-    const plans={};for(const [name,query,value]of queries)plans[name]=(await f.owner.query(`EXPLAIN (ANALYZE,BUFFERS,FORMAT JSON) ${query}`,[value])).rows[0]["QUERY PLAN"][0];
-    await writeFile(process.env.LOAD_PLANS_REPORT??"/tmp/sahsah-gameplay-plans.json",JSON.stringify({kind:"disposable-local-query-plans",rooms,postgres:"18",plans},null,2)+"\n");
+    const plans = {};
+    for (const [name, query, value] of queries)
+      plans[name] = (
+        await f.owner.query(`EXPLAIN (ANALYZE,BUFFERS,FORMAT JSON) ${query}`, [
+          value,
+        ])
+      ).rows[0]["QUERY PLAN"][0];
+    await writeFile(
+      process.env.LOAD_PLANS_REPORT ?? "/tmp/sahsah-gameplay-plans.json",
+      JSON.stringify(
+        { kind: "disposable-local-query-plans", rooms, postgres: "18", plans },
+        null,
+        2,
+      ) + "\n",
+    );
   }
   await writeFile(
     process.env.LOAD_REPORT ?? "/tmp/sahsah-gameplay-load.json",

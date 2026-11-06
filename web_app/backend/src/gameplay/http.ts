@@ -14,15 +14,37 @@ import { GameplayRates } from "./rates.js";
 import { requireState } from "./problem.js";
 
 @Injectable()
-export class GameplayHttpInterceptor implements NestInterceptor,OnModuleInit {
+export class GameplayHttpInterceptor implements NestInterceptor, OnModuleInit {
   private rates = new GameplayRates();
   private sources = new Map<string, number>();
-  private policy={ipRate:100,ipBurst:240,subjectRate:60,subjectBurst:240};
-  constructor(private core: GameplayService,private config:ConfigService) {}
-  onModuleInit(){
-    if(!this.core.options.enabled)return;
-    const setting=(name:string,fallback:number)=>{const raw=this.config.get<string>(name,String(fallback));const n=Number(raw);requireState(/^\d+$/.test(raw)&&Number.isSafeInteger(n)&&n>=1&&n<=10000,"INVALID_HTTP_RATE_CONFIGURATION",500);return n;};
-    this.policy={ipRate:setting("GAMEPLAY_HTTP_IP_RATE",100),ipBurst:setting("GAMEPLAY_HTTP_IP_BURST",240),subjectRate:setting("GAMEPLAY_HTTP_SUBJECT_RATE",60),subjectBurst:setting("GAMEPLAY_HTTP_SUBJECT_BURST",240)};
+  private policy = {
+    ipRate: 100,
+    ipBurst: 240,
+    subjectRate: 60,
+    subjectBurst: 240,
+  };
+  constructor(
+    private core: GameplayService,
+    private config: ConfigService,
+  ) {}
+  onModuleInit() {
+    if (!this.core.options.enabled) return;
+    const setting = (name: string, fallback: number) => {
+      const raw = this.config.get<string>(name, String(fallback));
+      const n = Number(raw);
+      requireState(
+        /^\d+$/.test(raw) && Number.isSafeInteger(n) && n >= 1 && n <= 10000,
+        "INVALID_HTTP_RATE_CONFIGURATION",
+        500,
+      );
+      return n;
+    };
+    this.policy = {
+      ipRate: setting("GAMEPLAY_HTTP_IP_RATE", 100),
+      ipBurst: setting("GAMEPLAY_HTTP_IP_BURST", 240),
+      subjectRate: setting("GAMEPLAY_HTTP_SUBJECT_RATE", 60),
+      subjectBurst: setting("GAMEPLAY_HTTP_SUBJECT_BURST", 240),
+    };
   }
   intercept(context: ExecutionContext, next: CallHandler) {
     const http = context.switchToHttp(),
@@ -37,7 +59,11 @@ export class GameplayHttpInterceptor implements NestInterceptor,OnModuleInit {
     const started = performance.now(),
       path = req.path.toLowerCase();
     this.core.enabled();
-    this.rates.take(`ip:${req.ip ?? req.socket.remoteAddress}`, this.policy.ipRate, this.policy.ipBurst);
+    this.rates.take(
+      `ip:${req.ip ?? req.socket.remoteAddress}`,
+      this.policy.ipRate,
+      this.policy.ipBurst,
+    );
     const invitation = path.includes("/room-invitations/"),
       anonymousJoin =
         invitation &&
@@ -70,7 +96,11 @@ export class GameplayHttpInterceptor implements NestInterceptor,OnModuleInit {
       subject = actor.account
         ? `account:${actor.account.accountId}`
         : `guest:${actor.member!.id}`;
-      this.rates.take(subject, this.policy.subjectRate, this.policy.subjectBurst);
+      this.rates.take(
+        subject,
+        this.policy.subjectRate,
+        this.policy.subjectBurst,
+      );
     }
     const operation =
       typeof req.headers["idempotency-key"] === "string"
