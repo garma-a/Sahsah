@@ -21,6 +21,8 @@ The repository root and `web_app/` organize applications. Each application insta
 
 The playable game remains in `sahsah_prototype/`. The API now owns the [Drizzle/PostgreSQL schema and database foundation](web_app/backend/README.md); account, gameplay, payment and multiplayer workflows remain unimplemented in the new applications. The new frontend and empty AdminJS dashboard remain starters.
 
+For payment setup, see the [Paymob checklist](docs/payments/paymob-onboarding-guide.md) or the [PDF copy](docs/payments/paymob-onboarding-guide.pdf).
+
 ## Tooling
 
 Use Node **24 LTS** and pnpm **10.34.3**. The root `.mise.toml` pins these tools for local development. Where pnpm is unavailable, substitute `npx --yes pnpm@10.34.3` for `pnpm` in the commands below. Each application can be copied out of this repository and installed on its own.
