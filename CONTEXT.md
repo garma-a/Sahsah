@@ -54,6 +54,14 @@ The game's six selected categories and their six question tiles each, for 36 til
 **Category**:
 A selectable grouping of question packs, such as Football.
 
+**Section**:
+A named shelf of categories on the selection screen, such as New categories or Celebrities. A category belongs to one section; sections only organise browsing and do not affect the board.
+_Avoid_: Category, when referring to the shelf rather than a selectable item.
+
+**Category cover**:
+The public poster artwork that represents a category on the selection screen and on the board.
+_Avoid_: Question image, which is private gameplay media.
+
 **Question format**:
 The presentation and interaction of an individual question, such as text, image or audio. A pack may mix formats.
 _Avoid_: Category, when describing how a question is presented.
