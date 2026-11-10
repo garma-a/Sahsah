@@ -29,7 +29,7 @@ export async function grantRuntime(client: Client, runtimeRole: string) {
     await client.query(`GRANT SELECT, INSERT ON ALL TABLES IN SCHEMA public TO ${app}`);
     const { rows: tables } = await client.query<{ table_name: string }>(`
       SELECT tablename AS table_name FROM pg_tables WHERE schemaname='public'
-        AND tablename NOT IN ('accounts', 'token_ledger_entries', 'staff_audit_events')
+        AND tablename NOT IN ('accounts', 'token_ledger_entries', 'staff_audit_events', 'room_actions', 'game_actions', 'game_packs', 'game_question_media')
     `);
     for (const table of tables) await client.query(`GRANT UPDATE ON public.${identifier(table.table_name)} TO ${app}`);
     const { rows: columns } = await client.query<{ column_name: string }>(`
@@ -43,7 +43,7 @@ export async function grantRuntime(client: Client, runtimeRole: string) {
     await client.query(`GRANT UPDATE (details) ON public.staff_audit_events TO ${app}`);
     await client.query(`GRANT DELETE ON public.question_media, public.game_question_media,
       public.staff_sessions, public.phone_verification_challenges, public.public_page_media,
-      public.game_actions, public.outbox_events TO ${app}`);
+      public.game_actions, public.outbox_events, public.room_pack_selections, public.room_actions TO ${app}`);
     await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK");

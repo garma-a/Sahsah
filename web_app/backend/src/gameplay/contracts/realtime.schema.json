@@ -1,0 +1,4410 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sahsah.invalid/contracts/realtime-v1",
+  "title": "Sahsah realtime v1 contract",
+  "description": "Framing plus strict schemas; direction/auth/phase/epoch/role checks remain mandatory.",
+  "$defs": {
+    "Id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "Revision": {
+      "type": "string",
+      "pattern": "^(?:0|(?:[1-9][0-9]{0,17}|[1-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-6]|9223372036854775807))$",
+      "maxLength": 19,
+      "description": "Canonical unsigned decimal, runtime <=9223372036854775807. Exact bigint transport."
+    },
+    "Score": {
+      "type": "string",
+      "pattern": "^(?:0|(?:[1-9][0-9]{0,17}|[1-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-6]|9223372036854775807))$",
+      "maxLength": 19,
+      "description": "Exact nonnegative team total; manual input ceiling is separate from subsequent legal awards."
+    },
+    "SignedInteger": {
+      "type": "string",
+      "pattern": "^(?:0|-?(?:[1-9][0-9]{0,17}|[1-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-6]|9223372036854775807))$",
+      "maxLength": 20
+    },
+    "Time": {
+      "type": "string",
+      "format": "date-time",
+      "maxLength": 40,
+      "description": "UTC RFC3339 instant ending in Z.",
+      "pattern": "Z$"
+    },
+    "Secret": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{43}$",
+      "minLength": 43,
+      "maxLength": 43,
+      "writeOnly": true,
+      "description": "Canonical unpadded base64url of exactly 32 CSPRNG bytes. Client saves before sending; server stores domain-separated hash only."
+    },
+    "Basis": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "Language": {
+      "type": "string",
+      "enum": [
+        "ar",
+        "franco"
+      ]
+    },
+    "Team": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "number": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "score": {
+          "$ref": "#/$defs/Score"
+        }
+      },
+      "required": [
+        "number",
+        "name",
+        "score"
+      ]
+    },
+    "Teams": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Team"
+      },
+      "minItems": 2,
+      "maxItems": 2,
+      "description": "Exactly team1 then team2."
+    },
+    "Selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "boardPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "categoryId": {
+          "$ref": "#/$defs/Id"
+        },
+        "packId": {
+          "$ref": "#/$defs/Id"
+        },
+        "observedRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "repeatConsentBasis": {
+          "$ref": "#/$defs/Basis"
+        }
+      },
+      "required": [
+        "boardPosition",
+        "categoryId",
+        "packId",
+        "observedRevision"
+      ]
+    },
+    "Selections": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Selection"
+      },
+      "minItems": 0,
+      "maxItems": 6,
+      "description": "Distinct position/category; repeat basis only for explicitly accepted actual pack/roster. Start requires exactly six."
+    },
+    "Member": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "teamNumber": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "enum": [
+            1,
+            2,
+            null
+          ]
+        },
+        "host": {
+          "type": "boolean"
+        },
+        "memberVersion": {
+          "$ref": "#/$defs/Revision"
+        },
+        "ready": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "displayName",
+        "teamNumber",
+        "host",
+        "memberVersion",
+        "ready"
+      ]
+    },
+    "Feedback": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "$ref": "#/$defs/Revision"
+        },
+        "vote": {
+          "type": "string",
+          "enum": [
+            "like",
+            "dislike"
+          ]
+        }
+      },
+      "required": [
+        "version"
+      ]
+    },
+    "ImageRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "image"
+          ]
+        },
+        "boardPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "questionPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "prompt_image",
+            "answer_image",
+            "hint_image"
+          ]
+        },
+        "variantNumber": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2
+        }
+      },
+      "required": [
+        "kind",
+        "boardPosition",
+        "questionPosition",
+        "role",
+        "variantNumber"
+      ]
+    },
+    "AudioRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "audio"
+          ]
+        },
+        "boardPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "questionPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "question_audio",
+            "answer_audio"
+          ]
+        },
+        "variantNumber": {
+          "type": "integer",
+          "enum": [
+            0
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "boardPosition",
+        "questionPosition",
+        "role",
+        "variantNumber"
+      ]
+    },
+    "Playback": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "playing": {
+          "type": "boolean"
+        },
+        "positionMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1800000
+        },
+        "durationMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1800000
+        },
+        "updatedAt": {
+          "$ref": "#/$defs/Time"
+        }
+      },
+      "required": [
+        "playing",
+        "positionMs",
+        "durationMs",
+        "updatedAt"
+      ]
+    },
+    "TimerReady": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": [
+            "ready"
+          ]
+        },
+        "remainingMs": {
+          "type": "integer",
+          "enum": [
+            60000
+          ]
+        }
+      },
+      "required": [
+        "state",
+        "remainingMs"
+      ]
+    },
+    "TimerRunning": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": [
+            "running"
+          ]
+        },
+        "remainingMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 60000
+        },
+        "deadlineAt": {
+          "$ref": "#/$defs/Time"
+        }
+      },
+      "required": [
+        "state",
+        "remainingMs",
+        "deadlineAt"
+      ],
+      "description": "A persisted running deadline can already display zero; no per-second DB writes."
+    },
+    "TimerPaused": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": [
+            "paused"
+          ]
+        },
+        "remainingMs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60000
+        }
+      },
+      "required": [
+        "state",
+        "remainingMs"
+      ]
+    },
+    "TimerElapsed": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": [
+            "elapsed"
+          ]
+        },
+        "remainingMs": {
+          "type": "integer",
+          "enum": [
+            0
+          ]
+        }
+      },
+      "required": [
+        "state",
+        "remainingMs"
+      ]
+    },
+    "Timer": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/TimerReady"
+        },
+        {
+          "$ref": "#/$defs/TimerRunning"
+        },
+        {
+          "$ref": "#/$defs/TimerPaused"
+        },
+        {
+          "$ref": "#/$defs/TimerElapsed"
+        }
+      ]
+    },
+    "StandardQuestion": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "STANDARD"
+          ]
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "image": {
+          "$ref": "#/$defs/ImageRef"
+        }
+      },
+      "required": [
+        "format",
+        "prompt"
+      ]
+    },
+    "ImageBlurQuestion": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "IMAGE_BLUR"
+          ]
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "image": {
+          "$ref": "#/$defs/ImageRef"
+        },
+        "stageIndex": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2
+        },
+        "stageSuggestions": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 600
+          },
+          "minItems": 3,
+          "maxItems": 3
+        }
+      },
+      "required": [
+        "format",
+        "prompt",
+        "image",
+        "stageIndex",
+        "stageSuggestions"
+      ]
+    },
+    "ImageZoomQuestion": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "IMAGE_ZOOM"
+          ]
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "image": {
+          "$ref": "#/$defs/ImageRef"
+        },
+        "stageIndex": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2
+        },
+        "stageSuggestions": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 600
+          },
+          "minItems": 3,
+          "maxItems": 3
+        }
+      },
+      "required": [
+        "format",
+        "prompt",
+        "image",
+        "stageIndex",
+        "stageSuggestions"
+      ]
+    },
+    "ImagePersonQuestion": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "IMAGE_PERSON"
+          ]
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "image": {
+          "$ref": "#/$defs/ImageRef"
+        }
+      },
+      "required": [
+        "format",
+        "prompt",
+        "image"
+      ]
+    },
+    "ImageColorQuestion": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "IMAGE_COLOR"
+          ]
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "image": {
+          "$ref": "#/$defs/ImageRef"
+        }
+      },
+      "required": [
+        "format",
+        "prompt",
+        "image"
+      ]
+    },
+    "ImageRiddleQuestion": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "IMAGE_RIDDLE"
+          ]
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "image": {
+          "$ref": "#/$defs/ImageRef"
+        }
+      },
+      "required": [
+        "format",
+        "prompt",
+        "image"
+      ]
+    },
+    "MemoryReady": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "IMAGE_MEMORY"
+          ]
+        },
+        "memoryPhase": {
+          "type": "string",
+          "enum": [
+            "ready"
+          ]
+        },
+        "instruction": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        }
+      },
+      "required": [
+        "format",
+        "memoryPhase",
+        "instruction"
+      ]
+    },
+    "MemoryViewingFirst": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "IMAGE_MEMORY"
+          ]
+        },
+        "memoryPhase": {
+          "type": "string",
+          "enum": [
+            "viewing_first"
+          ]
+        },
+        "instruction": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "image": {
+          "$ref": "#/$defs/ImageRef"
+        }
+      },
+      "required": [
+        "format",
+        "memoryPhase",
+        "instruction",
+        "image"
+      ]
+    },
+    "MemoryRecall": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "IMAGE_MEMORY"
+          ]
+        },
+        "memoryPhase": {
+          "type": "string",
+          "enum": [
+            "recall"
+          ]
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        }
+      },
+      "required": [
+        "format",
+        "memoryPhase",
+        "prompt"
+      ]
+    },
+    "MemoryRevisit": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "IMAGE_MEMORY"
+          ]
+        },
+        "memoryPhase": {
+          "type": "string",
+          "enum": [
+            "revisit"
+          ]
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "image": {
+          "$ref": "#/$defs/ImageRef"
+        }
+      },
+      "required": [
+        "format",
+        "memoryPhase",
+        "prompt",
+        "image"
+      ]
+    },
+    "MemoryQuestion": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/MemoryReady"
+        },
+        {
+          "$ref": "#/$defs/MemoryViewingFirst"
+        },
+        {
+          "$ref": "#/$defs/MemoryRecall"
+        },
+        {
+          "$ref": "#/$defs/MemoryRevisit"
+        }
+      ]
+    },
+    "AudioGuessViewerQuestion": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "AUDIO_GUESS"
+          ]
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "durationMs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1800000
+        }
+      },
+      "required": [
+        "format",
+        "prompt",
+        "durationMs"
+      ]
+    },
+    "AudioGuessHostQuestion": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "AUDIO_GUESS"
+          ]
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "durationMs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1800000
+        },
+        "audio": {
+          "$ref": "#/$defs/AudioRef"
+        }
+      },
+      "required": [
+        "format",
+        "prompt",
+        "durationMs",
+        "audio"
+      ]
+    },
+    "AudioReverseViewerQuestion": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "AUDIO_REVERSE"
+          ]
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "durationMs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1800000
+        }
+      },
+      "required": [
+        "format",
+        "prompt",
+        "durationMs"
+      ]
+    },
+    "AudioReverseHostQuestion": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "AUDIO_REVERSE"
+          ]
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "durationMs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1800000
+        },
+        "audio": {
+          "$ref": "#/$defs/AudioRef"
+        }
+      },
+      "required": [
+        "format",
+        "prompt",
+        "durationMs",
+        "audio"
+      ]
+    },
+    "AudioVoiceViewerQuestion": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "AUDIO_VOICE"
+          ]
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "durationMs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1800000
+        },
+        "hint": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        }
+      },
+      "required": [
+        "format",
+        "prompt",
+        "durationMs"
+      ]
+    },
+    "AudioVoiceHostQuestion": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "AUDIO_VOICE"
+          ]
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "durationMs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1800000
+        },
+        "hint": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "audio": {
+          "$ref": "#/$defs/AudioRef"
+        }
+      },
+      "required": [
+        "format",
+        "prompt",
+        "durationMs",
+        "audio"
+      ]
+    },
+    "HostQuestion": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/StandardQuestion"
+        },
+        {
+          "$ref": "#/$defs/ImageBlurQuestion"
+        },
+        {
+          "$ref": "#/$defs/ImageZoomQuestion"
+        },
+        {
+          "$ref": "#/$defs/ImagePersonQuestion"
+        },
+        {
+          "$ref": "#/$defs/ImageColorQuestion"
+        },
+        {
+          "$ref": "#/$defs/ImageRiddleQuestion"
+        },
+        {
+          "$ref": "#/$defs/MemoryQuestion"
+        },
+        {
+          "$ref": "#/$defs/AudioGuessHostQuestion"
+        },
+        {
+          "$ref": "#/$defs/AudioReverseHostQuestion"
+        },
+        {
+          "$ref": "#/$defs/AudioVoiceHostQuestion"
+        }
+      ]
+    },
+    "ViewerQuestion": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/StandardQuestion"
+        },
+        {
+          "$ref": "#/$defs/ImageBlurQuestion"
+        },
+        {
+          "$ref": "#/$defs/ImageZoomQuestion"
+        },
+        {
+          "$ref": "#/$defs/ImagePersonQuestion"
+        },
+        {
+          "$ref": "#/$defs/ImageColorQuestion"
+        },
+        {
+          "$ref": "#/$defs/ImageRiddleQuestion"
+        },
+        {
+          "$ref": "#/$defs/MemoryQuestion"
+        },
+        {
+          "$ref": "#/$defs/AudioGuessViewerQuestion"
+        },
+        {
+          "$ref": "#/$defs/AudioReverseViewerQuestion"
+        },
+        {
+          "$ref": "#/$defs/AudioVoiceViewerQuestion"
+        }
+      ]
+    },
+    "StandardViewerAnswer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "STANDARD"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "image": {
+          "$ref": "#/$defs/ImageRef"
+        }
+      },
+      "required": [
+        "format",
+        "text"
+      ]
+    },
+    "StandardHostAnswer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "STANDARD"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "image": {
+          "$ref": "#/$defs/ImageRef"
+        }
+      },
+      "required": [
+        "format",
+        "text"
+      ]
+    },
+    "ImageBlurViewerAnswer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "IMAGE_BLUR"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "image": {
+          "$ref": "#/$defs/ImageRef"
+        }
+      },
+      "required": [
+        "format",
+        "text",
+        "image"
+      ]
+    },
+    "ImageBlurHostAnswer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "IMAGE_BLUR"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "image": {
+          "$ref": "#/$defs/ImageRef"
+        }
+      },
+      "required": [
+        "format",
+        "text",
+        "image"
+      ]
+    },
+    "ImageZoomViewerAnswer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "IMAGE_ZOOM"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "image": {
+          "$ref": "#/$defs/ImageRef"
+        }
+      },
+      "required": [
+        "format",
+        "text",
+        "image"
+      ]
+    },
+    "ImageZoomHostAnswer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "IMAGE_ZOOM"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "image": {
+          "$ref": "#/$defs/ImageRef"
+        }
+      },
+      "required": [
+        "format",
+        "text",
+        "image"
+      ]
+    },
+    "AudioGuessViewerAnswer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "AUDIO_GUESS"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        }
+      },
+      "required": [
+        "format",
+        "text"
+      ]
+    },
+    "AudioGuessHostAnswer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "AUDIO_GUESS"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        }
+      },
+      "required": [
+        "format",
+        "text"
+      ]
+    },
+    "AudioReverseViewerAnswer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "AUDIO_REVERSE"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        }
+      },
+      "required": [
+        "format",
+        "text"
+      ]
+    },
+    "AudioReverseHostAnswer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "AUDIO_REVERSE"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "forwardAudio": {
+          "$ref": "#/$defs/AudioRef"
+        }
+      },
+      "required": [
+        "format",
+        "text"
+      ]
+    },
+    "ImagePersonViewerAnswer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "IMAGE_PERSON"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "image": {
+          "$ref": "#/$defs/ImageRef"
+        }
+      },
+      "required": [
+        "format",
+        "text",
+        "image"
+      ]
+    },
+    "ImagePersonHostAnswer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "IMAGE_PERSON"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "image": {
+          "$ref": "#/$defs/ImageRef"
+        }
+      },
+      "required": [
+        "format",
+        "text",
+        "image"
+      ]
+    },
+    "ImageColorViewerAnswer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "IMAGE_COLOR"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "image": {
+          "$ref": "#/$defs/ImageRef"
+        },
+        "colorHex": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        }
+      },
+      "required": [
+        "format",
+        "text",
+        "image"
+      ]
+    },
+    "ImageColorHostAnswer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "IMAGE_COLOR"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "image": {
+          "$ref": "#/$defs/ImageRef"
+        },
+        "colorHex": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        }
+      },
+      "required": [
+        "format",
+        "text",
+        "image"
+      ]
+    },
+    "ImageRiddleViewerAnswer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "IMAGE_RIDDLE"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "image": {
+          "$ref": "#/$defs/ImageRef"
+        }
+      },
+      "required": [
+        "format",
+        "text"
+      ]
+    },
+    "ImageRiddleHostAnswer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "IMAGE_RIDDLE"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "image": {
+          "$ref": "#/$defs/ImageRef"
+        }
+      },
+      "required": [
+        "format",
+        "text"
+      ]
+    },
+    "AudioVoiceViewerAnswer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "AUDIO_VOICE"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        }
+      },
+      "required": [
+        "format",
+        "text"
+      ]
+    },
+    "AudioVoiceHostAnswer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "AUDIO_VOICE"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        }
+      },
+      "required": [
+        "format",
+        "text"
+      ]
+    },
+    "ImageMemoryViewerAnswer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "IMAGE_MEMORY"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "image": {
+          "$ref": "#/$defs/ImageRef"
+        }
+      },
+      "required": [
+        "format",
+        "text",
+        "image"
+      ]
+    },
+    "ImageMemoryHostAnswer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "IMAGE_MEMORY"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "image": {
+          "$ref": "#/$defs/ImageRef"
+        }
+      },
+      "required": [
+        "format",
+        "text",
+        "image"
+      ]
+    },
+    "Controls": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "open_question",
+          "return_to_board",
+          "advance_hint",
+          "show_memory",
+          "hide_memory",
+          "pause_timer",
+          "resume_timer",
+          "reset_timer",
+          "reveal_answer",
+          "resolve_question",
+          "adjust_score",
+          "end_game"
+        ]
+      },
+      "minItems": 0,
+      "maxItems": 12
+    },
+    "Tile": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "questionPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "basePoints": {
+          "type": "integer",
+          "enum": [
+            200,
+            400,
+            600
+          ]
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "unopened",
+            "opened",
+            "revealed",
+            "resolved"
+          ]
+        },
+        "winningTeamNumber": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "enum": [
+            1,
+            2,
+            null
+          ]
+        },
+        "awardedPoints": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 600
+        }
+      },
+      "required": [
+        "questionPosition",
+        "basePoints",
+        "state"
+      ]
+    },
+    "BoardCategory": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "boardPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "categoryId": {
+          "$ref": "#/$defs/Id"
+        },
+        "packId": {
+          "$ref": "#/$defs/Id"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "tiles": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Tile"
+          },
+          "minItems": 6,
+          "maxItems": 6
+        }
+      },
+      "required": [
+        "boardPosition",
+        "categoryId",
+        "packId",
+        "name",
+        "tiles"
+      ]
+    },
+    "LobbyView": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "lobby"
+          ]
+        },
+        "audience": {
+          "type": "string",
+          "enum": [
+            "host",
+            "viewer"
+          ]
+        },
+        "roomId": {
+          "$ref": "#/$defs/Id"
+        },
+        "teamOneName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "teamTwoName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "members": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Member"
+          },
+          "minItems": 1,
+          "maxItems": 6
+        },
+        "selections": {
+          "$ref": "#/$defs/Selections"
+        },
+        "readyGeneration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "idleExpiresAt": {
+          "$ref": "#/$defs/Time"
+        },
+        "previousGameId": {
+          "$ref": "#/$defs/Id"
+        }
+      },
+      "required": [
+        "phase",
+        "audience",
+        "roomId",
+        "teamOneName",
+        "teamTwoName",
+        "members",
+        "selections",
+        "readyGeneration",
+        "idleExpiresAt"
+      ]
+    },
+    "BoardView": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "board"
+          ]
+        },
+        "audience": {
+          "type": "string",
+          "enum": [
+            "host",
+            "viewer"
+          ]
+        },
+        "roomId": {
+          "$ref": "#/$defs/Id"
+        },
+        "gameId": {
+          "$ref": "#/$defs/Id"
+        },
+        "teams": {
+          "$ref": "#/$defs/Teams"
+        },
+        "board": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/BoardCategory"
+          },
+          "minItems": 6,
+          "maxItems": 6
+        },
+        "idleExpiresAt": {
+          "$ref": "#/$defs/Time"
+        }
+      },
+      "required": [
+        "phase",
+        "audience",
+        "roomId",
+        "gameId",
+        "teams",
+        "board",
+        "idleExpiresAt"
+      ]
+    },
+    "HostQuestionView": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "question"
+          ]
+        },
+        "audience": {
+          "type": "string",
+          "enum": [
+            "host"
+          ]
+        },
+        "roomId": {
+          "$ref": "#/$defs/Id"
+        },
+        "gameId": {
+          "$ref": "#/$defs/Id"
+        },
+        "boardPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "questionPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "basePoints": {
+          "type": "integer",
+          "enum": [
+            200,
+            400,
+            600
+          ]
+        },
+        "suggestedPoints": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600
+        },
+        "teams": {
+          "$ref": "#/$defs/Teams"
+        },
+        "timer": {
+          "$ref": "#/$defs/Timer"
+        },
+        "idleExpiresAt": {
+          "$ref": "#/$defs/Time"
+        },
+        "question": {
+          "$ref": "#/$defs/HostQuestion"
+        },
+        "controls": {
+          "$ref": "#/$defs/Controls"
+        }
+      },
+      "required": [
+        "phase",
+        "audience",
+        "roomId",
+        "gameId",
+        "boardPosition",
+        "questionPosition",
+        "basePoints",
+        "suggestedPoints",
+        "teams",
+        "timer",
+        "idleExpiresAt",
+        "question",
+        "controls"
+      ]
+    },
+    "HostAnswerView": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/HostStandardAnswerView"
+        },
+        {
+          "$ref": "#/$defs/HostImageBlurAnswerView"
+        },
+        {
+          "$ref": "#/$defs/HostImageZoomAnswerView"
+        },
+        {
+          "$ref": "#/$defs/HostAudioGuessAnswerView"
+        },
+        {
+          "$ref": "#/$defs/HostAudioReverseAnswerView"
+        },
+        {
+          "$ref": "#/$defs/HostImagePersonAnswerView"
+        },
+        {
+          "$ref": "#/$defs/HostImageColorAnswerView"
+        },
+        {
+          "$ref": "#/$defs/HostImageRiddleAnswerView"
+        },
+        {
+          "$ref": "#/$defs/HostAudioVoiceAnswerView"
+        },
+        {
+          "$ref": "#/$defs/HostImageMemoryAnswerView"
+        }
+      ]
+    },
+    "ViewerQuestionView": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "question"
+          ]
+        },
+        "audience": {
+          "type": "string",
+          "enum": [
+            "viewer"
+          ]
+        },
+        "roomId": {
+          "$ref": "#/$defs/Id"
+        },
+        "gameId": {
+          "$ref": "#/$defs/Id"
+        },
+        "boardPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "questionPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "basePoints": {
+          "type": "integer",
+          "enum": [
+            200,
+            400,
+            600
+          ]
+        },
+        "suggestedPoints": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600
+        },
+        "teams": {
+          "$ref": "#/$defs/Teams"
+        },
+        "timer": {
+          "$ref": "#/$defs/Timer"
+        },
+        "idleExpiresAt": {
+          "$ref": "#/$defs/Time"
+        },
+        "question": {
+          "$ref": "#/$defs/ViewerQuestion"
+        }
+      },
+      "required": [
+        "phase",
+        "audience",
+        "roomId",
+        "gameId",
+        "boardPosition",
+        "questionPosition",
+        "basePoints",
+        "suggestedPoints",
+        "teams",
+        "timer",
+        "idleExpiresAt",
+        "question"
+      ]
+    },
+    "ViewerAnswerView": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ViewerStandardAnswerView"
+        },
+        {
+          "$ref": "#/$defs/ViewerImageBlurAnswerView"
+        },
+        {
+          "$ref": "#/$defs/ViewerImageZoomAnswerView"
+        },
+        {
+          "$ref": "#/$defs/ViewerAudioGuessAnswerView"
+        },
+        {
+          "$ref": "#/$defs/ViewerAudioReverseAnswerView"
+        },
+        {
+          "$ref": "#/$defs/ViewerImagePersonAnswerView"
+        },
+        {
+          "$ref": "#/$defs/ViewerImageColorAnswerView"
+        },
+        {
+          "$ref": "#/$defs/ViewerImageRiddleAnswerView"
+        },
+        {
+          "$ref": "#/$defs/ViewerAudioVoiceAnswerView"
+        },
+        {
+          "$ref": "#/$defs/ViewerImageMemoryAnswerView"
+        }
+      ]
+    },
+    "CategoryResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "boardPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "categoryId": {
+          "$ref": "#/$defs/Id"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "resolvedCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 6
+        },
+        "teamOneAwardPoints": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2400
+        },
+        "teamTwoAwardPoints": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2400
+        },
+        "winningTeamNumber": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "enum": [
+            1,
+            2,
+            null
+          ]
+        }
+      },
+      "required": [
+        "boardPosition",
+        "categoryId",
+        "name",
+        "resolvedCount",
+        "teamOneAwardPoints",
+        "teamTwoAwardPoints",
+        "winningTeamNumber"
+      ]
+    },
+    "ResultTeam": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "number": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "score": {
+          "$ref": "#/$defs/Score"
+        },
+        "questionAwardTotal": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 14400
+        },
+        "manualAdjustmentTotal": {
+          "$ref": "#/$defs/SignedInteger"
+        }
+      },
+      "required": [
+        "number",
+        "name",
+        "score",
+        "questionAwardTotal",
+        "manualAdjustmentTotal"
+      ]
+    },
+    "Result": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "gameId": {
+          "$ref": "#/$defs/Id"
+        },
+        "roomId": {
+          "$ref": "#/$defs/Id"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "finished",
+            "expired",
+            "failed"
+          ]
+        },
+        "endReason": {
+          "type": "string",
+          "enum": [
+            "completed",
+            "host_ended",
+            "host_left",
+            "idle_timeout",
+            "platform_failure"
+          ]
+        },
+        "endedAt": {
+          "$ref": "#/$defs/Time"
+        },
+        "resolvedQuestionCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 36
+        },
+        "winningTeamNumber": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "enum": [
+            1,
+            2,
+            null
+          ]
+        },
+        "teams": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResultTeam"
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "categories": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CategoryResult"
+          },
+          "minItems": 6,
+          "maxItems": 6
+        }
+      },
+      "required": [
+        "gameId",
+        "roomId",
+        "status",
+        "endReason",
+        "endedAt",
+        "resolvedQuestionCount",
+        "winningTeamNumber",
+        "teams",
+        "categories"
+      ]
+    },
+    "ResultView": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "result"
+          ]
+        },
+        "audience": {
+          "type": "string",
+          "enum": [
+            "host",
+            "viewer"
+          ]
+        },
+        "result": {
+          "$ref": "#/$defs/Result"
+        }
+      },
+      "required": [
+        "phase",
+        "audience",
+        "result"
+      ]
+    },
+    "Empty": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {}
+    },
+    "MemoryAnsweredQuestion": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/MemoryRecall"
+        },
+        {
+          "$ref": "#/$defs/MemoryRevisit"
+        }
+      ]
+    },
+    "HostStandardAnswerView": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "answer"
+          ]
+        },
+        "audience": {
+          "type": "string",
+          "enum": [
+            "host"
+          ]
+        },
+        "roomId": {
+          "$ref": "#/$defs/Id"
+        },
+        "gameId": {
+          "$ref": "#/$defs/Id"
+        },
+        "boardPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "questionPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "basePoints": {
+          "type": "integer",
+          "enum": [
+            200,
+            400,
+            600
+          ]
+        },
+        "suggestedPoints": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600
+        },
+        "teams": {
+          "$ref": "#/$defs/Teams"
+        },
+        "timer": {
+          "$ref": "#/$defs/Timer"
+        },
+        "idleExpiresAt": {
+          "$ref": "#/$defs/Time"
+        },
+        "question": {
+          "$ref": "#/$defs/StandardQuestion"
+        },
+        "answer": {
+          "$ref": "#/$defs/StandardHostAnswer"
+        },
+        "controls": {
+          "$ref": "#/$defs/Controls"
+        },
+        "feedback": {
+          "$ref": "#/$defs/Feedback"
+        }
+      },
+      "required": [
+        "phase",
+        "audience",
+        "roomId",
+        "gameId",
+        "boardPosition",
+        "questionPosition",
+        "basePoints",
+        "suggestedPoints",
+        "teams",
+        "timer",
+        "idleExpiresAt",
+        "question",
+        "answer",
+        "controls",
+        "feedback"
+      ]
+    },
+    "HostImageBlurAnswerView": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "answer"
+          ]
+        },
+        "audience": {
+          "type": "string",
+          "enum": [
+            "host"
+          ]
+        },
+        "roomId": {
+          "$ref": "#/$defs/Id"
+        },
+        "gameId": {
+          "$ref": "#/$defs/Id"
+        },
+        "boardPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "questionPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "basePoints": {
+          "type": "integer",
+          "enum": [
+            200,
+            400,
+            600
+          ]
+        },
+        "suggestedPoints": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600
+        },
+        "teams": {
+          "$ref": "#/$defs/Teams"
+        },
+        "timer": {
+          "$ref": "#/$defs/Timer"
+        },
+        "idleExpiresAt": {
+          "$ref": "#/$defs/Time"
+        },
+        "question": {
+          "$ref": "#/$defs/ImageBlurQuestion"
+        },
+        "answer": {
+          "$ref": "#/$defs/ImageBlurHostAnswer"
+        },
+        "controls": {
+          "$ref": "#/$defs/Controls"
+        },
+        "feedback": {
+          "$ref": "#/$defs/Feedback"
+        }
+      },
+      "required": [
+        "phase",
+        "audience",
+        "roomId",
+        "gameId",
+        "boardPosition",
+        "questionPosition",
+        "basePoints",
+        "suggestedPoints",
+        "teams",
+        "timer",
+        "idleExpiresAt",
+        "question",
+        "answer",
+        "controls",
+        "feedback"
+      ]
+    },
+    "HostImageZoomAnswerView": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "answer"
+          ]
+        },
+        "audience": {
+          "type": "string",
+          "enum": [
+            "host"
+          ]
+        },
+        "roomId": {
+          "$ref": "#/$defs/Id"
+        },
+        "gameId": {
+          "$ref": "#/$defs/Id"
+        },
+        "boardPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "questionPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "basePoints": {
+          "type": "integer",
+          "enum": [
+            200,
+            400,
+            600
+          ]
+        },
+        "suggestedPoints": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600
+        },
+        "teams": {
+          "$ref": "#/$defs/Teams"
+        },
+        "timer": {
+          "$ref": "#/$defs/Timer"
+        },
+        "idleExpiresAt": {
+          "$ref": "#/$defs/Time"
+        },
+        "question": {
+          "$ref": "#/$defs/ImageZoomQuestion"
+        },
+        "answer": {
+          "$ref": "#/$defs/ImageZoomHostAnswer"
+        },
+        "controls": {
+          "$ref": "#/$defs/Controls"
+        },
+        "feedback": {
+          "$ref": "#/$defs/Feedback"
+        }
+      },
+      "required": [
+        "phase",
+        "audience",
+        "roomId",
+        "gameId",
+        "boardPosition",
+        "questionPosition",
+        "basePoints",
+        "suggestedPoints",
+        "teams",
+        "timer",
+        "idleExpiresAt",
+        "question",
+        "answer",
+        "controls",
+        "feedback"
+      ]
+    },
+    "HostAudioGuessAnswerView": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "answer"
+          ]
+        },
+        "audience": {
+          "type": "string",
+          "enum": [
+            "host"
+          ]
+        },
+        "roomId": {
+          "$ref": "#/$defs/Id"
+        },
+        "gameId": {
+          "$ref": "#/$defs/Id"
+        },
+        "boardPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "questionPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "basePoints": {
+          "type": "integer",
+          "enum": [
+            200,
+            400,
+            600
+          ]
+        },
+        "suggestedPoints": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600
+        },
+        "teams": {
+          "$ref": "#/$defs/Teams"
+        },
+        "timer": {
+          "$ref": "#/$defs/Timer"
+        },
+        "idleExpiresAt": {
+          "$ref": "#/$defs/Time"
+        },
+        "question": {
+          "$ref": "#/$defs/AudioGuessHostQuestion"
+        },
+        "answer": {
+          "$ref": "#/$defs/AudioGuessHostAnswer"
+        },
+        "controls": {
+          "$ref": "#/$defs/Controls"
+        },
+        "feedback": {
+          "$ref": "#/$defs/Feedback"
+        }
+      },
+      "required": [
+        "phase",
+        "audience",
+        "roomId",
+        "gameId",
+        "boardPosition",
+        "questionPosition",
+        "basePoints",
+        "suggestedPoints",
+        "teams",
+        "timer",
+        "idleExpiresAt",
+        "question",
+        "answer",
+        "controls",
+        "feedback"
+      ]
+    },
+    "HostAudioReverseAnswerView": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "answer"
+          ]
+        },
+        "audience": {
+          "type": "string",
+          "enum": [
+            "host"
+          ]
+        },
+        "roomId": {
+          "$ref": "#/$defs/Id"
+        },
+        "gameId": {
+          "$ref": "#/$defs/Id"
+        },
+        "boardPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "questionPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "basePoints": {
+          "type": "integer",
+          "enum": [
+            200,
+            400,
+            600
+          ]
+        },
+        "suggestedPoints": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600
+        },
+        "teams": {
+          "$ref": "#/$defs/Teams"
+        },
+        "timer": {
+          "$ref": "#/$defs/Timer"
+        },
+        "idleExpiresAt": {
+          "$ref": "#/$defs/Time"
+        },
+        "question": {
+          "$ref": "#/$defs/AudioReverseHostQuestion"
+        },
+        "answer": {
+          "$ref": "#/$defs/AudioReverseHostAnswer"
+        },
+        "controls": {
+          "$ref": "#/$defs/Controls"
+        },
+        "feedback": {
+          "$ref": "#/$defs/Feedback"
+        }
+      },
+      "required": [
+        "phase",
+        "audience",
+        "roomId",
+        "gameId",
+        "boardPosition",
+        "questionPosition",
+        "basePoints",
+        "suggestedPoints",
+        "teams",
+        "timer",
+        "idleExpiresAt",
+        "question",
+        "answer",
+        "controls",
+        "feedback"
+      ]
+    },
+    "HostImagePersonAnswerView": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "answer"
+          ]
+        },
+        "audience": {
+          "type": "string",
+          "enum": [
+            "host"
+          ]
+        },
+        "roomId": {
+          "$ref": "#/$defs/Id"
+        },
+        "gameId": {
+          "$ref": "#/$defs/Id"
+        },
+        "boardPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "questionPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "basePoints": {
+          "type": "integer",
+          "enum": [
+            200,
+            400,
+            600
+          ]
+        },
+        "suggestedPoints": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600
+        },
+        "teams": {
+          "$ref": "#/$defs/Teams"
+        },
+        "timer": {
+          "$ref": "#/$defs/Timer"
+        },
+        "idleExpiresAt": {
+          "$ref": "#/$defs/Time"
+        },
+        "question": {
+          "$ref": "#/$defs/ImagePersonQuestion"
+        },
+        "answer": {
+          "$ref": "#/$defs/ImagePersonHostAnswer"
+        },
+        "controls": {
+          "$ref": "#/$defs/Controls"
+        },
+        "feedback": {
+          "$ref": "#/$defs/Feedback"
+        }
+      },
+      "required": [
+        "phase",
+        "audience",
+        "roomId",
+        "gameId",
+        "boardPosition",
+        "questionPosition",
+        "basePoints",
+        "suggestedPoints",
+        "teams",
+        "timer",
+        "idleExpiresAt",
+        "question",
+        "answer",
+        "controls",
+        "feedback"
+      ]
+    },
+    "HostImageColorAnswerView": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "answer"
+          ]
+        },
+        "audience": {
+          "type": "string",
+          "enum": [
+            "host"
+          ]
+        },
+        "roomId": {
+          "$ref": "#/$defs/Id"
+        },
+        "gameId": {
+          "$ref": "#/$defs/Id"
+        },
+        "boardPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "questionPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "basePoints": {
+          "type": "integer",
+          "enum": [
+            200,
+            400,
+            600
+          ]
+        },
+        "suggestedPoints": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600
+        },
+        "teams": {
+          "$ref": "#/$defs/Teams"
+        },
+        "timer": {
+          "$ref": "#/$defs/Timer"
+        },
+        "idleExpiresAt": {
+          "$ref": "#/$defs/Time"
+        },
+        "question": {
+          "$ref": "#/$defs/ImageColorQuestion"
+        },
+        "answer": {
+          "$ref": "#/$defs/ImageColorHostAnswer"
+        },
+        "controls": {
+          "$ref": "#/$defs/Controls"
+        },
+        "feedback": {
+          "$ref": "#/$defs/Feedback"
+        }
+      },
+      "required": [
+        "phase",
+        "audience",
+        "roomId",
+        "gameId",
+        "boardPosition",
+        "questionPosition",
+        "basePoints",
+        "suggestedPoints",
+        "teams",
+        "timer",
+        "idleExpiresAt",
+        "question",
+        "answer",
+        "controls",
+        "feedback"
+      ]
+    },
+    "HostImageRiddleAnswerView": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "answer"
+          ]
+        },
+        "audience": {
+          "type": "string",
+          "enum": [
+            "host"
+          ]
+        },
+        "roomId": {
+          "$ref": "#/$defs/Id"
+        },
+        "gameId": {
+          "$ref": "#/$defs/Id"
+        },
+        "boardPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "questionPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "basePoints": {
+          "type": "integer",
+          "enum": [
+            200,
+            400,
+            600
+          ]
+        },
+        "suggestedPoints": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600
+        },
+        "teams": {
+          "$ref": "#/$defs/Teams"
+        },
+        "timer": {
+          "$ref": "#/$defs/Timer"
+        },
+        "idleExpiresAt": {
+          "$ref": "#/$defs/Time"
+        },
+        "question": {
+          "$ref": "#/$defs/ImageRiddleQuestion"
+        },
+        "answer": {
+          "$ref": "#/$defs/ImageRiddleHostAnswer"
+        },
+        "controls": {
+          "$ref": "#/$defs/Controls"
+        },
+        "feedback": {
+          "$ref": "#/$defs/Feedback"
+        }
+      },
+      "required": [
+        "phase",
+        "audience",
+        "roomId",
+        "gameId",
+        "boardPosition",
+        "questionPosition",
+        "basePoints",
+        "suggestedPoints",
+        "teams",
+        "timer",
+        "idleExpiresAt",
+        "question",
+        "answer",
+        "controls",
+        "feedback"
+      ]
+    },
+    "HostAudioVoiceAnswerView": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "answer"
+          ]
+        },
+        "audience": {
+          "type": "string",
+          "enum": [
+            "host"
+          ]
+        },
+        "roomId": {
+          "$ref": "#/$defs/Id"
+        },
+        "gameId": {
+          "$ref": "#/$defs/Id"
+        },
+        "boardPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "questionPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "basePoints": {
+          "type": "integer",
+          "enum": [
+            200,
+            400,
+            600
+          ]
+        },
+        "suggestedPoints": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600
+        },
+        "teams": {
+          "$ref": "#/$defs/Teams"
+        },
+        "timer": {
+          "$ref": "#/$defs/Timer"
+        },
+        "idleExpiresAt": {
+          "$ref": "#/$defs/Time"
+        },
+        "question": {
+          "$ref": "#/$defs/AudioVoiceHostQuestion"
+        },
+        "answer": {
+          "$ref": "#/$defs/AudioVoiceHostAnswer"
+        },
+        "controls": {
+          "$ref": "#/$defs/Controls"
+        },
+        "feedback": {
+          "$ref": "#/$defs/Feedback"
+        }
+      },
+      "required": [
+        "phase",
+        "audience",
+        "roomId",
+        "gameId",
+        "boardPosition",
+        "questionPosition",
+        "basePoints",
+        "suggestedPoints",
+        "teams",
+        "timer",
+        "idleExpiresAt",
+        "question",
+        "answer",
+        "controls",
+        "feedback"
+      ]
+    },
+    "HostImageMemoryAnswerView": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "answer"
+          ]
+        },
+        "audience": {
+          "type": "string",
+          "enum": [
+            "host"
+          ]
+        },
+        "roomId": {
+          "$ref": "#/$defs/Id"
+        },
+        "gameId": {
+          "$ref": "#/$defs/Id"
+        },
+        "boardPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "questionPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "basePoints": {
+          "type": "integer",
+          "enum": [
+            200,
+            400,
+            600
+          ]
+        },
+        "suggestedPoints": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600
+        },
+        "teams": {
+          "$ref": "#/$defs/Teams"
+        },
+        "timer": {
+          "$ref": "#/$defs/Timer"
+        },
+        "idleExpiresAt": {
+          "$ref": "#/$defs/Time"
+        },
+        "question": {
+          "$ref": "#/$defs/MemoryAnsweredQuestion"
+        },
+        "answer": {
+          "$ref": "#/$defs/ImageMemoryHostAnswer"
+        },
+        "controls": {
+          "$ref": "#/$defs/Controls"
+        },
+        "feedback": {
+          "$ref": "#/$defs/Feedback"
+        }
+      },
+      "required": [
+        "phase",
+        "audience",
+        "roomId",
+        "gameId",
+        "boardPosition",
+        "questionPosition",
+        "basePoints",
+        "suggestedPoints",
+        "teams",
+        "timer",
+        "idleExpiresAt",
+        "question",
+        "answer",
+        "controls",
+        "feedback"
+      ]
+    },
+    "ViewerStandardAnswerView": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "answer"
+          ]
+        },
+        "audience": {
+          "type": "string",
+          "enum": [
+            "viewer"
+          ]
+        },
+        "roomId": {
+          "$ref": "#/$defs/Id"
+        },
+        "gameId": {
+          "$ref": "#/$defs/Id"
+        },
+        "boardPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "questionPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "basePoints": {
+          "type": "integer",
+          "enum": [
+            200,
+            400,
+            600
+          ]
+        },
+        "suggestedPoints": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600
+        },
+        "teams": {
+          "$ref": "#/$defs/Teams"
+        },
+        "timer": {
+          "$ref": "#/$defs/Timer"
+        },
+        "idleExpiresAt": {
+          "$ref": "#/$defs/Time"
+        },
+        "question": {
+          "$ref": "#/$defs/StandardQuestion"
+        },
+        "answer": {
+          "$ref": "#/$defs/StandardViewerAnswer"
+        }
+      },
+      "required": [
+        "phase",
+        "audience",
+        "roomId",
+        "gameId",
+        "boardPosition",
+        "questionPosition",
+        "basePoints",
+        "suggestedPoints",
+        "teams",
+        "timer",
+        "idleExpiresAt",
+        "question",
+        "answer"
+      ]
+    },
+    "ViewerImageBlurAnswerView": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "answer"
+          ]
+        },
+        "audience": {
+          "type": "string",
+          "enum": [
+            "viewer"
+          ]
+        },
+        "roomId": {
+          "$ref": "#/$defs/Id"
+        },
+        "gameId": {
+          "$ref": "#/$defs/Id"
+        },
+        "boardPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "questionPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "basePoints": {
+          "type": "integer",
+          "enum": [
+            200,
+            400,
+            600
+          ]
+        },
+        "suggestedPoints": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600
+        },
+        "teams": {
+          "$ref": "#/$defs/Teams"
+        },
+        "timer": {
+          "$ref": "#/$defs/Timer"
+        },
+        "idleExpiresAt": {
+          "$ref": "#/$defs/Time"
+        },
+        "question": {
+          "$ref": "#/$defs/ImageBlurQuestion"
+        },
+        "answer": {
+          "$ref": "#/$defs/ImageBlurViewerAnswer"
+        }
+      },
+      "required": [
+        "phase",
+        "audience",
+        "roomId",
+        "gameId",
+        "boardPosition",
+        "questionPosition",
+        "basePoints",
+        "suggestedPoints",
+        "teams",
+        "timer",
+        "idleExpiresAt",
+        "question",
+        "answer"
+      ]
+    },
+    "ViewerImageZoomAnswerView": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "answer"
+          ]
+        },
+        "audience": {
+          "type": "string",
+          "enum": [
+            "viewer"
+          ]
+        },
+        "roomId": {
+          "$ref": "#/$defs/Id"
+        },
+        "gameId": {
+          "$ref": "#/$defs/Id"
+        },
+        "boardPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "questionPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "basePoints": {
+          "type": "integer",
+          "enum": [
+            200,
+            400,
+            600
+          ]
+        },
+        "suggestedPoints": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600
+        },
+        "teams": {
+          "$ref": "#/$defs/Teams"
+        },
+        "timer": {
+          "$ref": "#/$defs/Timer"
+        },
+        "idleExpiresAt": {
+          "$ref": "#/$defs/Time"
+        },
+        "question": {
+          "$ref": "#/$defs/ImageZoomQuestion"
+        },
+        "answer": {
+          "$ref": "#/$defs/ImageZoomViewerAnswer"
+        }
+      },
+      "required": [
+        "phase",
+        "audience",
+        "roomId",
+        "gameId",
+        "boardPosition",
+        "questionPosition",
+        "basePoints",
+        "suggestedPoints",
+        "teams",
+        "timer",
+        "idleExpiresAt",
+        "question",
+        "answer"
+      ]
+    },
+    "ViewerAudioGuessAnswerView": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "answer"
+          ]
+        },
+        "audience": {
+          "type": "string",
+          "enum": [
+            "viewer"
+          ]
+        },
+        "roomId": {
+          "$ref": "#/$defs/Id"
+        },
+        "gameId": {
+          "$ref": "#/$defs/Id"
+        },
+        "boardPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "questionPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "basePoints": {
+          "type": "integer",
+          "enum": [
+            200,
+            400,
+            600
+          ]
+        },
+        "suggestedPoints": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600
+        },
+        "teams": {
+          "$ref": "#/$defs/Teams"
+        },
+        "timer": {
+          "$ref": "#/$defs/Timer"
+        },
+        "idleExpiresAt": {
+          "$ref": "#/$defs/Time"
+        },
+        "question": {
+          "$ref": "#/$defs/AudioGuessViewerQuestion"
+        },
+        "answer": {
+          "$ref": "#/$defs/AudioGuessViewerAnswer"
+        }
+      },
+      "required": [
+        "phase",
+        "audience",
+        "roomId",
+        "gameId",
+        "boardPosition",
+        "questionPosition",
+        "basePoints",
+        "suggestedPoints",
+        "teams",
+        "timer",
+        "idleExpiresAt",
+        "question",
+        "answer"
+      ]
+    },
+    "ViewerAudioReverseAnswerView": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "answer"
+          ]
+        },
+        "audience": {
+          "type": "string",
+          "enum": [
+            "viewer"
+          ]
+        },
+        "roomId": {
+          "$ref": "#/$defs/Id"
+        },
+        "gameId": {
+          "$ref": "#/$defs/Id"
+        },
+        "boardPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "questionPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "basePoints": {
+          "type": "integer",
+          "enum": [
+            200,
+            400,
+            600
+          ]
+        },
+        "suggestedPoints": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600
+        },
+        "teams": {
+          "$ref": "#/$defs/Teams"
+        },
+        "timer": {
+          "$ref": "#/$defs/Timer"
+        },
+        "idleExpiresAt": {
+          "$ref": "#/$defs/Time"
+        },
+        "question": {
+          "$ref": "#/$defs/AudioReverseViewerQuestion"
+        },
+        "answer": {
+          "$ref": "#/$defs/AudioReverseViewerAnswer"
+        }
+      },
+      "required": [
+        "phase",
+        "audience",
+        "roomId",
+        "gameId",
+        "boardPosition",
+        "questionPosition",
+        "basePoints",
+        "suggestedPoints",
+        "teams",
+        "timer",
+        "idleExpiresAt",
+        "question",
+        "answer"
+      ]
+    },
+    "ViewerImagePersonAnswerView": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "answer"
+          ]
+        },
+        "audience": {
+          "type": "string",
+          "enum": [
+            "viewer"
+          ]
+        },
+        "roomId": {
+          "$ref": "#/$defs/Id"
+        },
+        "gameId": {
+          "$ref": "#/$defs/Id"
+        },
+        "boardPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "questionPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "basePoints": {
+          "type": "integer",
+          "enum": [
+            200,
+            400,
+            600
+          ]
+        },
+        "suggestedPoints": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600
+        },
+        "teams": {
+          "$ref": "#/$defs/Teams"
+        },
+        "timer": {
+          "$ref": "#/$defs/Timer"
+        },
+        "idleExpiresAt": {
+          "$ref": "#/$defs/Time"
+        },
+        "question": {
+          "$ref": "#/$defs/ImagePersonQuestion"
+        },
+        "answer": {
+          "$ref": "#/$defs/ImagePersonViewerAnswer"
+        }
+      },
+      "required": [
+        "phase",
+        "audience",
+        "roomId",
+        "gameId",
+        "boardPosition",
+        "questionPosition",
+        "basePoints",
+        "suggestedPoints",
+        "teams",
+        "timer",
+        "idleExpiresAt",
+        "question",
+        "answer"
+      ]
+    },
+    "ViewerImageColorAnswerView": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "answer"
+          ]
+        },
+        "audience": {
+          "type": "string",
+          "enum": [
+            "viewer"
+          ]
+        },
+        "roomId": {
+          "$ref": "#/$defs/Id"
+        },
+        "gameId": {
+          "$ref": "#/$defs/Id"
+        },
+        "boardPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "questionPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "basePoints": {
+          "type": "integer",
+          "enum": [
+            200,
+            400,
+            600
+          ]
+        },
+        "suggestedPoints": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600
+        },
+        "teams": {
+          "$ref": "#/$defs/Teams"
+        },
+        "timer": {
+          "$ref": "#/$defs/Timer"
+        },
+        "idleExpiresAt": {
+          "$ref": "#/$defs/Time"
+        },
+        "question": {
+          "$ref": "#/$defs/ImageColorQuestion"
+        },
+        "answer": {
+          "$ref": "#/$defs/ImageColorViewerAnswer"
+        }
+      },
+      "required": [
+        "phase",
+        "audience",
+        "roomId",
+        "gameId",
+        "boardPosition",
+        "questionPosition",
+        "basePoints",
+        "suggestedPoints",
+        "teams",
+        "timer",
+        "idleExpiresAt",
+        "question",
+        "answer"
+      ]
+    },
+    "ViewerImageRiddleAnswerView": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "answer"
+          ]
+        },
+        "audience": {
+          "type": "string",
+          "enum": [
+            "viewer"
+          ]
+        },
+        "roomId": {
+          "$ref": "#/$defs/Id"
+        },
+        "gameId": {
+          "$ref": "#/$defs/Id"
+        },
+        "boardPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "questionPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "basePoints": {
+          "type": "integer",
+          "enum": [
+            200,
+            400,
+            600
+          ]
+        },
+        "suggestedPoints": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600
+        },
+        "teams": {
+          "$ref": "#/$defs/Teams"
+        },
+        "timer": {
+          "$ref": "#/$defs/Timer"
+        },
+        "idleExpiresAt": {
+          "$ref": "#/$defs/Time"
+        },
+        "question": {
+          "$ref": "#/$defs/ImageRiddleQuestion"
+        },
+        "answer": {
+          "$ref": "#/$defs/ImageRiddleViewerAnswer"
+        }
+      },
+      "required": [
+        "phase",
+        "audience",
+        "roomId",
+        "gameId",
+        "boardPosition",
+        "questionPosition",
+        "basePoints",
+        "suggestedPoints",
+        "teams",
+        "timer",
+        "idleExpiresAt",
+        "question",
+        "answer"
+      ]
+    },
+    "ViewerAudioVoiceAnswerView": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "answer"
+          ]
+        },
+        "audience": {
+          "type": "string",
+          "enum": [
+            "viewer"
+          ]
+        },
+        "roomId": {
+          "$ref": "#/$defs/Id"
+        },
+        "gameId": {
+          "$ref": "#/$defs/Id"
+        },
+        "boardPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "questionPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "basePoints": {
+          "type": "integer",
+          "enum": [
+            200,
+            400,
+            600
+          ]
+        },
+        "suggestedPoints": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600
+        },
+        "teams": {
+          "$ref": "#/$defs/Teams"
+        },
+        "timer": {
+          "$ref": "#/$defs/Timer"
+        },
+        "idleExpiresAt": {
+          "$ref": "#/$defs/Time"
+        },
+        "question": {
+          "$ref": "#/$defs/AudioVoiceViewerQuestion"
+        },
+        "answer": {
+          "$ref": "#/$defs/AudioVoiceViewerAnswer"
+        }
+      },
+      "required": [
+        "phase",
+        "audience",
+        "roomId",
+        "gameId",
+        "boardPosition",
+        "questionPosition",
+        "basePoints",
+        "suggestedPoints",
+        "teams",
+        "timer",
+        "idleExpiresAt",
+        "question",
+        "answer"
+      ]
+    },
+    "ViewerImageMemoryAnswerView": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "answer"
+          ]
+        },
+        "audience": {
+          "type": "string",
+          "enum": [
+            "viewer"
+          ]
+        },
+        "roomId": {
+          "$ref": "#/$defs/Id"
+        },
+        "gameId": {
+          "$ref": "#/$defs/Id"
+        },
+        "boardPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "questionPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "basePoints": {
+          "type": "integer",
+          "enum": [
+            200,
+            400,
+            600
+          ]
+        },
+        "suggestedPoints": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600
+        },
+        "teams": {
+          "$ref": "#/$defs/Teams"
+        },
+        "timer": {
+          "$ref": "#/$defs/Timer"
+        },
+        "idleExpiresAt": {
+          "$ref": "#/$defs/Time"
+        },
+        "question": {
+          "$ref": "#/$defs/MemoryAnsweredQuestion"
+        },
+        "answer": {
+          "$ref": "#/$defs/ImageMemoryViewerAnswer"
+        }
+      },
+      "required": [
+        "phase",
+        "audience",
+        "roomId",
+        "gameId",
+        "boardPosition",
+        "questionPosition",
+        "basePoints",
+        "suggestedPoints",
+        "teams",
+        "timer",
+        "idleExpiresAt",
+        "question",
+        "answer"
+      ]
+    },
+    "ClientAuthenticateData": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "protocolVersion": {
+          "type": "integer",
+          "enum": [
+            1
+          ]
+        },
+        "roomId": {
+          "$ref": "#/$defs/Id"
+        },
+        "language": {
+          "$ref": "#/$defs/Language"
+        },
+        "authorization": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 4096,
+          "pattern": "^Bearer [^\\s]+$",
+          "writeOnly": true
+        },
+        "controllerSecret": {
+          "$ref": "#/$defs/Secret"
+        }
+      },
+      "required": [
+        "protocolVersion",
+        "roomId",
+        "language",
+        "authorization"
+      ]
+    },
+    "ClientReauthenticateData": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "authorization": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 4096,
+          "pattern": "^Bearer [^\\s]+$",
+          "writeOnly": true
+        },
+        "controllerSecret": {
+          "$ref": "#/$defs/Secret"
+        }
+      },
+      "required": [
+        "authorization"
+      ]
+    },
+    "SetLanguageData": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "language": {
+          "$ref": "#/$defs/Language"
+        }
+      },
+      "required": [
+        "language"
+      ]
+    },
+    "PlaybackData": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "gameId": {
+          "$ref": "#/$defs/Id"
+        },
+        "media": {
+          "$ref": "#/$defs/AudioRef"
+        },
+        "controllerGeneration": {
+          "$ref": "#/$defs/Revision"
+        },
+        "gameVersion": {
+          "$ref": "#/$defs/Revision"
+        },
+        "playbackSequence": {
+          "$ref": "#/$defs/Revision"
+        },
+        "playing": {
+          "type": "boolean"
+        },
+        "positionMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1800000
+        }
+      },
+      "required": [
+        "gameId",
+        "media",
+        "controllerGeneration",
+        "gameVersion",
+        "playbackSequence",
+        "playing",
+        "positionMs"
+      ]
+    },
+    "ClientAuthenticateFrame": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "event": {
+          "type": "string",
+          "enum": [
+            "authenticate"
+          ]
+        },
+        "data": {
+          "$ref": "#/$defs/ClientAuthenticateData"
+        }
+      },
+      "required": [
+        "event",
+        "data"
+      ]
+    },
+    "ClientReauthenticateFrame": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "event": {
+          "type": "string",
+          "enum": [
+            "reauthenticate"
+          ]
+        },
+        "data": {
+          "$ref": "#/$defs/ClientReauthenticateData"
+        }
+      },
+      "required": [
+        "event",
+        "data"
+      ]
+    },
+    "ClientResyncFrame": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "event": {
+          "type": "string",
+          "enum": [
+            "resync"
+          ]
+        },
+        "data": {
+          "$ref": "#/$defs/Empty"
+        }
+      },
+      "required": [
+        "event",
+        "data"
+      ]
+    },
+    "ClientSetLanguageFrame": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "event": {
+          "type": "string",
+          "enum": [
+            "set_language"
+          ]
+        },
+        "data": {
+          "$ref": "#/$defs/SetLanguageData"
+        }
+      },
+      "required": [
+        "event",
+        "data"
+      ]
+    },
+    "ClientPlaybackStatusFrame": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "event": {
+          "type": "string",
+          "enum": [
+            "playback_status"
+          ]
+        },
+        "data": {
+          "$ref": "#/$defs/PlaybackData"
+        }
+      },
+      "required": [
+        "event",
+        "data"
+      ]
+    },
+    "AuthenticatedData": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "protocolVersion": {
+          "type": "integer",
+          "enum": [
+            1
+          ]
+        },
+        "streamId": {
+          "$ref": "#/$defs/Id"
+        },
+        "sequence": {
+          "$ref": "#/$defs/Revision"
+        },
+        "serverTime": {
+          "$ref": "#/$defs/Time"
+        },
+        "language": {
+          "$ref": "#/$defs/Language"
+        },
+        "credentialExpiresAt": {
+          "$ref": "#/$defs/Time"
+        }
+      },
+      "required": [
+        "protocolVersion",
+        "streamId",
+        "sequence",
+        "serverTime",
+        "language"
+      ]
+    },
+    "StateData": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ServerLobbyStateData"
+        },
+        {
+          "$ref": "#/$defs/ServerGameStateData"
+        }
+      ]
+    },
+    "PresenceData": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "protocolVersion": {
+          "type": "integer",
+          "enum": [
+            1
+          ]
+        },
+        "streamId": {
+          "$ref": "#/$defs/Id"
+        },
+        "sequence": {
+          "$ref": "#/$defs/Revision"
+        },
+        "serverTime": {
+          "$ref": "#/$defs/Time"
+        },
+        "processEpoch": {
+          "$ref": "#/$defs/Id"
+        },
+        "members": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "membershipId": {
+                "$ref": "#/$defs/Id"
+              },
+              "connected": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "membershipId",
+              "connected"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 6
+        },
+        "playback": {
+          "$ref": "#/$defs/Playback"
+        }
+      },
+      "required": [
+        "protocolVersion",
+        "streamId",
+        "sequence",
+        "serverTime",
+        "processEpoch",
+        "members"
+      ]
+    },
+    "ProtocolNoticeData": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "protocolVersion": {
+          "type": "integer",
+          "enum": [
+            1
+          ]
+        },
+        "streamId": {
+          "$ref": "#/$defs/Id"
+        },
+        "sequence": {
+          "$ref": "#/$defs/Revision"
+        },
+        "serverTime": {
+          "$ref": "#/$defs/Time"
+        },
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "requestId": {
+          "$ref": "#/$defs/Id"
+        }
+      },
+      "required": [
+        "protocolVersion",
+        "streamId",
+        "sequence",
+        "serverTime",
+        "code"
+      ]
+    },
+    "ServerAuthenticatedFrame": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "event": {
+          "type": "string",
+          "enum": [
+            "authenticated"
+          ]
+        },
+        "data": {
+          "$ref": "#/$defs/AuthenticatedData"
+        }
+      },
+      "required": [
+        "event",
+        "data"
+      ]
+    },
+    "ServerStateFrame": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "event": {
+          "type": "string",
+          "enum": [
+            "state"
+          ]
+        },
+        "data": {
+          "$ref": "#/$defs/StateData"
+        }
+      },
+      "required": [
+        "event",
+        "data"
+      ]
+    },
+    "ServerPresenceFrame": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "event": {
+          "type": "string",
+          "enum": [
+            "presence"
+          ]
+        },
+        "data": {
+          "$ref": "#/$defs/PresenceData"
+        }
+      },
+      "required": [
+        "event",
+        "data"
+      ]
+    },
+    "ServerCredentialExpiringFrame": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "event": {
+          "type": "string",
+          "enum": [
+            "credential_expiring"
+          ]
+        },
+        "data": {
+          "$ref": "#/$defs/ProtocolNoticeData"
+        }
+      },
+      "required": [
+        "event",
+        "data"
+      ]
+    },
+    "ServerControlRevokedFrame": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "event": {
+          "type": "string",
+          "enum": [
+            "control_revoked"
+          ]
+        },
+        "data": {
+          "$ref": "#/$defs/ProtocolNoticeData"
+        }
+      },
+      "required": [
+        "event",
+        "data"
+      ]
+    },
+    "ServerMembershipRevokedFrame": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "event": {
+          "type": "string",
+          "enum": [
+            "membership_revoked"
+          ]
+        },
+        "data": {
+          "$ref": "#/$defs/ProtocolNoticeData"
+        }
+      },
+      "required": [
+        "event",
+        "data"
+      ]
+    },
+    "ServerRoomClosedFrame": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "event": {
+          "type": "string",
+          "enum": [
+            "room_closed"
+          ]
+        },
+        "data": {
+          "$ref": "#/$defs/ProtocolNoticeData"
+        }
+      },
+      "required": [
+        "event",
+        "data"
+      ]
+    },
+    "ServerResyncRequiredFrame": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "event": {
+          "type": "string",
+          "enum": [
+            "resync_required"
+          ]
+        },
+        "data": {
+          "$ref": "#/$defs/ProtocolNoticeData"
+        }
+      },
+      "required": [
+        "event",
+        "data"
+      ]
+    },
+    "ServerProtocolErrorFrame": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "event": {
+          "type": "string",
+          "enum": [
+            "protocol_error"
+          ]
+        },
+        "data": {
+          "$ref": "#/$defs/ProtocolNoticeData"
+        }
+      },
+      "required": [
+        "event",
+        "data"
+      ]
+    },
+    "LobbySource": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "roomVersion": {
+          "$ref": "#/$defs/Revision"
+        }
+      },
+      "required": [
+        "roomVersion"
+      ]
+    },
+    "GameSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "roomVersion": {
+          "$ref": "#/$defs/Revision"
+        },
+        "gameId": {
+          "$ref": "#/$defs/Id"
+        },
+        "gameVersion": {
+          "$ref": "#/$defs/Revision"
+        },
+        "gameProjectionVersion": {
+          "$ref": "#/$defs/Revision"
+        }
+      },
+      "required": [
+        "roomVersion",
+        "gameId",
+        "gameVersion",
+        "gameProjectionVersion"
+      ]
+    },
+    "GameView": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/BoardView"
+        },
+        {
+          "$ref": "#/$defs/HostQuestionView"
+        },
+        {
+          "$ref": "#/$defs/ViewerQuestionView"
+        },
+        {
+          "$ref": "#/$defs/HostAnswerView"
+        },
+        {
+          "$ref": "#/$defs/ViewerAnswerView"
+        },
+        {
+          "$ref": "#/$defs/ResultView"
+        }
+      ]
+    },
+    "ServerLobbyStateData": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "protocolVersion": {
+          "type": "integer",
+          "enum": [
+            1
+          ]
+        },
+        "streamId": {
+          "$ref": "#/$defs/Id"
+        },
+        "sequence": {
+          "$ref": "#/$defs/Revision"
+        },
+        "serverTime": {
+          "$ref": "#/$defs/Time"
+        },
+        "language": {
+          "$ref": "#/$defs/Language"
+        },
+        "source": {
+          "$ref": "#/$defs/LobbySource"
+        },
+        "view": {
+          "$ref": "#/$defs/LobbyView"
+        }
+      },
+      "required": [
+        "protocolVersion",
+        "streamId",
+        "sequence",
+        "serverTime",
+        "language",
+        "source",
+        "view"
+      ]
+    },
+    "ServerGameStateData": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "protocolVersion": {
+          "type": "integer",
+          "enum": [
+            1
+          ]
+        },
+        "streamId": {
+          "$ref": "#/$defs/Id"
+        },
+        "sequence": {
+          "$ref": "#/$defs/Revision"
+        },
+        "serverTime": {
+          "$ref": "#/$defs/Time"
+        },
+        "language": {
+          "$ref": "#/$defs/Language"
+        },
+        "source": {
+          "$ref": "#/$defs/GameSource"
+        },
+        "view": {
+          "$ref": "#/$defs/GameView"
+        }
+      },
+      "required": [
+        "protocolVersion",
+        "streamId",
+        "sequence",
+        "serverTime",
+        "language",
+        "source",
+        "view"
+      ]
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/ClientAuthenticateFrame"
+    },
+    {
+      "$ref": "#/$defs/ClientReauthenticateFrame"
+    },
+    {
+      "$ref": "#/$defs/ClientResyncFrame"
+    },
+    {
+      "$ref": "#/$defs/ClientSetLanguageFrame"
+    },
+    {
+      "$ref": "#/$defs/ClientPlaybackStatusFrame"
+    },
+    {
+      "$ref": "#/$defs/ServerAuthenticatedFrame"
+    },
+    {
+      "$ref": "#/$defs/ServerStateFrame"
+    },
+    {
+      "$ref": "#/$defs/ServerPresenceFrame"
+    },
+    {
+      "$ref": "#/$defs/ServerCredentialExpiringFrame"
+    },
+    {
+      "$ref": "#/$defs/ServerControlRevokedFrame"
+    },
+    {
+      "$ref": "#/$defs/ServerMembershipRevokedFrame"
+    },
+    {
+      "$ref": "#/$defs/ServerRoomClosedFrame"
+    },
+    {
+      "$ref": "#/$defs/ServerResyncRequiredFrame"
+    },
+    {
+      "$ref": "#/$defs/ServerProtocolErrorFrame"
+    }
+  ]
+}

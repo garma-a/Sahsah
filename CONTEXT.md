@@ -20,6 +20,20 @@ _Avoid_: User, when an account is not implied.
 One of the people participating in a game, including its host; a game has at most six players in total.
 _Avoid_: Guest, when the host is included in the count.
 
+**Viewer**:
+A participant other than the host who watches the shared gameplay without operating game controls or playing question audio. A viewer may join anonymously or with an account and counts toward the six-player limit.
+_Avoid_: Guest, when describing viewing permissions rather than sign-in status.
+
+**Lobby**:
+The room's preparation stage before its next game, where participants choose teams and confirm readiness while the host prepares the board.
+
+**Lobby setup**:
+The host's selected categories/question packs and team setup prepared for the room's next game.
+_Avoid_: Game board, before a game has started.
+
+**Ready confirmation**:
+A non-host participant's agreement to join the room's next game with its current meaningful setup. Changes to selected content, the roster or team assignments require everyone to confirm again.
+
 **Team**:
 One of the two competing sides in a game, with its own name and score, whether or not a player has connected to that side.
 
@@ -31,7 +45,7 @@ One play through a trivia board, ending with a result or an early finish.
 _Avoid_: Session, when it could mean an invitation room or a signed-in session.
 
 **Room**:
-The invitation space in which a host and guests can stay together across multiple separate games.
+The invitation space in which a host and guests can stay together across multiple separate games; a host has at most one open room.
 _Avoid_: Game, when referring to the shared invitation space.
 
 **Board**:

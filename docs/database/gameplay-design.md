@@ -1,6 +1,6 @@
 # Sahsah gameplay state and scoring
 
-Status: accepted Q49–Q60 behavior with a proposed relational representation; Q74 defines replay readiness. This is a design artifact, not an implemented engine or an approved migration.
+Status: accepted Q49–Q60 behavior; Q74 defines replay readiness. The [Drizzle/PostgreSQL foundation](implementation-status.md) is implemented, while the gameplay engine remains unimplemented. API-Q5 accepted the remaining reset/navigation interactions on 2026-11-05; [the API design session](../api/design-session.md) records the current contract work.
 
 ## Accepted behavior and prototype differences
 
@@ -14,7 +14,7 @@ Status: accepted Q49–Q60 behavior with a proposed relational representation; Q
 | Award | Default to current hint-stage points; host may select zero through original tile points | Q52; [current award bound](../../sahsah_prototype/src/lib/game-rules.ts#L523) |
 | Total correction | Host enters a nonnegative absolute total; record its difference from the previous total without overwriting earlier awards | Q55; [current absolute-target UI](../../sahsah_prototype/src/pages/GamePage.tsx#L174) |
 
-The proposed reopening implementation distinguishes a timer paused by navigation from one deliberately paused by the host. Reopening resumes the former with its saved time; an intentional host pause remains paused. Reset creates an explicit fresh 60-second clock and does not erase question progress. These are implementation interpretations to include in the final scenario review, rather than additional accepted answers.
+API-Q5 accepts distinguishing a timer paused by navigation from one deliberately paused by the host. Reopening resumes the former with its saved time; an intentional host pause remains paused. For an answering clock that has already started, Reset creates and immediately runs a fresh 60-second clock without erasing question progress. Memory's first-hide prerequisite remains unchanged.
 
 Do not carry forward the archived three-play audio limit, timed memory viewing or 30-second memory answering period. Public pack edits still affect only new games: runtime always uses the game's starting content and rules snapshot.
 
@@ -43,9 +43,9 @@ The timer uses `ready`, `running`, `paused` or `elapsed`, a `remaining_ms` check
 | First memory hide | Record first-hide milestone and start the answering deadline once |
 | Pause | Calculate remaining milliseconds from the deadline, clamp to 0–60,000 and store paused or elapsed; clear deadline |
 | Resume | Use the saved positive remainder to create a new deadline; never infer a reset from a zero remainder |
-| Explicit reset | Save a fresh full duration without removing hints/reveal/history; automatic versus manual resumption after this action remains part of the final timer interaction review |
+| Explicit reset | For an answering clock that has already started, save a fresh 60-second deadline and run immediately without removing hints/reveal/history; preserve memory's first-hide prerequisite |
 | Return to board | Checkpoint/pause running time, mark whether navigation should resume it, and clear the active pointer |
-| Reopen unresolved slot | Restore retained progress and saved time; do not create a new question attempt or exposure identity |
+| Reopen unresolved slot | Restore retained progress and saved time; resume a navigation-paused clock while preserving an intentional host pause; do not create a new question attempt or exposure identity |
 | Reveal / resolve / end | Stop a running clock and clear navigation-resume intent in the same command transaction |
 | Time passes | Clients render the countdown from the authoritative deadline; no per-second PostgreSQL writes |
 
@@ -69,7 +69,7 @@ The shared game lock resolves opening versus end/expiry races: a terminal unopen
 ## Resolution and score transaction
 
 1. Apply the same game lock, fresh-clock, authority, expected-version and command-identity checks.
-2. Validate opening/reveal prerequisites, absence of an earlier resolution, and the selected team or explicit no-winner decision. Derive suggested points from copied stage rules; validate an override against this slot's original 200/400/600 cap, rather than the broad database bound of 600.
+2. Validate opening/reveal prerequisites, absence of an earlier resolution, and the selected team or explicit no-winner decision. Derive suggested points from copied stage rules and validate an override against this slot's original 200/400/600 cap. The actual Drizzle schema also enforces `awarded_points <= base_points`.
 3. Insert one resolution. A winner with zero points remains distinguishable from nobody winning. Insert one matching award score entry for a selected team, even at zero; no-winner resolution has no team score entry.
 4. Update that team's score projection with the same entry. Score history stores before/after/difference and the resulting game version. A retry returns the original accepted result; a conflicting payload must not silently turn an earlier award into another outcome.
 5. If all six questions in this copied pack now have resolutions, credit eligible signed-in starting players once. No-winner resolutions count; a player who explicitly left receives no new completion. Different games' partial resolutions never combine.
@@ -80,12 +80,12 @@ For an overall correction, lock the same active game, validate an integer target
 
 For replay, Q74 returns to the room lobby with names/team choices retained. Reset non-host Ready confirmations for the next game; the host may remove absent members. A successful start freezes that game's newly confirmed roster, copies current selected content, claims accounts and spends one new token. It never reopens or changes the previous game.
 
-`bigint` score totals are a proposed storage range, not a selected business maximum. The API must validate its integer representation explicitly. Staff content permissions do not authorize host scoring, and player scoring authority does not authorize financial-token changes.
+API-Q19 accepted manual target input from zero through 1,000,000 on 2026-11-06; subsequent valid question awards may raise the resulting total beyond that input ceiling. The implemented bigint storage and exact decimal-string API representation preserve precision. Staff content permissions do not authorize host scoring, and player scoring authority does not authorize financial-token changes.
 
 ## Integrity and performance boundaries
 
 - Snapshot/state/resolution composite keys keep each question inside one game. Winner and score-entry team FKs keep teams inside that same game. Actor FKs identify the original host account; the transaction separately proves current controller authority.
-- Checks enforce nonnegative totals, exact before/after differences, timer pairing and broad award bounds. Exact per-tile caps, matching resolution/entry values, score projection equality and six-resolution completion are cross-row transaction rules.
+- Checks enforce nonnegative totals, exact before/after differences, timer pairing and each tile's award cap. Matching resolution/entry values, score projection equality and six-resolution completion require coherent transaction rules across rows.
 - First-opening, reveal and memory milestones need old/new-state guards; a row check cannot prove immutability. The same applies to append-only score history and final adjudications.
 - No index is added on timer state, hint stage, memory visibility, score or JSON snapshot fields: named access paths start with one game and read at most 36 slot rows and two teams.
 - The root game row serializes commands within one active game, while other games proceed independently. Keep transactions short; media transfer and WebSocket fan-out occur outside locks.

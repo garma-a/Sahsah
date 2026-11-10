@@ -12,7 +12,7 @@ The API defaults to http://localhost:3001/api/health. Run `pnpm check`, `pnpm te
 
 ## Database setup
 
-The 39-table schema is in `src/database/schema/`, grouped by domain with camelCase TypeScript properties and the agreed snake_case database names. All 37 enums, 87 foreign keys, 304 checks and 148 indexes (19 partial) are represented. `drizzle/0000_sahsah_schema.sql` creates the physical schema; `0001_postgresql_integrity.sql` preserves foreign-key deferral and the 28 private PostgreSQL helper functions and 28 triggers. No shop, staff, player, provider or authored content rows are inserted automatically.
+The 41-table schema is in `src/database/schema/`, grouped by domain with camelCase TypeScript properties and the agreed snake_case database names. All 37 enums, 93 foreign keys, 312 checks and 156 indexes (21 partial) are represented. `drizzle/0000_sahsah_schema.sql` creates the physical schema; `0001_postgresql_integrity.sql` preserves foreign-key deferral and the 28 private PostgreSQL helper functions and 28 triggers. No shop, staff, player, provider or authored content rows are inserted automatically.
 
 Provision a **new local database** using an existing PostgreSQL administrator connection:
 
@@ -45,7 +45,7 @@ An empty `DATABASE_URL` keeps the development/test starter available. Production
 
 Inject `DatabaseService` for typed Drizzle queries. Use `database.transaction(async (db) => { ... })` for atomic writes. It uses one checked-out connection, commits before returning, rolls back on statement **or deferred COMMIT** failure, and always releases/discards the connection. It also rejects a callback that swallowed a SQL error and caused PostgreSQL to roll back at COMMIT. Do not hold a transaction across provider/storage HTTP, use `pool.query` for transaction statements, or retry unknown external effects automatically. Deadlock/serialization retries belong to each future operation's durable request identity.
 
-Insert a sourced `token_ledger_entries` movement to change a bank; its INSERT trigger alone projects the balance. Never update the balance separately. Lock order and full-board/authorization/cryptographic/pricing contracts remain responsibilities of the future services described in the design handoff.
+Insert a sourced `token_ledger_entries` movement to change a bank; its INSERT trigger alone projects the balance. Never update the balance separately. The gameplay module implements the full-board, authorization, credential and game lock-order contracts; pricing/provider workflows remain outside gameplay.
 
 PostgreSQL bigint columns map to JavaScript `bigint`; exact `numeric` maps to decimal strings, `bytea` to `Buffer`, and `timestamptz` to strings preserving microseconds. Convert bigint values deliberately to decimal strings at an HTTP/JSON boundary; do not coerce them to imprecise numbers or add a global JSON monkey patch. Schema JSON types provide compile-time structure; services must validate bounded runtime content.
 
@@ -53,7 +53,7 @@ PostgreSQL bigint columns map to JavaScript `bigint`; exact `numeric` maps to de
 
 Use `pnpm db:generate` for future schema changes and `drizzle-kit generate --custom --name=description` for PostgreSQL behavior that Drizzle cannot express. Review and commit SQL, snapshots and the journal together. `pnpm db:check` checks the migration graph. `db:migrate` uses Drizzle's maintained migrator on a dedicated connection with an advisory lock spanning history verification and migration application. All pending domain DDL commits in one transaction. Apply/status compare every applied hash and timestamp to the checked-in history and reject changed, missing, reordered or unknown migrations. Never edit a migration that has been applied to a retained database.
 
-The initial SQL deliberately creates unique indexes **before** foreign keys that reference them; Kit's generated order otherwise fails on the composite references. Review this dependency order for future generated migrations. All 87 foreign keys are `DEFERRABLE INITIALLY IMMEDIATE`, matching the accepted export; the financial/deletion/purge constraint triggers retain their individual deferred semantics. Column-unique constraints use Drizzle's explicit generated `_unique` names instead of the export's automatic `_key` suffix. Composite primary keys preserve PostgreSQL's physical `_pkey` names. This changes naming only.
+The initial SQL deliberately creates unique indexes **before** foreign keys that reference them; Kit's generated order otherwise fails on the composite references. Review this dependency order for future generated migrations. All 93 foreign keys are `DEFERRABLE INITIALLY IMMEDIATE`, matching the accepted export; the financial/deletion/purge constraint triggers retain their individual deferred semantics. Column-unique constraints use Drizzle's explicit generated `_unique` names instead of the export's automatic `_key` suffix. Composite primary keys preserve PostgreSQL's physical `_pkey` names. This changes naming only.
 
 Partial indexes are modeled in Drizzle so future generation retains them. Private functions, triggers, trusted search paths, revoked helper privileges and FK deferral remain reviewed custom SQL. Use the guarded commands; `drizzle-kit push`/automatic synchronization is not the deployment workflow and must not replace these migrations.
 
@@ -97,3 +97,9 @@ Authentication uses an HttpOnly, SameSite=Lax session cookie scoped to `/admin`;
 The staff tables now exist, but AdminJS still uses the starter environment login and memory sessions. Database adapters/resources, staff-backed login, authorization and persistent session serialization remain unimplemented. No separate admin installation or server is needed. Middleware still mounts before Nest's body parser and catch-all handlers.
 
 References: [Drizzle migrations](https://orm.drizzle.team/docs/migrations), [custom SQL migrations](https://orm.drizzle.team/docs/kit-custom-migrations), [node-postgres transactions](https://node-postgres.com/features/transactions), [NestJS databases](https://docs.nestjs.com/techniques/database).
+
+## Gameplay API
+
+The optional gameplay module exposes `/api/v1` REST and `/api/v1/realtime` native WebSocket operations. It defaults to disabled. See [the reviewed contract](../../docs/api/README.md) and [implementation, configuration and load evidence](../../docs/api/implementation-and-operations.md). `0002_gameplay_rooms.sql` and `0003_gameplay_history.sql` add draft selections/receipts, revisions, controller recovery and immutable-history guards. Reapply runtime grants after migrating.
+
+`pnpm test` includes contract metadata, full-cycle HTTP/WS, all-format media and contention tests against disposable PostgreSQL. For a bounded local smoke measurement run `pnpm build` then `LOAD_ROOMS=10 LOAD_CYCLES=2 node scripts/gameplay-load.mjs`; up to 100 rooms/600 clients are supported by this fixture. This never certifies a Railway deployment. No frontend/prototype/mobile gameplay UI is migrated by this backend change.

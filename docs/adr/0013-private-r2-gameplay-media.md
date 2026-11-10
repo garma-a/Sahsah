@@ -1,0 +1,5 @@
+# Deliver private gameplay media through expiring R2 URLs
+
+Accepted 2026-11-05 in API-Q4. Keep gameplay images and audio in private Cloudflare R2 objects with immutable keys, and issue short-lived presigned reads only after checking current membership, controller/audience, question phase and media role. The user accepts that an already issued URL remains usable until expiry after authority changes; viewer projections must never receive question or forward-audio access.
+
+An authenticated edge delivery layer could recheck later fetches but introduces another operational surface. Direct R2 delivery keeps media bytes off NestJS and fits the existing single-API/database topology; the trade-off is bounded reuse of issued bearer URLs. Exact TTL/renewal limits remain to be specified, signed URLs are excluded from database snapshots and durable messages, and downloaded bytes cannot be recalled. R2 signatures use its S3 endpoint rather than a public custom-domain path. See [Cloudflare's access semantics](https://developers.cloudflare.com/r2/api/s3/presigned-urls/) and [the API design session](../api/design-session.md).

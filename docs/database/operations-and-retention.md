@@ -10,7 +10,7 @@ A worker claims pending work with `SKIP LOCKED`, assigns a lease token/deadline,
 
 An outbox retry does not make provider HTTP effects exactly once. Unknown payment creation requires inquiry/reconciliation; media uses immutable keys/conditional creation; auth deletion/revocation handlers recheck current local state. Generic resource kind/ID is deliberate routing metadata, not a polymorphic FK: handlers reload and validate their source before acting.
 
-For game fan-out, publish the committed game/version hint, then let each authorized client request its permitted projection. Reconnect/version gaps recover from PostgreSQL. No permanent per-connection message history is needed, and neither WebSocket heartbeat nor countdown tick writes to PostgreSQL.
+For game fan-out, the committed game/version hint drives a dispatcher that reloads authoritative state and eligible recipients, then pushes the permitted host/viewer projections. Coalesce superseded hints and share bounded projection work instead of requiring a client fetch after every hint. Initial connection/reconnect/version gaps use authorized snapshots from PostgreSQL. This 2026-11-05 API-Q3 refinement is recorded in [ADR 0012](../adr/0012-rest-commands-and-gameplay-push.md). No permanent per-connection message history is needed, and neither WebSocket heartbeat nor countdown tick writes to PostgreSQL.
 
 ## Idempotency and authority
 
