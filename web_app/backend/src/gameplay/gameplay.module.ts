@@ -10,9 +10,10 @@ import { MediaService } from "./media.js";
 import { GameplayRealtime } from "./realtime.js";
 import { GameplayHttpInterceptor } from "./http.js";
 import { GameplayMaintenance } from "./maintenance.js";
+import { PreviewController } from "./preview.controller.js";
 
 @Module({
-  controllers: [GameplayController],
+  controllers: [GameplayController, PreviewController],
   providers: [
     GameplayService,
     RoomOperations,

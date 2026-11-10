@@ -61,23 +61,53 @@ export class CatalogService {
   async categories(query: Record<string, unknown>): Promise<Data> {
     this.core.enabled();
     const lang = language(query.language as string | undefined),
-      { limit, cursor } = paging(query, 50);
+      { limit, cursor } = paging(query, 20);
+    // Counts only packs a host can start: six current questions.
     const result = await this.core.database.db
-      .execute(sql`SELECT c.id,c.name_ar,c.name_franco,c.display_order,
-      (SELECT count(*)::int FROM question_packs p WHERE p.category_id=c.id AND p.publication_state='published' AND p.archived_at IS NULL) AS count
-      FROM categories c WHERE c.archived_at IS NULL AND (c.display_order,c.id)>(${cursor[0]},${cursor[1]}::uuid)
+      .execute(sql`SELECT c.id,c.name_ar,c.name_franco,c.display_order,c.description_ar,c.description_franco,
+      g.id AS section_id,g.name_ar AS section_ar,g.name_franco AS section_franco,g.display_order AS section_order,
+      (SELECT m.storage_key FROM media_assets m WHERE m.id=c.cover_media_asset_id AND m.state='ready' AND m.access_scope='public' AND m.archived_at IS NULL) AS cover_key,
+      (SELECT count(*)::int FROM question_packs p WHERE p.category_id=c.id AND p.publication_state='published' AND p.archived_at IS NULL
+        AND (SELECT count(*) FROM questions q WHERE q.pack_id=p.id AND q.retired_at IS NULL)=6) AS count
+      FROM categories c LEFT JOIN category_sections g ON g.id=c.section_id
+      WHERE c.archived_at IS NULL AND (c.display_order,c.id)>(${cursor[0]},${cursor[1]}::uuid)
       ORDER BY c.display_order,c.id LIMIT ${limit + 1}`);
     const rows = result.rows as {
       id: string;
       name_ar: string;
       name_franco: string | null;
       display_order: number;
+      description_ar: string | null;
+      description_franco: string | null;
+      section_id: string | null;
+      section_ar: string;
+      section_franco: string | null;
+      section_order: number;
+      cover_key: string | null;
       count: number;
     }[];
+    const covers = this.core.options.publicMediaBaseUrl;
     return {
       items: rows.slice(0, limit).map((r) => ({
         id: r.id,
         name: local(r.name_ar, r.name_franco, lang),
+        ...(r.description_ar
+          ? {
+              description: local(r.description_ar, r.description_franco, lang),
+            }
+          : {}),
+        ...(r.section_id
+          ? {
+              section: {
+                id: r.section_id,
+                name: local(r.section_ar, r.section_franco, lang),
+                displayOrder: r.section_order,
+              },
+            }
+          : {}),
+        ...(covers && r.cover_key
+          ? { coverUrl: `${covers}/${r.cover_key}` }
+          : {}),
         publishedPackCount: r.count,
       })),
       ...(rows.length > limit
@@ -163,7 +193,7 @@ export class CatalogService {
   ): Promise<Data> {
     this.core.enabled();
     language(query.language as string | undefined);
-    const { limit, cursor } = paging(query, 1);
+    const { limit, cursor } = paging(query, 20);
     requireState(
       query.freshOnly === undefined ||
         query.freshOnly === "true" ||
@@ -217,12 +247,11 @@ export class CatalogService {
           scanned = pack;
           const e = eligibility.get(pack.id)!;
           if (e.questions.length !== 6) continue;
-          if (query.freshOnly !== "false" && !e.fresh) continue;
+          if (query.freshOnly === "true" && !e.fresh) continue;
           let progress: Data | undefined;
           if (own) {
             const row = history.rows.find((r) => r.pack_id === pack.id) as
-              | { current: boolean }
-              | undefined;
+              { current: boolean } | undefined;
             progress = {
               completed: row?.current ?? false,
               updated: !!row && !row.current,

@@ -12,7 +12,7 @@ The API defaults to http://localhost:3001/api/health. Run `pnpm check`, `pnpm te
 
 ## Database setup
 
-The 41-table schema is in `src/database/schema/`, grouped by domain with camelCase TypeScript properties and the agreed snake_case database names. All 37 enums, 93 foreign keys, 312 checks and 156 indexes (21 partial) are represented. `drizzle/0000_sahsah_schema.sql` creates the physical schema; `0001_postgresql_integrity.sql` preserves foreign-key deferral and the 28 private PostgreSQL helper functions and 28 triggers. No shop, staff, player, provider or authored content rows are inserted automatically.
+The 42-table schema is in `src/database/schema/`, grouped by domain with camelCase TypeScript properties and the agreed snake_case database names. All 37 enums, 95 foreign keys, 315 checks and 158 indexes (21 partial) are represented. `drizzle/0000_sahsah_schema.sql` creates the physical schema; `0001_postgresql_integrity.sql` preserves foreign-key deferral and the 28 private PostgreSQL helper functions and 28 triggers. No shop, staff, player, provider or authored content rows are inserted automatically.
 
 Provision a **new local database** using an existing PostgreSQL administrator connection:
 
@@ -53,7 +53,7 @@ PostgreSQL bigint columns map to JavaScript `bigint`; exact `numeric` maps to de
 
 Use `pnpm db:generate` for future schema changes and `drizzle-kit generate --custom --name=description` for PostgreSQL behavior that Drizzle cannot express. Review and commit SQL, snapshots and the journal together. `pnpm db:check` checks the migration graph. `db:migrate` uses Drizzle's maintained migrator on a dedicated connection with an advisory lock spanning history verification and migration application. All pending domain DDL commits in one transaction. Apply/status compare every applied hash and timestamp to the checked-in history and reject changed, missing, reordered or unknown migrations. Never edit a migration that has been applied to a retained database.
 
-The initial SQL deliberately creates unique indexes **before** foreign keys that reference them; Kit's generated order otherwise fails on the composite references. Review this dependency order for future generated migrations. All 93 foreign keys are `DEFERRABLE INITIALLY IMMEDIATE`, matching the accepted export; the financial/deletion/purge constraint triggers retain their individual deferred semantics. Column-unique constraints use Drizzle's explicit generated `_unique` names instead of the export's automatic `_key` suffix. Composite primary keys preserve PostgreSQL's physical `_pkey` names. This changes naming only.
+The initial SQL deliberately creates unique indexes **before** foreign keys that reference them; Kit's generated order otherwise fails on the composite references. Review this dependency order for future generated migrations. All 95 foreign keys are `DEFERRABLE INITIALLY IMMEDIATE`, matching the accepted export; the financial/deletion/purge constraint triggers retain their individual deferred semantics. Column-unique constraints use Drizzle's explicit generated `_unique` names instead of the export's automatic `_key` suffix. Composite primary keys preserve PostgreSQL's physical `_pkey` names. This changes naming only.
 
 Partial indexes are modeled in Drizzle so future generation retains them. Private functions, triggers, trusted search paths, revoked helper privileges and FK deferral remain reviewed custom SQL. Use the guarded commands; `drizzle-kit push`/automatic synchronization is not the deployment workflow and must not replace these migrations.
 
@@ -100,6 +100,24 @@ References: [Drizzle migrations](https://orm.drizzle.team/docs/migrations), [cus
 
 ## Gameplay API
 
-The optional gameplay module exposes `/api/v1` REST and `/api/v1/realtime` native WebSocket operations. It defaults to disabled. See [the reviewed contract](../../docs/api/README.md) and [implementation, configuration and load evidence](../../docs/api/implementation-and-operations.md). `0002_gameplay_rooms.sql` and `0003_gameplay_history.sql` add draft selections/receipts, revisions, controller recovery and immutable-history guards. Reapply runtime grants after migrating.
+The optional gameplay module exposes `/api/v1` REST and `/api/v1/realtime` native WebSocket operations. It defaults to disabled. See [the reviewed contract](../../docs/api/README.md) and [implementation, configuration and load evidence](../../docs/api/implementation-and-operations.md). `0002_gameplay_rooms.sql` and `0003_gameplay_history.sql` add draft selections/receipts, revisions, controller recovery and immutable-history guards. `0004_category_presentation.sql` adds category sections, descriptions and public covers. Reapply runtime grants after migrating.
 
 `pnpm test` includes contract metadata, full-cycle HTTP/WS, all-format media and contention tests against disposable PostgreSQL. For a bounded local smoke measurement run `pnpm build` then `LOAD_ROOMS=10 LOAD_CYCLES=2 node scripts/gameplay-load.mjs`; up to 100 rooms/600 clients are supported by this fixture. This never certifies a Railway deployment. No frontend/prototype/mobile gameplay UI is migrated by this backend change.
+
+### Run the game locally
+
+```sh
+docker compose up -d            # PostgreSQL 18 on localhost:5433, with local-only roles
+cp .env.example .env            # then set the values below
+pnpm db:migrate && pnpm db:grant-runtime
+pnpm content:seed               # placeholder categories, packs, questions and media
+pnpm dev
+```
+
+Local `.env` values: the two database URLs shown in `.env.example`, `GAMEPLAY_ENABLED=true`, `GAMEPLAY_PREVIEW_PASSCODE` (six characters or more), `GAMEPLAY_PREVIEW_SECRET` (`openssl rand -hex 32`) and `GAMEPLAY_LOCAL_MEDIA_DIR=.media`.
+
+**Preview mode** ([ADR 0017](../../docs/adr/0017-passcode-preview-without-login.md)) stands in for login until it exists. `POST /api/v1/preview/sessions` with `{ "passcode", "displayName" }` creates a host account for that browser with 10,000 tokens and returns a 30-day `credential` to send as `Authorization: Bearer …`; sending `{ "credential", "displayName" }` renews it. Preview admission uses API process pressure only and admits 20 open rooms. It is off unless the passcode is set, refuses to start alongside `GAMEPLAY_IDENTITY_JWKS_URL`, and its database must be discarded before real accounts exist.
+
+**Media storage** is chosen by configuration. With `GAMEPLAY_LOCAL_MEDIA_DIR`, files live under `private/` and `public/` in that directory and this API serves them at `/api/dev-media` (private files only through five-minute signed links); production refuses this setting. Otherwise private question media is signed from R2 and category covers are read from `GAMEPLAY_PUBLIC_MEDIA_BASE_URL`. `pnpm content:seed` writes to whichever storage is configured and can be rerun safely; for R2 it needs the write-capable `R2_IMPORT_*` key and `R2_PUBLIC_BUCKET`, which the API deployment never receives.
+
+Behind a platform proxy set `TRUSTED_PROXY_HOPS` (Railway: 1) so rate limits and pending-connection limits apply per player rather than to the proxy.

@@ -23,7 +23,12 @@ import { setTimeout as retryDelay } from "node:timers/promises";
 import type { Data, GameplayOptions, VerifiedAccount } from "./ports.js";
 import { GameplayScheduler } from "./scheduler.js";
 import { GameplayMetrics } from "./metrics.js";
-import { existingIdentity, resourcePressure } from "./integrations.js";
+import {
+  existingIdentity,
+  previewPressure,
+  resourcePressure,
+} from "./integrations.js";
+import { previewIdentity, previewMode } from "./preview.js";
 
 export type Tx = DatabaseService["db"];
 export type Room = typeof s.rooms.$inferSelect;
@@ -97,22 +102,30 @@ export class GameplayService implements OnModuleInit, OnModuleDestroy {
         options.enabled ?? this.config.get("GAMEPLAY_ENABLED") === "true",
     };
     if (!this.options.enabled) return;
-    this.options.verifyAccount ??= existingIdentity(process.env);
+    const preview = (this.options.preview ??= previewMode(process.env));
+    this.options.verifyAccount ??= preview
+      ? previewIdentity(preview)
+      : existingIdentity(process.env);
     requireState(
       Number(process.env.DATABASE_POOL_MAX ?? 5) >= 3,
       "GAMEPLAY_POOL_TOO_SMALL",
       500,
     );
-    this.options.pressure ??= resourcePressure(process.env, this.metrics);
+    this.options.pressure ??= preview
+      ? previewPressure(process.env, this.metrics)
+      : resourcePressure(process.env, this.metrics);
+    // Admission closes at 85% of the ceiling: preview admits 20 rooms.
     const ceiling =
       options.capacity ??
-      (process.env.NODE_ENV === "production"
-        ? {
-            rooms: Number(process.env.GAMEPLAY_CAPACITY_ROOMS),
-            members: Number(process.env.GAMEPLAY_CAPACITY_MEMBERS),
-            games: Number(process.env.GAMEPLAY_CAPACITY_GAMES),
-          }
-        : { rooms: 200, members: 1200, games: 200 });
+      (preview
+        ? { rooms: 24, members: 144, games: 24 }
+        : process.env.NODE_ENV === "production"
+          ? {
+              rooms: Number(process.env.GAMEPLAY_CAPACITY_ROOMS),
+              members: Number(process.env.GAMEPLAY_CAPACITY_MEMBERS),
+              games: Number(process.env.GAMEPLAY_CAPACITY_GAMES),
+            }
+          : { rooms: 200, members: 1200, games: 200 });
     this.admission.configure(ceiling);
     if (process.env.NODE_ENV === "production") {
       requireState(
@@ -189,12 +202,37 @@ export class GameplayService implements OnModuleInit, OnModuleDestroy {
   operation(req: Request) {
     return id(req.headers["idempotency-key"]);
   }
+  /** Live streams subscribe here; called once per changed room after commit. */
+  onCommitted?: (roomId: string) => void;
+  private hinted = new WeakMap<Tx, Map<string, string>>();
+  private pushed = new Set<string>();
+  /** True once for a hint this process already delivered after its commit. */
+  takePushed(deduplicationKey: string) {
+    return this.pushed.delete(deduplicationKey);
+  }
   async transaction<T>(work: (db: Tx) => Promise<T>): Promise<T> {
     // All callers are database-only, identified gameplay mutations. Retry the
     // entire rolled-back transaction; recheck the original intent/version.
     for (let attempt = 0; ; attempt++) {
       try {
-        return await this.database.transaction(work);
+        let committing: Tx | undefined;
+        const result = await this.database.transaction((db) => {
+          committing = db;
+          return work(db);
+        });
+        // Push without waiting for the outbox poll. The durable hint remains
+        // the safety net for a crash between commit and this line.
+        const hints = committing && this.hinted.get(committing);
+        if (hints && this.onCommitted) {
+          for (const key of hints.keys()) {
+            if (this.pushed.size >= 4096)
+              this.pushed.delete(this.pushed.values().next().value!);
+            this.pushed.add(key);
+          }
+          for (const roomId of new Set(hints.values()))
+            this.onCommitted(roomId);
+        }
+        return result;
       } catch (error) {
         const code = databaseCode(error),
           constraint = databaseConstraint(error);
@@ -420,12 +458,15 @@ export class GameplayService implements OnModuleInit, OnModuleDestroy {
     gameId?: string,
     gameProjection?: bigint,
   ) {
-    const resource = gameId ?? roomId;
+    const resource = gameId ?? roomId,
+      deduplicationKey = `${gameId ? "game" : "room"}:${resource}:${gameProjection ?? version}`;
+    const hints = this.hinted.get(db) ?? new Map<string, string>();
+    this.hinted.set(db, hints.set(deduplicationKey, roomId));
     await db
       .insert(s.outboxEvents)
       .values({
         id: randomUUID(),
-        deduplicationKey: `${gameId ? "game" : "room"}:${resource}:${gameProjection ?? version}`,
+        deduplicationKey,
         topic: gameId ? "game.changed" : "room.changed",
         resourceKind: gameId ? "game" : "room",
         resourceId: resource,

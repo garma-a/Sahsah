@@ -28,6 +28,7 @@ All server application frames carry `protocolVersion:1`, `streamId`, monotonic d
 | `credential_expiring` | Account proof expiry notification; client refreshes through its existing auth integration and sends `reauthenticate`. No login API is introduced. |
 | `control_revoked` | Stop host controls/audio immediately; clear private local playback state and close/re-authenticate as permitted. Old proof remains fenced in REST. |
 | `membership_revoked` / `room_closed` | Stop live rendering/media renewal, close stream. Original compact result can still be fetched with retained participant proof. |
+| `stream_replaced` | The same seat authenticated on another tab or device. Stop rendering and do not reconnect automatically; the seat and its credential stay valid. |
 | `resync_required` | Discard partial/stale local state and obtain the current authorized snapshot; no event-log replay promise. |
 | `protocol_error` | Safe stable code/request ID; malformed/rate-limited/unauthorized frames can close the stream. No stack/credential echo. |
 

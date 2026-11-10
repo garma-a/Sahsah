@@ -14,6 +14,23 @@ import { bytea } from "./types.js";
 import type { JsonObject } from "./types.js";
 import { staffAccounts } from "./staff.js";
 
+export const categorySections = t.pgTable(
+  "category_sections",
+  {
+    id: t.uuid("id").primaryKey().notNull(),
+    nameAr: t.text("name_ar").notNull(),
+    nameFranco: t.text("name_franco"),
+    displayOrder: t.integer("display_order").default(0).notNull(),
+  },
+  (table): t.PgTableExtraConfigValue[] => [
+    t.check("category_sections_display_order_bounds", sql`display_order >= 0`),
+    t.check(
+      "category_sections_name_bounds",
+      sql`length(btrim(name_ar)) > 0 AND char_length(name_ar) <= 160 AND (name_franco IS NULL OR (length(btrim(name_franco)) > 0 AND char_length(name_franco) <= 160))`,
+    ),
+  ],
+);
+
 export const categories = t.pgTable(
   "categories",
   {
@@ -25,9 +42,35 @@ export const categories = t.pgTable(
       withTimezone: true,
       mode: "string",
     }),
+    sectionId: t.uuid("section_id"),
+    descriptionAr: t.text("description_ar"),
+    descriptionFranco: t.text("description_franco"),
+    // Public artwork only; private gameplay media stays in question_media.
+    coverMediaAssetId: t.uuid("cover_media_asset_id"),
   },
   (table): t.PgTableExtraConfigValue[] => [
     t.check("categories_display_order_bounds", sql`display_order >= 0`),
+    t.index("categories_section").on(table.sectionId, table.id),
+    t
+      .foreignKey({
+        name: "categories_section",
+        columns: [table.sectionId],
+        foreignColumns: [categorySections.id],
+      })
+      .onDelete("no action")
+      .onUpdate("no action"),
+    t
+      .foreignKey({
+        name: "categories_cover_asset",
+        columns: [table.coverMediaAssetId],
+        foreignColumns: [mediaAssets.id],
+      })
+      .onDelete("no action")
+      .onUpdate("no action"),
+    t.check(
+      "categories_description_bounds",
+      sql`(description_ar IS NULL OR (length(btrim(description_ar)) > 0 AND char_length(description_ar) <= 500)) AND (description_franco IS NULL OR (length(btrim(description_franco)) > 0 AND char_length(description_franco) <= 500))`,
+    ),
   ],
 );
 

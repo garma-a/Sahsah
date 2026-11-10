@@ -4850,6 +4850,14 @@
             "minLength": 1,
             "maxLength": 160
           },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "section": {
+            "$ref": "#/components/schemas/CategorySection"
+          },
           "coverUrl": {
             "type": "string",
             "format": "uri"
@@ -4864,7 +4872,8 @@
           "id",
           "name",
           "publishedPackCount"
-        ]
+        ],
+        "description": "publishedPackCount counts only playable packs: published, unarchived, with six current questions. coverUrl is public category artwork, never gameplay media."
       },
       "Progress": {
         "type": "object",
@@ -8450,6 +8459,30 @@
         "minItems": 0,
         "maxItems": 6,
         "description": "Provisional distinct category/pack choices. Repeat consent is confirmed later against the actual room roster."
+      },
+      "CategorySection": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "displayOrder": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "displayOrder"
+        ]
       }
     },
     "responses": {

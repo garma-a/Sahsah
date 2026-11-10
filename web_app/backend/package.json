@@ -30,7 +30,8 @@
     "db:migrate": "npm run build && node --env-file-if-exists=.env dist/database/cli.js migrate",
     "db:status": "npm run build && node --env-file-if-exists=.env dist/database/cli.js status",
     "db:grant-runtime": "npm run build && node --env-file-if-exists=.env dist/database/cli.js grant-runtime",
-    "test:database": "npm run build && node --test tests/database/*.test.mjs"
+    "test:database": "npm run build && node --test tests/database/*.test.mjs",
+    "content:seed": "node --env-file-if-exists=.env scripts/content/seed-placeholders.mjs"
   },
   "dependencies": {
     "@adminjs/express": "6.1.1",

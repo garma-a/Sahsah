@@ -24,6 +24,7 @@ const names: Record<string, string> = {
   credential_expiring: "ServerCredentialExpiringFrame",
   control_revoked: "ServerControlRevokedFrame",
   membership_revoked: "ServerMembershipRevokedFrame",
+  stream_replaced: "ServerStreamReplacedFrame",
   room_closed: "ServerRoomClosedFrame",
   resync_required: "ServerResyncRequiredFrame",
   protocol_error: "ServerProtocolErrorFrame",

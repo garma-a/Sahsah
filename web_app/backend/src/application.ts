@@ -6,7 +6,8 @@ import AppModule from "./app.module.js";
 import { mountAdminDashboard } from "./admin/admin-dashboard.js";
 import { GameplayService } from "./gameplay/service.js";
 import type { GameplayOptions } from "./gameplay/ports.js";
-import { r2Signer } from "./gameplay/media.js";
+import { localMedia, publicMediaBaseUrl, r2Signer } from "./gameplay/media.js";
+import { trustedProxyHops } from "./gameplay/http.js";
 import { GameplayWsAdapter } from "./gameplay/realtime.js";
 import { json, type ErrorRequestHandler } from "express";
 import { randomUUID } from "node:crypto";
@@ -16,15 +17,26 @@ export async function createApplication(
 ) {
   const app = await NestFactory.create(AppModule, { abortOnError: false });
   const config = app.get(ConfigService);
-  app.getHttpAdapter().getInstance().disable("x-powered-by");
+  const express = app.getHttpAdapter().getInstance();
+  express.disable("x-powered-by");
+  // Behind a platform proxy, rate limits must key on the client address.
+  const hops = trustedProxyHops(process.env);
+  if (hops) express.set("trust proxy", hops);
+  const gameplay =
+      options.gameplay?.enabled ?? process.env.GAMEPLAY_ENABLED === "true",
+    local = gameplay ? localMedia(process.env) : undefined;
   app.get(GameplayService).configure({
     ...options.gameplay,
     signMedia:
       options.gameplay?.signMedia ??
-      ((options.gameplay?.enabled ?? process.env.GAMEPLAY_ENABLED === "true")
-        ? r2Signer(process.env)
+      (gameplay ? (local?.sign ?? r2Signer(process.env)) : undefined),
+    publicMediaBaseUrl:
+      options.gameplay?.publicMediaBaseUrl ??
+      (gameplay
+        ? (local?.publicBaseUrl ?? publicMediaBaseUrl(process.env))
         : undefined),
   });
+  if (local) app.use("/api/dev-media", local.serve);
   app.setGlobalPrefix("api");
   app.useWebSocketAdapter(
     new GameplayWsAdapter(app, {
