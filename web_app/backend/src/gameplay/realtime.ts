@@ -1,3 +1,4 @@
+import { log, withContext, errorStack } from "./logging.js";
 import { type OnModuleDestroy } from "@nestjs/common";
 import {
   WebSocketGateway,
@@ -109,6 +110,7 @@ interface Connection {
   streamId: string;
   sequence: bigint;
   roomId?: string;
+  gameId?: string;
   memberId?: string;
   actor?: Actor;
   language: Contract<"Language">;
@@ -161,10 +163,15 @@ export class GameplayRealtime
   afterInit(server: WebSocketServer) {
     this.server = server;
     this.core.onCommitted = (roomId) => this.invalidate(roomId);
-    this.timer = setInterval(() => this.tick(), 1000);
+    this.timer = setInterval(() => withContext("realtime.tick", () => this.tick(), { requestId: randomUUID() }), 1000);
     this.timer.unref();
   }
   handleConnection(socket: WebSocket, request: IncomingMessage) {
+    const connectionId = randomUUID();
+    let connection: Connection | undefined;
+    const socketContext = () => ({ requestId: connectionId, roomId: connection?.roomId, gameId: connection?.gameId, accountId: connection?.actor?.account?.accountId });
+    withContext("realtime.handleConnection", () => log.info("realtime.handleConnection", { outcome: "open" }), socketContext());
+    socket.once("close", (closeCode) => withContext("realtime.close", () => log.info("realtime.close", { closeCode }), socketContext()));
     if (
       !this.core.options.enabled ||
       [...this.connections].filter((c) => !c.actor).length >= 64 ||
@@ -175,7 +182,7 @@ export class GameplayRealtime
     }
     const c: Connection = {
       socket,
-      streamId: randomUUID(),
+      streamId: connectionId,
       sequence: 0n,
       language: "ar",
       busy: false,
@@ -195,6 +202,7 @@ export class GameplayRealtime
       ),
       releaseUpgrade: pendingUpgrades.get(request),
     };
+    connection = c;
     c.authTimer.unref();
     this.connections.add(c);
     socket.on("error", () => this.cleanup(c));
@@ -216,7 +224,7 @@ export class GameplayRealtime
       }
       c.tokens--;
       c.queue.push(raw);
-      void this.consume(c);
+      void withContext("realtime.consume", () => this.consume(c), socketContext());
     });
   }
   current(c: Connection) {
@@ -470,7 +478,8 @@ export class GameplayRealtime
       let failed = false;
       void this.core.scheduler
         .run("protected", () => this.publish(roomId, room))
-        .catch(() => {
+        .catch((error) => {
+          log.warn("realtime.pump", { code: "IN_PROCESS_PUSH_FAILED", stack: errorStack(error) });
           failed = true;
           if (this.rooms.has(roomId)) this.pendingRooms.add(roomId);
         })
@@ -487,6 +496,7 @@ export class GameplayRealtime
     }
   }
   private async publish(roomId: string, stream: RoomStream) {
+    log.debug("realtime.publish", { count: [...this.members.values()].filter((c) => c.roomId === roomId).length });
     try {
       for (
         let pass = 0;
@@ -563,6 +573,7 @@ export class GameplayRealtime
           });
         }
         const fence = await this.fence(roomId);
+        for (const c of recipients) c.gameId = fence.game?.id;
         const source: Contract<"LobbySource"> | Contract<"GameSource"> = {
           roomVersion: String(fence.room.stateVersion),
           ...(fence.game && fence.room.presentationMode === "game"

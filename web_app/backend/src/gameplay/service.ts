@@ -1,3 +1,5 @@
+import { writtenAtMost, written } from "./invariant.js";
+import { scoped, enrichContext, log, errorStack, context, withContext } from "./logging.js";
 import type { Contract } from "./contract.js";
 import { single, invariant } from "./invariant.js";
 import {
@@ -202,10 +204,19 @@ export class GameplayService implements OnModuleInit, OnModuleDestroy {
     }
   }
   operation(req: Request) {
-    return id(req.headers["idempotency-key"]);
+    const operationId = id(req.headers["idempotency-key"]);
+    enrichContext({ operationId });
+    return operationId;
   }
   /** Live streams subscribe here; called once per changed room after commit. */
   onCommitted?: (roomId: string) => void;
+  private committedLogs = new WeakMap<Tx, (() => void)[]>();
+  afterCommit(db: Tx, work: () => void) {
+    const captured = { ...context() };
+    const logs = this.committedLogs.get(db) ?? [];
+    logs.push(() => withContext(captured.scope, work, captured));
+    this.committedLogs.set(db, logs);
+  }
   private hinted = new WeakMap<Tx, Map<string, string>>();
   private pushed = new Set<string>();
   /** True once for a hint this process already delivered after its commit. */
@@ -224,6 +235,7 @@ export class GameplayService implements OnModuleInit, OnModuleDestroy {
         });
         // Push without waiting for the outbox poll. The durable hint remains
         // the safety net for a crash between commit and this line.
+        if (committing) for (const writeLog of this.committedLogs.get(committing) ?? []) writeLog();
         const hints = committing && this.hinted.get(committing);
         if (hints && this.onCommitted) {
           for (const key of hints.keys()) {
@@ -231,8 +243,13 @@ export class GameplayService implements OnModuleInit, OnModuleDestroy {
               this.pushed.delete(this.pushed.values().next().value!);
             this.pushed.add(key);
           }
-          for (const roomId of new Set(hints.values()))
-            this.onCommitted(roomId);
+          for (const roomId of new Set(hints.values())) {
+            try { this.onCommitted(roomId); }
+            catch (error) {
+              log.warn("platform.transaction.push", { code: "IN_PROCESS_PUSH_FAILED", stack: errorStack(error) });
+              throw error;
+            }
+          }
         }
         return result;
       } catch (error) {
@@ -246,10 +263,12 @@ export class GameplayService implements OnModuleInit, OnModuleDestroy {
               constraint ?? "",
             ));
         if (!retry || attempt >= 2) throw error;
+        log.warn("platform.transaction.retry", { code, attempt: attempt + 1 });
         await retryDelay(10 * (attempt + 1));
       }
     }
   }
+  @scoped("service.identity")
   async identity(authorization?: string): Promise<Actor> {
     this.enabled();
     requireState(
@@ -298,10 +317,12 @@ export class GameplayService implements OnModuleInit, OnModuleDestroy {
       throw new GameplayProblem(401, "UNAUTHENTICATED");
     }
     const verified = { ...account, accountId: row.id };
+    enrichContext({ accountId: row.id });
     if (!cached?.account)
       this.rememberCredential(fingerprint, `account:${row.id}`, verified);
     return { account: verified, proofFingerprint: fingerprint };
   }
+  @scoped("service.actor")
   async actor(req: Request): Promise<Actor> {
     const known = this.actors.get(req);
     if (known) return known;
@@ -335,10 +356,14 @@ export class GameplayService implements OnModuleInit, OnModuleDestroy {
         403,
       );
   }
+  @scoped("service.room")
   async room(db: Tx, roomId: string, lock = true): Promise<Room> {
     const query = db.select().from(s.rooms).where(eq(s.rooms.id, roomId));
+    const waiting = performance.now();
     const room = (await (lock ? query.for("update") : query))[0];
+    if (lock) log.debug("rooms.room.lock", { waitMs: performance.now() - waiting });
     requireState(room, "NOT_FOUND", 404);
+    enrichContext({ roomId: room.id });
     return room;
   }
   async members(db: Tx, roomId: string) {
@@ -440,7 +465,7 @@ export class GameplayService implements OnModuleInit, OnModuleDestroy {
       effect: "changed",
       ...outcome,
     };
-    await db.insert(s.roomActions).values({
+    single(await db.insert(s.roomActions).values({
       operationId,
       roomId: room.id,
       actorAccountId: actor.account?.accountId,
@@ -451,7 +476,7 @@ export class GameplayService implements OnModuleInit, OnModuleDestroy {
       acceptedAt: now.toISOString(),
       expiresAt: new Date(now.getTime() + 7 * 86400000).toISOString(),
       resultData: result,
-    });
+    }).returning(), "ROOMACTIONS_WRITE_ROW");
     return result;
   }
   async hint(
@@ -465,7 +490,7 @@ export class GameplayService implements OnModuleInit, OnModuleDestroy {
       deduplicationKey = `${gameId ? "game" : "room"}:${resource}:${gameProjection ?? version}`;
     const hints = this.hinted.get(db) ?? new Map<string, string>();
     this.hinted.set(db, hints.set(deduplicationKey, roomId));
-    await db
+    await writtenAtMost(db
       .insert(s.outboxEvents)
       .values({
         id: randomUUID(),
@@ -477,8 +502,9 @@ export class GameplayService implements OnModuleInit, OnModuleDestroy {
         availableAt: sql`clock_timestamp()`,
         createdAt: sql`clock_timestamp()`,
       })
-      .onConflictDoNothing();
+      .onConflictDoNothing().returning(), 1, "OUTBOXEVENTS_WRITE_COUNT");
   }
+  @scoped("service.create")
   async create(actor: Actor, operationId: string, body: Contract<"CreateRoom">): Promise<Contract<"Receipt">> {
     requireState(actor.account, "UNAUTHENTICATED", 401);
     const hash = digest("createRoom", actor.account.accountId, body);
@@ -568,17 +594,18 @@ export class GameplayService implements OnModuleInit, OnModuleDestroy {
               invitationExpiresAt: plusDay(now),
             })
             .returning(), "SERVICE_ROOM_ROW");
-          await db.insert(s.roomMemberships).values({
+          single(await db.insert(s.roomMemberships).values({
             id: memberId,
             roomId,
             accountId: actor.account!.accountId,
             displayName: account!.displayName!,
             lobbyTeamNumber: body.hostTeamNumber,
             joinedAt: now.toISOString(),
-          });
+          }).returning(), "ROOMMEMBERSHIPS_WRITE_ROW");
+          enrichContext({ roomId, accountId: actor.account!.accountId });
           const selections = body.selections;
           if (selections.length)
-            await db.insert(s.roomPackSelections).values(
+            await written(db.insert(s.roomPackSelections).values(
               selections.map((item) => ({
                 roomId,
                 boardPosition: Number(item.boardPosition),
@@ -586,8 +613,9 @@ export class GameplayService implements OnModuleInit, OnModuleDestroy {
                 packId: String(item.packId),
                 observedRevision: BigInt(String(item.observedRevision)),
               })),
-            );
+            ).returning(), selections.length, "ROOMPACKSELECTIONS_WRITE_COUNT");
           await this.hint(db, room.id, room.stateVersion);
+          this.afterCommit(db, () => log.info("rooms.create", { outcome: "created" }));
           return this.saveReceipt(
             db,
             room,

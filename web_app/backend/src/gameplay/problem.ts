@@ -15,6 +15,8 @@ export class GameplayProblem extends Error {
     public details: JsonObject = {},
   ) {
     super(code);
+    if (status >= 400 && status < 500) log.warn(context().scope, { code, status });
+    else if (status >= 500 && code !== "INTERNAL_INVARIANT") log.error(context().scope, { code, status, stack: errorStack(this) });
   }
 }
 export function requireState(
@@ -62,8 +64,8 @@ export class GameplayProblemFilter implements ExceptionFilter {
     if (status === 429 || status === 503)
       response.setHeader("Retry-After", "15");
     const requestId = context().requestId;
-    if (status >= 500) log.error("platform.problem.catch", { code: applicationCode, status, stack: errorStack(error) });
-    else if (error instanceof GameplayProblem) log.warn("platform.problem.catch", { code: applicationCode, status });
+    if (status >= 500 && !(error instanceof GameplayProblem)) log.error("platform.problem.catch", { code: applicationCode, status, stack: errorStack(error) });
+
     response.setHeader("X-Request-Id", requestId);
     response.setHeader("Cache-Control", "private, no-store");
     response

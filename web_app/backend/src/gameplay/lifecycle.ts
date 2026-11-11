@@ -1,3 +1,4 @@
+import { scoped, enrichContext, log, errorStack } from "./logging.js";
 import { single, invariant } from "./invariant.js";
 import { Injectable } from "@nestjs/common";
 import { and, eq, isNull, sql } from "drizzle-orm";
@@ -73,6 +74,7 @@ export class RoomLifecycle {
     )[0];
     if (room) await this.expireRoom(room.id);
   }
+  @scoped("lifecycle.current")
   async current(actor: Actor): Promise<Contract<"CurrentRoomResponse">> {
     requireState(actor.account, "UNAUTHENTICATED", 401);
     const row = (
@@ -125,6 +127,7 @@ export class RoomLifecycle {
         : {}),
     };
   }
+  @scoped("lifecycle.takeover")
   async takeover(
     actor: Actor,
     roomId: string,
@@ -215,6 +218,7 @@ export class RoomLifecycle {
       );
     });
   }
+  @scoped("lifecycle.replay")
   async replay(
     actor: Actor,
     roomId: string,
@@ -265,6 +269,7 @@ export class RoomLifecycle {
       );
     });
   }
+  @scoped("lifecycle.bind")
   async bind(
     actor: Actor,
     guest: Actor,
@@ -327,6 +332,7 @@ export class RoomLifecycle {
       );
     });
   }
+  @scoped("lifecycle.memberAction")
   async memberAction(
     actor: Actor,
     roomId: string,
@@ -434,7 +440,7 @@ export class RoomLifecycle {
             ),
           );
         if (member.accountId)
-          await db
+          single(await db
             .update(s.accounts)
             .set({ activeGameId: null, activeGameClaimedAt: null })
             .where(
@@ -442,7 +448,7 @@ export class RoomLifecycle {
                 eq(s.accounts.id, member.accountId),
                 eq(s.accounts.activeGameId, game.id),
               ),
-            );
+            ).returning(), "ACCOUNTS_WRITE_ROW");
         const changed = single(await db
           .update(s.games)
           .set({
@@ -493,6 +499,7 @@ export class RoomLifecycle {
       );
     });
   }
+  @scoped("lifecycle.closeLocked")
   async closeLocked(
     db: Tx,
     room: Room,
@@ -562,6 +569,7 @@ export class RoomLifecycle {
       false,
     );
   }
+  @scoped("lifecycle.close")
   async close(actor: Actor, roomId: string, operationId: string, body: Contract<"RoomMutation">) {
     return this.core.transaction(async (db) =>
       this.closeLocked(
@@ -575,6 +583,7 @@ export class RoomLifecycle {
       ),
     );
   }
+  @scoped("lifecycle.expireRoom")
   async expireRoom(roomId: string) {
     const initial = await this.core.room(this.core.database.db, roomId, false);
     if (initial.closedAt) return;
@@ -591,7 +600,10 @@ export class RoomLifecycle {
         new Date(room.lastLobbyActivityAt).getTime(),
         game?.endedAt ? new Date(game.endedAt).getTime() : 0,
       );
-      if (now.getTime() >= base + 86400000) await this.closeRows(db, room, now);
+      if (now.getTime() >= base + 86400000) {
+        await this.closeRows(db, room, now);
+        this.core.afterCommit(db, () => log.info("rooms.expireRoom", { outcome: "expired" }));
+      }
     });
   }
 }

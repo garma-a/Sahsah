@@ -1,3 +1,4 @@
+import { scoped, enrichContext, log, errorStack } from "./logging.js";
 import type { Contract } from "./contract.js";
 import { invariant } from "./invariant.js";
 import { Injectable } from "@nestjs/common";
@@ -137,6 +138,7 @@ export class MediaService {
     private games: GameOperations,
     private projections: ProjectionService,
   ) {}
+  @scoped("media.access")
   async access(actor: Actor, gameId: string, body: Contract<"MediaRequest">): Promise<Contract<"MediaLinks">> {
     const requested = body.refs;
     requireState(

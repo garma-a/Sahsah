@@ -1,3 +1,4 @@
+import { log } from "./logging.js";
 import { GameplayProblem, requireState } from "./problem.js";
 import type { Contract } from "./contract.js";
 import type { PressureSample } from "./ports.js";
@@ -26,6 +27,7 @@ export class Admission {
   private occupancy?: CapacityVector;
   private ceiling?: CapacityVector;
   revision = 0;
+  private loggedPaused = false;
   configure(ceiling: CapacityVector) {
     requireState(
       [ceiling.rooms, ceiling.members, ceiling.games].every(
@@ -102,7 +104,10 @@ export class Admission {
           this.occupancy![key] >=
           Math.floor(this.ceiling![key] * 0.85),
       );
-    return this.closed || full
+    const paused = this.closed || full;
+    if (paused && !this.loggedPaused) log.warn("platform.admission.availability", { code: "ADMISSION_PAUSED" });
+    this.loggedPaused = paused;
+    return paused
       ? { admission: "paused", retryAfterSeconds: 15 }
       : { admission: "open" };
   }

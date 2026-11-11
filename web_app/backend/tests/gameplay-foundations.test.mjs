@@ -54,3 +54,17 @@ test("invariants assert impossible states and exact single-row results", async (
     assert.throws(check, (error) => error.status === 500 && error.code === "INTERNAL_INVARIANT");
   }
 });
+
+
+test("state helpers reject impossible scores, positions and version transitions", async () => {
+  const { stateInvariants, versionIncrement, written, writtenAtMost } = await import("../dist/gameplay/invariant.js");
+  stateInvariants({ teamOneScore: 0n, teamTwoScore: 10n, boardPosition: 1, questionPosition: 6, stageIndex: 2, remainingMs: 0 });
+  versionIncrement(4n, 5n);
+  await written(Promise.resolve([{ boardPosition: 3 }]), 1, "EXACT");
+  await writtenAtMost(Promise.resolve([]), 1, "DEDUPLICATED");
+  for (const row of [{ teamOneScore: -1n }, { boardPosition: 7 }, { stageIndex: 3 }, { remainingMs: 60001 }, { activeBoardPosition: 1, activeQuestionPosition: null }, { timerState: "running", timerDeadlineAt: null }]) {
+    assert.throws(() => stateInvariants(row), { code: "INTERNAL_INVARIANT" });
+  }
+  assert.throws(() => versionIncrement(4n, 6n), { code: "INTERNAL_INVARIANT" });
+  await assert.rejects(written(Promise.resolve([]), 1, "EXACT"), { code: "INTERNAL_INVARIANT" });
+});

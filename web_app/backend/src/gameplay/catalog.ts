@@ -1,3 +1,4 @@
+import { scoped, enrichContext, log, errorStack } from "./logging.js";
 import { Injectable } from "@nestjs/common";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import * as s from "../database/schema/index.js";
@@ -60,6 +61,7 @@ const next = (n: number, id: string) =>
 @Injectable()
 export class CatalogService {
   constructor(private core: GameplayService) {}
+  @scoped("catalog.categories")
   async categories(query: Record<string, unknown>): Promise<Contract<"CategoryPage">> {
     this.core.enabled();
     const lang = language(query.language),
@@ -220,6 +222,7 @@ export class CatalogService {
       }),
     );
   }
+  @scoped("catalog.packs")
   async packs(
     actor: Actor | undefined,
     categoryId: string,

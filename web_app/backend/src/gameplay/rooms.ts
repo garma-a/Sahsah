@@ -1,4 +1,6 @@
-import { single, invariant } from "./invariant.js";
+import { written } from "./invariant.js";
+import { scoped, enrichContext, log, errorStack } from "./logging.js";
+import { single, invariant, versionIncrement } from "./invariant.js";
 import { Injectable } from "@nestjs/common";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { randomInt, randomUUID } from "node:crypto";
@@ -25,6 +27,7 @@ export class RoomOperations {
     private core: GameplayService,
     private catalog: CatalogService,
   ) {}
+  @scoped("rooms.bump")
   async bump(
     db: Tx,
     room: Room,
@@ -53,6 +56,8 @@ export class RoomOperations {
       })
       .where(eq(s.rooms.id, room.id))
       .returning(), "ROOMS_UPDATED_ROW");
+    versionIncrement(room.stateVersion, updated.stateVersion);
+    invariant(updated.lobbyGeneration === room.lobbyGeneration + Number(semantic), "ROOM_READY_GENERATION_INCREMENT");
     await this.core.hint(db, room.id, updated.stateVersion);
     return updated;
   }
@@ -151,6 +156,7 @@ export class RoomOperations {
       admission: this.core.admission.availability().admission,
     };
   }
+  @scoped("rooms.join")
   async join(
     code: string,
     actor: Actor | undefined,
@@ -293,6 +299,7 @@ export class RoomOperations {
       }),
     );
   }
+  @scoped("rooms.rotate")
   async rotate(
     actor: Actor,
     roomId: string,
@@ -347,6 +354,7 @@ export class RoomOperations {
       );
     });
   }
+  @scoped("rooms.memberChange")
   async memberChange(
     actor: Actor,
     roomId: string,
@@ -442,6 +450,7 @@ export class RoomOperations {
       );
     });
   }
+  @scoped("rooms.saveSetup")
   async saveSetup(
     actor: Actor,
     roomId: string,
@@ -553,18 +562,18 @@ export class RoomOperations {
         teamTwoName: String(body.teamTwoName).trim(),
       });
       if (host.lobbyTeamNumber !== body.hostTeamNumber)
-        await db
+        single(await db
           .update(s.roomMemberships)
           .set({
             lobbyTeamNumber: body.hostTeamNumber,
             stateVersion: host.stateVersion + 1n,
           })
-          .where(eq(s.roomMemberships.id, host.id));
+          .where(eq(s.roomMemberships.id, host.id)).returning(), "ROOMMEMBERSHIPS_WRITE_ROW");
       await db
         .delete(s.roomPackSelections)
         .where(eq(s.roomPackSelections.roomId, roomId));
       if (choices.length)
-        await db.insert(s.roomPackSelections).values(
+        await written(db.insert(s.roomPackSelections).values(
           choices.map((choice) => ({
             roomId,
             boardPosition: Number(choice.boardPosition),
@@ -581,7 +590,7 @@ export class RoomOperations {
                 }
               : {}),
           })),
-        );
+        ).returning(), choices.length, "ROOMPACKSELECTIONS_WRITE_COUNT");
       return this.core.saveReceipt(
         db,
         updated,

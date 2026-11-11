@@ -33,15 +33,19 @@ export interface LogFields {
 }
 export const logContext = new AsyncLocalStorage<LogContext>();
 const processId = randomUUID();
+const parents = new WeakMap<LogContext, LogContext>();
 export function context() {
   return logContext.getStore() ?? { requestId: processId, scope: "platform.process" };
 }
 export function withContext<T>(scope: string, work: () => T, fields: Partial<LogContext> = {}): T {
-  return logContext.run({ ...context(), ...fields, scope }, work);
+  const parent = logContext.getStore();
+  const next = { ...context(), ...fields, scope };
+  if (parent && parent.requestId === next.requestId) parents.set(next, parent);
+  return logContext.run(next, work);
 }
 export function enrichContext(fields: Partial<Omit<LogContext, "scope" | "requestId">>) {
-  const current = logContext.getStore();
-  if (current) Object.assign(current, fields);
+  let current = logContext.getStore();
+  while (current) { Object.assign(current, fields); current = parents.get(current); }
 }
 export function requestId(value: unknown) {
   return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(value)
@@ -139,4 +143,14 @@ export class SafeNestLogger implements LoggerService {
     withContext("platform.nest.error", () => this.logger.error({ code: "NEST_ERROR", stack: errorStack(error) }));
   }
   fatal(error: unknown) { this.error(error); }
+}
+
+/** Preserve the async scope across existing methods without changing their arguments. */
+export function scoped(scope: string) {
+  return function <A extends unknown[], R>(_target: object, _name: string, descriptor: TypedPropertyDescriptor<(...args: A) => R>) {
+    const work = descriptor.value;
+    if (work) descriptor.value = function (...args: A): R {
+      return withContext(scope, () => work.apply(this, args));
+    };
+  };
 }
