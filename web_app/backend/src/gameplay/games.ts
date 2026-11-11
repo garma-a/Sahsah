@@ -618,7 +618,7 @@ export class GameOperations {
               asset.state === "ready" &&
                 !asset.archivedAt &&
                 asset.accessScope === "private" &&
-                asset.storageProvider === "r2" &&
+                ["r2", "local"].includes(asset.storageProvider) &&
                 asset.contentType &&
                 asset.contentType.length <= 100 &&
                 asset.byteSize !== null &&

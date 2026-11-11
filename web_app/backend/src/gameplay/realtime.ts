@@ -16,6 +16,7 @@ import { frame } from "./realtime-contract.js";
 import { canonical, equalProof, proof } from "./proof.js";
 import { questionView, answerView } from "./content.js";
 import { GameplayProblem, requireState } from "./problem.js";
+import { clientAddress } from "./http.js";
 import type { Data } from "./ports.js";
 import type { IncomingMessage } from "node:http";
 
@@ -65,7 +66,7 @@ function verifyUpgrade(info: { origin: string; req: IncomingMessage }) {
   const origins = (process.env.CORS_ORIGINS ?? "http://localhost:3000")
     .split(",")
     .map((v) => v.trim());
-  const source = info.req.socket.remoteAddress ?? "unknown";
+  const source = clientAddress(info.req);
   if (
     info.req.url !== "/api/v1/realtime" ||
     (info.origin && !origins.includes(info.origin)) ||
@@ -150,6 +151,7 @@ export class GameplayRealtime
   ) {}
   afterInit(server: WebSocketServer) {
     this.server = server;
+    this.core.onCommitted = (roomId) => this.invalidate(roomId);
     this.timer = setInterval(() => this.tick(), 1000);
     this.timer.unref();
   }
@@ -343,8 +345,8 @@ export class GameplayRealtime
     const key = `${room.id}:${member.id}`,
       old = this.members.get(key);
     this.members.set(key, c);
-    if (old && old !== c)
-      this.stop(old, "membership_revoked", "STREAM_REPLACED");
+    // The seat is still valid: another tab or device took over this stream.
+    if (old && old !== c) this.stop(old, "stream_replaced", "STREAM_REPLACED");
     this.rooms.set(
       room.id,
       this.rooms.get(room.id) ?? { dirty: 0, running: false },
@@ -755,7 +757,9 @@ export class GameplayRealtime
         ? "control_revoked"
         : code === "ROOM_CLOSED"
           ? "room_closed"
-          : "membership_revoked",
+          : code === "STREAM_REPLACED"
+            ? "stream_replaced"
+            : "membership_revoked",
       code,
     );
   }

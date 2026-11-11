@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createApplication } from "../dist/application.js";
 
-// Starter HTTP tests must never pick up a developer's configured database.
+// Starter HTTP tests must never pick up a developer's configured database or gameplay.
 process.env.DATABASE_URL = "";
+process.env.GAMEPLAY_ENABLED = "false";
 process.env.NODE_ENV = "test";
 
 const credentials = {

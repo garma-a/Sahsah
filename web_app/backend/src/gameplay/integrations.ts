@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { availableParallelism, totalmem } from "node:os";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { z } from "zod";
 import type { PressureSample, VerifiedAccount } from "./ports.js";
@@ -55,26 +56,12 @@ const number = (value: string | undefined) => {
   requireState(Number.isFinite(n) && n > 0, "INVALID_RESOURCE_LIMIT", 500);
   return n;
 };
-export function resourcePressure(
-  env: NodeJS.ProcessEnv,
-  metrics: GameplayMetrics,
-): (() => Promise<PressureSample>) | undefined {
-  if (!env.GAMEPLAY_DB_PRESSURE_URL) return;
-  const url = new URL(env.GAMEPLAY_DB_PRESSURE_URL);
-  requireState(
-    url.protocol === "https:" && !url.username && !url.password,
-    "INVALID_PRESSURE_SOURCE",
-    500,
-  );
-  const expectedCpu = number(env.GAMEPLAY_DB_CPU_LIMIT_CORES),
-    expectedMemory = number(env.GAMEPLAY_DB_MEMORY_LIMIT_BYTES);
+/** Fraction of this process's CPU or memory limit in use, whichever is higher. */
+function apiLoad(env: NodeJS.ProcessEnv, hostFallback = false) {
   let previousCpu = process.cpuUsage(),
-    previousAt = performance.now(),
-    dbSample: z.infer<typeof dbMetric> | undefined,
-    dbFetchedAt = 0;
+    previousAt = performance.now();
   return async () => {
-    const now = Date.now(),
-      at = performance.now(),
+    const at = performance.now(),
       cpu = process.cpuUsage();
     const elapsedUs = Math.max(1, (at - previousAt) * 1000),
       cpuUsed =
@@ -89,14 +76,16 @@ export function resourcePressure(
         String(process.memoryUsage().rss),
       ),
     ]);
+    const configured = (value: string | undefined, host: number) =>
+      hostFallback && !value ? host : number(value);
     const cpuParts = cpuMax.trim().split(/\s+/);
     const cpuLimit =
       cpuParts[0] === "max"
-        ? number(env.GAMEPLAY_API_CPU_LIMIT_CORES)
+        ? configured(env.GAMEPLAY_API_CPU_LIMIT_CORES, availableParallelism())
         : Number(cpuParts[0]) / Number(cpuParts[1]);
     const memoryLimit =
       memoryMax.trim() === "max"
-        ? number(env.GAMEPLAY_API_MEMORY_LIMIT_BYTES)
+        ? configured(env.GAMEPLAY_API_MEMORY_LIMIT_BYTES, totalmem())
         : Number(memoryMax.trim());
     requireState(
       cpuLimit > 0 &&
@@ -106,6 +95,52 @@ export function resourcePressure(
       "INVALID_RESOURCE_LIMIT",
       500,
     );
+    return Math.max(
+      cpuUsed / cpuLimit,
+      Number(memoryCurrent.trim()) / memoryLimit,
+    );
+  };
+}
+/**
+ * Preview admission: API process pressure only. The preview database has no
+ * exporter, so the small fixed room ceiling bounds its load instead.
+ */
+export function previewPressure(
+  env: NodeJS.ProcessEnv,
+  metrics: GameplayMetrics,
+): () => Promise<PressureSample> {
+  const api = apiLoad(env, true);
+  return async () => {
+    const used = await api(),
+      loop = metrics.loop.percentile(99) / 1000000;
+    metrics.loop.reset();
+    return {
+      api: used,
+      database: 0,
+      sampledAt: Date.now(),
+      application: loop / 200,
+    };
+  };
+}
+export function resourcePressure(
+  env: NodeJS.ProcessEnv,
+  metrics: GameplayMetrics,
+): (() => Promise<PressureSample>) | undefined {
+  if (!env.GAMEPLAY_DB_PRESSURE_URL) return;
+  const url = new URL(env.GAMEPLAY_DB_PRESSURE_URL);
+  requireState(
+    url.protocol === "https:" && !url.username && !url.password,
+    "INVALID_PRESSURE_SOURCE",
+    500,
+  );
+  const expectedCpu = number(env.GAMEPLAY_DB_CPU_LIMIT_CORES),
+    expectedMemory = number(env.GAMEPLAY_DB_MEMORY_LIMIT_BYTES);
+  const api = apiLoad(env);
+  let dbSample: z.infer<typeof dbMetric> | undefined,
+    dbFetchedAt = 0;
+  return async () => {
+    const now = Date.now(),
+      apiUsed = await api();
     if (!dbSample || now - dbFetchedAt >= 5000) {
       const response = await fetch(url, {
         headers: env.GAMEPLAY_DB_PRESSURE_TOKEN
@@ -142,10 +177,7 @@ export function resourcePressure(
     const loop = metrics.loop.percentile(99) / 1000000;
     metrics.loop.reset();
     return {
-      api: Math.max(
-        cpuUsed / cpuLimit,
-        Number(memoryCurrent.trim()) / memoryLimit,
-      ),
+      api: apiUsed,
       database: Math.max(
         dbSample.cpuUsedCores / expectedCpu,
         dbSample.memoryUsedBytes / expectedMemory,

@@ -19,6 +19,7 @@ export class GameplayMaintenance implements OnModuleInit, OnModuleDestroy {
   private busy = false;
   private stopped = false;
   private lastHousekeeping = 0;
+  private lastDispatch = 0;
   private current?: Promise<void>;
   private logger = new Logger(GameplayMaintenance.name);
   constructor(
@@ -39,7 +40,12 @@ export class GameplayMaintenance implements OnModuleInit, OnModuleDestroy {
   private async pass() {
     this.busy = true;
     try {
-      await this.core.scheduler.run("background", () => this.dispatch());
+      // Mutations push live views in-process after commit; this poll only
+      // delivers maintenance changes and hints orphaned by a failed push.
+      if (Date.now() - this.lastDispatch >= 500) {
+        this.lastDispatch = Date.now();
+        await this.core.scheduler.run("background", () => this.dispatch());
+      }
       if (Date.now() - this.lastHousekeeping >= 1000) {
         this.lastHousekeeping = Date.now();
         await this.core.scheduler.run("background", async () => {
@@ -102,14 +108,20 @@ export class GameplayMaintenance implements OnModuleInit, OnModuleDestroy {
     const events = await this.core.database.transaction(async (db) => {
       const result =
         await db.execute(sql`WITH candidates AS (SELECT id FROM outbox_events WHERE topic IN ('room.changed','game.changed','account.gameplay.changed') AND ((state='pending' AND available_at<=clock_timestamp()) OR (state='running' AND lease_until<=clock_timestamp())) AND attempt_count<max_attempts ORDER BY available_at,id FOR UPDATE SKIP LOCKED LIMIT 50)
-        UPDATE outbox_events e SET state='running',attempt_count=e.attempt_count+1,lease_token=${lease},lease_until=clock_timestamp()+interval '30 seconds' FROM candidates c WHERE e.id=c.id RETURNING e.id,e.payload,e.created_at`);
+        UPDATE outbox_events e SET state='running',attempt_count=e.attempt_count+1,lease_token=${lease},lease_until=clock_timestamp()+interval '30 seconds' FROM candidates c WHERE e.id=c.id RETURNING e.id,e.payload,e.created_at,e.deduplication_key`);
       return result.rows as {
         id: string;
         payload: { roomId: string };
         created_at: Date;
+        deduplication_key: string;
       }[];
     });
-    for (const roomId of new Set(events.map((e) => e.payload.roomId)))
+    // Hints already pushed in-process after their commit are only acknowledged.
+    for (const roomId of new Set(
+      events
+        .filter((e) => !this.core.takePushed(e.deduplication_key))
+        .map((e) => e.payload.roomId),
+    ))
       this.realtime.invalidate(roomId);
     if (events.length) {
       await this.core.database.transaction((db) =>

@@ -1,0 +1,20 @@
+# Local development database only. Passwords here are local defaults, never
+# deployment secrets; the port is bound to this machine.
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_PASSWORD: sahsah_local_admin
+      POSTGRES_DB: sahsah
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - sahsah_postgres:/var/lib/postgresql
+      - ./scripts/database/local-roles.sql:/docker-entrypoint-initdb.d/10-roles.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d sahsah"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+volumes:
+  sahsah_postgres:

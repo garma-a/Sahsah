@@ -4169,6 +4169,25 @@
         "data"
       ]
     },
+    "ServerStreamReplacedFrame": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "event": {
+          "type": "string",
+          "enum": [
+            "stream_replaced"
+          ]
+        },
+        "data": {
+          "$ref": "#/$defs/ProtocolNoticeData"
+        }
+      },
+      "required": [
+        "event",
+        "data"
+      ]
+    },
     "ServerRoomClosedFrame": {
       "type": "object",
       "additionalProperties": false,
@@ -4396,6 +4415,9 @@
     },
     {
       "$ref": "#/$defs/ServerMembershipRevokedFrame"
+    },
+    {
+      "$ref": "#/$defs/ServerStreamReplacedFrame"
     },
     {
       "$ref": "#/$defs/ServerRoomClosedFrame"

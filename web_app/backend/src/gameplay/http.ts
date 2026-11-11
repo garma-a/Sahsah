@@ -8,10 +8,31 @@ import {
 import { ConfigService } from "@nestjs/config";
 import { from, lastValueFrom } from "rxjs";
 import type { Request, Response } from "express";
+import type { IncomingMessage } from "node:http";
 import { randomUUID } from "node:crypto";
 import { GameplayService } from "./service.js";
 import { GameplayRates } from "./rates.js";
 import { requireState } from "./problem.js";
+
+/** Number of platform proxies in front of the API; 0 trusts no forwarded address. */
+export function trustedProxyHops(env: NodeJS.ProcessEnv) {
+  const raw = env.TRUSTED_PROXY_HOPS ?? "0";
+  requireState(/^[0-3]$/.test(raw), "INVALID_PROXY_CONFIGURATION", 500);
+  return Number(raw);
+}
+/** Client address as seen through exactly the configured number of proxies. */
+export function clientAddress(
+  req: IncomingMessage,
+  hops = trustedProxyHops(process.env),
+) {
+  const direct = req.socket.remoteAddress ?? "unknown";
+  if (!hops) return direct;
+  const forwarded = String(req.headers["x-forwarded-for"] ?? "")
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean);
+  return [...forwarded, direct].at(-1 - hops) ?? forwarded[0] ?? direct;
+}
 
 @Injectable()
 export class GameplayHttpInterceptor implements NestInterceptor, OnModuleInit {
@@ -117,6 +138,10 @@ export class GameplayHttpInterceptor implements NestInterceptor, OnModuleInit {
       const result = await this.core.scheduler.run(lane, () =>
         lastValueFrom(next.handle()),
       );
+      // The category list is identical for every caller, so browsers and the
+      // CDN may reuse a success briefly. Everything else stays uncached.
+      if (path.endsWith("/categories"))
+        req.res!.setHeader("Cache-Control", "public, max-age=60");
       if (allocation && sourceKey) {
         if (this.sources.size >= 4096)
           this.sources.delete(this.sources.keys().next().value!);

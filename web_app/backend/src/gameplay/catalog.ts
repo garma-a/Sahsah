@@ -61,28 +61,88 @@ export class CatalogService {
   async categories(query: Record<string, unknown>): Promise<Data> {
     this.core.enabled();
     const lang = language(query.language as string | undefined),
-      { limit, cursor } = paging(query, 50);
-    const result = await this.core.database.db
-      .execute(sql`SELECT c.id,c.name_ar,c.name_franco,c.display_order,
-      (SELECT count(*)::int FROM question_packs p WHERE p.category_id=c.id AND p.publication_state='published' AND p.archived_at IS NULL) AS count
-      FROM categories c WHERE c.archived_at IS NULL AND (c.display_order,c.id)>(${cursor[0]},${cursor[1]}::uuid)
-      ORDER BY c.display_order,c.id LIMIT ${limit + 1}`);
-    const rows = result.rows as {
-      id: string;
-      name_ar: string;
-      name_franco: string | null;
-      display_order: number;
-      count: number;
-    }[];
+      { limit, cursor } = paging(query, 20);
+    const { db } = this.core.database,
+      c = s.categories,
+      m = s.mediaAssets;
+    const rows = await db
+      .select({
+        category: c,
+        section: s.categorySections,
+        coverKey: m.storageKey,
+      })
+      .from(c)
+      .leftJoin(s.categorySections, eq(s.categorySections.id, c.sectionId))
+      .leftJoin(
+        m,
+        and(
+          eq(m.id, c.coverMediaAssetId),
+          eq(m.state, "ready"),
+          eq(m.accessScope, "public"),
+          isNull(m.archivedAt),
+        ),
+      )
+      .where(
+        and(
+          isNull(c.archivedAt),
+          sql`(${c.displayOrder},${c.id}) > (${cursor[0]},${cursor[1]}::uuid)`,
+        ),
+      )
+      .orderBy(c.displayOrder, c.id)
+      .limit(limit + 1);
+    const page = rows.slice(0, limit);
+    // Counts only packs a host can start: six current questions.
+    const startable = page.length
+      ? await db
+          .select({ categoryId: s.questionPacks.categoryId })
+          .from(s.questionPacks)
+          .innerJoin(
+            s.questions,
+            and(
+              eq(s.questions.packId, s.questionPacks.id),
+              isNull(s.questions.retiredAt),
+            ),
+          )
+          .where(
+            and(
+              inArray(
+                s.questionPacks.categoryId,
+                page.map((r) => r.category.id),
+              ),
+              eq(s.questionPacks.publicationState, "published"),
+              isNull(s.questionPacks.archivedAt),
+            ),
+          )
+          .groupBy(s.questionPacks.categoryId, s.questionPacks.id)
+          .having(sql`count(*) = 6`)
+      : [];
+    const covers = this.core.options.publicMediaBaseUrl;
     return {
-      items: rows.slice(0, limit).map((r) => ({
+      items: page.map(({ category: r, section, coverKey }) => ({
         id: r.id,
-        name: local(r.name_ar, r.name_franco, lang),
-        publishedPackCount: r.count,
+        name: local(r.nameAr, r.nameFranco, lang),
+        ...(r.descriptionAr
+          ? { description: local(r.descriptionAr, r.descriptionFranco, lang) }
+          : {}),
+        ...(section
+          ? {
+              section: {
+                id: section.id,
+                name: local(section.nameAr, section.nameFranco, lang),
+                displayOrder: section.displayOrder,
+              },
+            }
+          : {}),
+        ...(covers && coverKey ? { coverUrl: `${covers}/${coverKey}` } : {}),
+        publishedPackCount: startable.filter((p) => p.categoryId === r.id)
+          .length,
       })),
       ...(rows.length > limit
         ? {
-            nextCursor: next(rows[limit - 1].display_order, rows[limit - 1].id),
+            nextCursor: next(
+              rows[limit - 1].category.displayOrder,
+              rows[limit - 1].category.id,
+            ),
           }
         : {}),
     };
@@ -163,7 +223,7 @@ export class CatalogService {
   ): Promise<Data> {
     this.core.enabled();
     language(query.language as string | undefined);
-    const { limit, cursor } = paging(query, 1);
+    const { limit, cursor } = paging(query, 20);
     requireState(
       query.freshOnly === undefined ||
         query.freshOnly === "true" ||
@@ -217,12 +277,11 @@ export class CatalogService {
           scanned = pack;
           const e = eligibility.get(pack.id)!;
           if (e.questions.length !== 6) continue;
-          if (query.freshOnly !== "false" && !e.fresh) continue;
+          if (query.freshOnly === "true" && !e.fresh) continue;
           let progress: Data | undefined;
           if (own) {
             const row = history.rows.find((r) => r.pack_id === pack.id) as
-              | { current: boolean }
-              | undefined;
+              { current: boolean } | undefined;
             progress = {
               completed: row?.current ?? false,
               updated: !!row && !row.current,

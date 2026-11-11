@@ -2,6 +2,9 @@ import { Injectable } from "@nestjs/common";
 import { and, eq, sql } from "drizzle-orm";
 import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { resolve } from "node:path";
+import type { RequestHandler } from "express";
 import * as s from "../database/schema/index.js";
 import { canonical } from "./proof.js";
 import { answerView, questionView, type Pin } from "./content.js";
@@ -33,8 +36,12 @@ export function r2Signer(
     },
   });
   const bucket = env.R2_GAMEPLAY_BUCKET;
-  return async ({ namespace, key }) => {
-    requireState(namespace === bucket, "MEDIA_UNAVAILABLE", 503);
+  return async ({ provider, namespace, key }) => {
+    requireState(
+      provider === "r2" && namespace === bucket,
+      "MEDIA_UNAVAILABLE",
+      503,
+    );
     const signingDate = new Date();
     const url = await getSignedUrl(
       client,
@@ -46,6 +53,71 @@ export function r2Signer(
       expiresAt: new Date(signingDate.getTime() + 300000).toISOString(),
     };
   };
+}
+/**
+ * Development storage: files under one directory, `private/` behind short
+ * signed links and `public/` open, served by this API. Never used in production.
+ */
+export function localMedia(env: NodeJS.ProcessEnv) {
+  if (!env.GAMEPLAY_LOCAL_MEDIA_DIR) return;
+  requireState(env.NODE_ENV !== "production", "LOCAL_MEDIA_IN_PRODUCTION", 500);
+  const root = resolve(env.GAMEPLAY_LOCAL_MEDIA_DIR),
+    base = (
+      env.GAMEPLAY_LOCAL_MEDIA_URL ??
+      `http://localhost:${env.PORT ?? 3001}/api/dev-media`
+    ).replace(/\/+$/, ""),
+    secret = randomBytes(32);
+  const mac = (key: string, expires: number) =>
+    createHmac("sha256", secret).update(`${expires}:${key}`).digest("hex");
+  const sign = async ({ provider, key }: MediaObject): Promise<SignedMedia> => {
+    requireState(provider === "local", "MEDIA_UNAVAILABLE", 503);
+    const expires = Date.now() + 300000;
+    return {
+      url: `${base}/private/${key}?expires=${expires}&signature=${mac(key, expires)}`,
+      expiresAt: new Date(expires).toISOString(),
+    };
+  };
+  const serve: RequestHandler = (req, res) => {
+    const [, scope, ...rest] = decodeURIComponent(req.path).split("/"),
+      key = rest.join("/"),
+      expires = Number(req.query.expires),
+      signature = Buffer.from(String(req.query.signature ?? ""));
+    const permitted =
+      scope === "public" ||
+      (scope === "private" &&
+        expires > Date.now() &&
+        signature.length === 64 &&
+        timingSafeEqual(signature, Buffer.from(mac(key, expires))));
+    if (!["GET", "HEAD"].includes(req.method) || !key || !permitted) {
+      res.sendStatus(404);
+      return;
+    }
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    res.setHeader(
+      "Cache-Control",
+      scope === "public" ? "public, max-age=300" : "private, no-store",
+    );
+    // sendFile confines the path to root and answers Range requests for audio.
+    res.sendFile(`${scope}/${key}`, { root, dotfiles: "deny" }, (error) => {
+      if (error && !res.headersSent) res.sendStatus(404);
+    });
+  };
+  return { sign, serve, publicBaseUrl: `${base}/public` };
+}
+export function publicMediaBaseUrl(env: NodeJS.ProcessEnv) {
+  if (!env.GAMEPLAY_PUBLIC_MEDIA_BASE_URL) return;
+  const url = new URL(env.GAMEPLAY_PUBLIC_MEDIA_BASE_URL);
+  requireState(
+    url.protocol === "https:" &&
+      !url.username &&
+      !url.password &&
+      !url.search &&
+      !url.hash,
+    "INVALID_PUBLIC_MEDIA_URL",
+    500,
+  );
+  return url.href.replace(/\/+$/, "");
 }
 function refs(value: unknown): Data[] {
   if (!value || typeof value !== "object") return [];
@@ -133,7 +205,7 @@ export class MediaService {
           )!;
           requireState(
             row &&
-              row.asset.storageProvider === "r2" &&
+              ["r2", "local"].includes(row.asset.storageProvider) &&
               row.asset.accessScope === "private" &&
               row.asset.state === "ready",
             "MEDIA_UNAVAILABLE",
@@ -151,6 +223,7 @@ export class MediaService {
       result.objects.map(async ({ ref, asset }) => ({
         ref,
         ...(await signer({
+          provider: asset.storageProvider,
           namespace: asset.storageNamespace,
           key: asset.storageKey,
         })),

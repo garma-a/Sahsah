@@ -275,7 +275,7 @@ test(
       (m) => m.event === "state",
     );
     assert.equal(replacementState.data.view.members.length, 2);
-    await guestStream.until((m) => m.event === "membership_revoked");
+    await guestStream.until((m) => m.event === "stream_replaced");
     assert.equal(replacement.ws.readyState, WebSocket.OPEN);
     const rotated = await call(
       "POST",
