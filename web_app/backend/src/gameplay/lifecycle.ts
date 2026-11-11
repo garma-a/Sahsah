@@ -1,5 +1,5 @@
 import { scoped, enrichContext, log, errorStack } from "./logging.js";
-import { single, invariant } from "./invariant.js";
+import { single, invariant, writtenAtMost } from "./invariant.js";
 import { Injectable } from "@nestjs/common";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import * as s from "../database/schema/index.js";
@@ -439,8 +439,9 @@ export class RoomLifecycle {
               isNull(s.gamePlayers.leftAt),
             ),
           );
+        // A conditional claim release may already be clear; preserve its zero-row result.
         if (member.accountId)
-          single(await db
+          await writtenAtMost(db
             .update(s.accounts)
             .set({ activeGameId: null, activeGameClaimedAt: null })
             .where(
@@ -448,7 +449,7 @@ export class RoomLifecycle {
                 eq(s.accounts.id, member.accountId),
                 eq(s.accounts.activeGameId, game.id),
               ),
-            ).returning(), "ACCOUNTS_WRITE_ROW");
+            ).returning(), 1, "ACCOUNT_CLAIM_RELEASE_COUNT");
         const changed = single(await db
           .update(s.games)
           .set({
