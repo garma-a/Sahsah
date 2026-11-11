@@ -1,11 +1,10 @@
-import { randomUUID } from "node:crypto";
 import {
   Catch,
   type ArgumentsHost,
   type ExceptionFilter,
   HttpException,
 } from "@nestjs/common";
-import { context, log, errorStack, enrichContext } from "./logging.js";
+import { context, currentRequestId, log, errorStack } from "./logging.js";
 import type { Response } from "express";
 import type { JsonObject } from "../database/schema/types.js";
 
@@ -16,8 +15,6 @@ export class GameplayProblem extends Error {
     public details: JsonObject = {},
   ) {
     super(code);
-    if (status >= 400 && status < 500) log.warn(context().scope, { code, status });
-    else if (status >= 500 && code !== "INTERNAL_INVARIANT") log.error(context().scope, { code, status, stack: errorStack(this) });
   }
 }
 export function requireState(
@@ -64,12 +61,13 @@ export class GameplayProblemFilter implements ExceptionFilter {
           : "INTERNAL_ERROR");
     if (status === 429 || status === 503)
       response.setHeader("Retry-After", "15");
-    // Problem.requestId remains a generated UUID; the response header carries correlation.
-    const requestId = randomUUID();
-    enrichContext({ problemId: requestId });
-    if (status >= 500 && !(error instanceof GameplayProblem)) log.error("platform.problem.catch", { code: applicationCode, status, stack: errorStack(error) });
-
-    response.setHeader("X-Request-Id", context().requestId);
+    // Logged once here, at the HTTP boundary. Capacity refusals are routine;
+    // invariant failures were already logged with context where they failed.
+    if (status < 500 || status === 503) log.warn(context().scope, { code: applicationCode, status });
+    else if (applicationCode !== "INTERNAL_INVARIANT")
+      log.error(context().scope, { code: applicationCode, status, stack: errorStack(error) });
+    const requestId = currentRequestId();
+    response.setHeader("X-Request-Id", requestId);
     response.setHeader("Cache-Control", "private, no-store");
     response
       .status(status)

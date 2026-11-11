@@ -771,6 +771,8 @@ export class GameplayRealtime
   private revoke(c: Connection, e: unknown) {
     const code =
       e instanceof GameplayProblem ? e.code : "PROJECTION_UNAVAILABLE";
+    if (e instanceof GameplayProblem) log.warn("realtime.revoke", { code });
+    else log.error("realtime.revoke", { code, stack: errorStack(e) });
     this.stop(
       c,
       code === "CONTROLLER_FENCED"

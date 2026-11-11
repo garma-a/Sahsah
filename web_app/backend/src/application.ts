@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import "reflect-metadata";
 import { StandardSchemaValidationPipe, ValidationPipe } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -12,7 +11,7 @@ import { trustedProxyHops } from "./gameplay/http.js";
 import { GameplayWsAdapter } from "./gameplay/realtime.js";
 import { json, type ErrorRequestHandler } from "express";
 import { PinoLogger } from "nestjs-pino";
-import { context, requestLogging, SafeNestLogger, log, enrichContext } from "./gameplay/logging.js";
+import { currentRequestId, requestLogging, SafeNestLogger, log } from "./gameplay/logging.js";
 
 export async function createApplication(
   options: { gameplay?: GameplayOptions } = {},
@@ -79,10 +78,9 @@ export async function createApplication(
     const bodyError: ErrorRequestHandler = (error, _req, res, next) => {
       if (!error) return next();
       const status = error.status === 413 ? 413 : 400;
-      const requestId = randomUUID();
-      enrichContext({ problemId: requestId });
+      const requestId = currentRequestId();
       log.warn("platform.http.body", { code: status === 413 ? "BODY_TOO_LARGE" : "INVALID_INPUT", status });
-      res.setHeader("X-Request-ID", context().requestId);
+      res.setHeader("X-Request-ID", requestId);
       res
         .status(status)
         .setHeader("Cache-Control", "private, no-store")

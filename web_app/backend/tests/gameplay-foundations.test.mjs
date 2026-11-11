@@ -4,9 +4,10 @@ import { Writable } from "node:stream";
 import { pino } from "pino";
 import { context, errorStack, logLevel, loggerOptions, requestId, withContext, enrichContext } from "../dist/gameplay/logging.js";
 
-test("request IDs accept bounded tokens and replace unsafe values", () => {
-  assert.equal(requestId("request-42.a_b"), "request-42.a_b");
-  for (const value of [undefined, ["one", "two"], "", "x".repeat(65), "a\nb", "a/b"]) {
+test("request IDs accept UUIDs and replace every other value", () => {
+  const id = "0b7d2f8e-6c1a-4f3e-9d2b-5a8c7e6f1d20";
+  assert.equal(requestId(id.toUpperCase()), id);
+  for (const value of [undefined, ["one", "two"], "", "request-42.a_b", "x".repeat(65), "a\nb", "a/b"]) {
     assert.match(requestId(value), /^[a-f0-9-]{36}$/);
   }
   assert.equal(logLevel({ NODE_ENV: "production" }), "info");
@@ -43,6 +44,10 @@ test("structured log serializers omit private payloads and error messages", () =
   assert.equal(record.scope, "platform.logging.test");
   assert.match(record.err.stack, /gameplay-foundations.test.mjs/);
   assert.equal(errorStack(error).includes(secret), false);
+  const database = Object.assign(new Error(secret), { cause: Object.assign(new Error(secret), { code: "23505", constraint: "rooms_one_open_owner" }) });
+  assert.match(errorStack(database), /^Error code=23505 constraint=rooms_one_open_owner\n/);
+  assert.equal(errorStack(database).includes(secret), false);
+  assert.match(errorStack(new TypeError("x is not a function")), /^TypeError: x is not a function\n/);
 });
 
 
@@ -70,7 +75,7 @@ test("state helpers reject impossible scores, positions and version transitions"
 });
 
 
-test("problem bodies retain UUID IDs while headers accept safe correlation tokens", async () => {
+test("problem bodies, headers and logs share one request ID", async () => {
   const { GameplayProblem, GameplayProblemFilter } = await import("../dist/gameplay/problem.js");
   const { output } = await import("../dist/gameplay/contract.js");
   const headers = new Map();
@@ -83,9 +88,8 @@ test("problem bodies retain UUID IDs while headers accept safe correlation token
     new GameplayProblemFilter().catch(new GameplayProblem(400, "INVALID_INPUT"), {
       switchToHttp: () => ({ getResponse: () => response }),
     });
-    assert.equal(context().problemId, body.requestId);
-  }, { requestId: "client.token-42" });
-  assert.equal(headers.get("x-request-id"), "client.token-42");
-  assert.match(body.requestId, /^[a-f0-9-]{36}$/);
+  }, { requestId: "0b7d2f8e-6c1a-4f3e-9d2b-5a8c7e6f1d20" });
+  assert.equal(headers.get("x-request-id"), "0b7d2f8e-6c1a-4f3e-9d2b-5a8c7e6f1d20");
+  assert.equal(body.requestId, "0b7d2f8e-6c1a-4f3e-9d2b-5a8c7e6f1d20");
   assert.equal(output("Problem", body), body);
 });

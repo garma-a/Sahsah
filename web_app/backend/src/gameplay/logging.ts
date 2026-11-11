@@ -8,7 +8,6 @@ import { PinoLogger } from "nestjs-pino";
 
 export interface LogContext {
   requestId: string;
-  problemId?: string;
   operationId?: string;
   roomId?: string;
   gameId?: string;
@@ -48,21 +47,56 @@ export function enrichContext(fields: Partial<Omit<LogContext, "scope" | "reques
   let current = logContext.getStore();
   while (current) { Object.assign(current, fields); current = parents.get(current); }
 }
+const uuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** Accept a caller's UUID so problem bodies, headers and logs share one ID. */
 export function requestId(value: unknown) {
-  return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(value)
-    ? value
+  return typeof value === "string" && uuidPattern.test(value)
+    ? value.toLowerCase()
     : randomUUID();
+}
+/** The current request or connection ID; a fresh UUID outside any context. */
+export function currentRequestId() {
+  return logContext.getStore()?.requestId ?? randomUUID();
 }
 export function logLevel(env: NodeJS.ProcessEnv = process.env) {
   if (env.NODE_ENV === "test" || env.NODE_TEST_CONTEXT) return "silent";
   return env.LOG_LEVEL ?? (env.NODE_ENV === "production" ? "info" : "debug");
 }
-/** Never serialize error messages, causes, SQL, parameters or arbitrary objects. */
+function causeField(error: unknown, key: "code" | "constraint"): string | undefined {
+  for (let e = error, depth = 0; e && typeof e === "object" && depth < 5; depth++) {
+    const value = (e as Record<string, unknown>)[key];
+    if (typeof value === "string") return value;
+    e = (e as { cause?: unknown }).cause;
+  }
+  return undefined;
+}
+// Messages of these runtime errors describe code defects, not request data.
+const safeMessageErrors = new Set(["TypeError", "RangeError", "ReferenceError"]);
+/**
+ * A safe summary line plus stack frames. Database and driver messages can
+ * contain SQL parameters and are never included; their code and constraint are.
+ */
 export function errorStack(error: unknown) {
   if (!(error instanceof Error)) return undefined;
-  return error.stack?.split("\n").filter((line) => /^\s+at .+\:\d+\:\d+\)?$/.test(line))
-    .map((line) => line.replace(/https?:\/\/\S+/g, "[REDACTED]"))
-    .join("\n");
+  const code = causeField(error, "code"),
+    constraint = causeField(error, "constraint"),
+    message = safeMessageErrors.has(error.name)
+      ? `: ${error.message.slice(0, 200)}`
+      : "";
+  const summary = [
+    `${error.name}${message}`,
+    code ? `code=${code}` : "",
+    constraint ? `constraint=${constraint}` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const frames = error.stack
+    ?.split("\n")
+    .filter((line) => /^\s+at .+\:\d+\:\d+\)?$/.test(line));
+  return [summary, ...(frames ?? [])]
+    .join("\n")
+    .replace(/https?:\/\/\S+/g, "[REDACTED]");
 }
 export function loggerOptions(): LoggerOptions {
   return {
@@ -104,7 +138,8 @@ export const log = {
 export function requestLogging(): RequestHandler {
   const http = pinoHttp({
     logger: rootLogger(),
-    genReqId: (req) => requestId(req.headers["x-request-id"]),
+    genReqId: (req) =>
+      typeof req.id === "string" ? req.id : requestId(req.headers["x-request-id"]),
     quietReqLogger: true,
     quietResLogger: true,
     // Logging only the template prevents invitation codes and signed paths leaking.
