@@ -6,7 +6,11 @@ import { RoomAccess } from "./access.js";
 import { GameplayIdentity } from "../platform/identity.js";
 import { GameplayRuntime } from "../platform/runtime.js";
 import { scoped, log } from "../platform/logging.js";
-import { single, writtenAtMost } from "../platform/invariant.js";
+import {
+  single,
+  versionIncrement,
+  writtenAtMost,
+} from "../platform/invariant.js";
 import { Injectable } from "@nestjs/common";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import * as s from "../../database/schema/index.js";
@@ -197,6 +201,8 @@ export class RoomLifecycle {
             .returning(),
           "LIFECYCLE_UPDATED_ROW",
         );
+        versionIncrement(game.stateVersion, updated.stateVersion);
+        versionIncrement(game.projectionVersion, updated.projectionVersion);
         game = updated;
         await this.outbox.hint(db, roomId, 0n, game.id, game.projectionVersion);
       }
@@ -336,6 +342,7 @@ export class RoomLifecycle {
           .returning(),
         "LIFECYCLE_UPDATEDMEMBER_ROW",
       );
+      versionIncrement(member.stateVersion, updatedMember.stateVersion);
       const updated = await this.rooms.bump(db, room, now, true);
       return this.receipts.saveReceipt(
         db,
@@ -483,6 +490,8 @@ export class RoomLifecycle {
             .returning(),
           "LIFECYCLE_CHANGED_ROW",
         );
+        versionIncrement(game.stateVersion, changed.stateVersion);
+        versionIncrement(game.projectionVersion, changed.projectionVersion);
         await this.outbox.hint(
           db,
           roomId,
@@ -508,6 +517,7 @@ export class RoomLifecycle {
           .returning(),
         "LIFECYCLE_UPDATEDMEMBER_ROW",
       );
+      versionIncrement(member.stateVersion, updatedMember.stateVersion);
       const updated = await this.rooms.bump(
         db,
         room,

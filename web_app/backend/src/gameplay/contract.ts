@@ -33,6 +33,8 @@ ajv.addSchema({
   definitions: convert(openapi.components.schemas),
 });
 const validators = new Map<string, ValidateFunction>();
+export function validator<N extends keyof WireTypes>(name: N): ValidateFunction<WireTypes[N]>;
+export function validator(name: string): ValidateFunction;
 export function validator(name: string): ValidateFunction {
   let validate = validators.get(name);
   if (!validate) {
@@ -67,14 +69,14 @@ function normalize(value: unknown): unknown {
   return value;
 }
 export function input<N extends keyof WireTypes>(name: N, value: unknown): WireTypes[N] {
-  if (!validator(name)(value)) throw new GameplayProblem(400, "INVALID_INPUT");
-  // AJV validated this exact contract; its cached validator erases the generic.
-  return value as WireTypes[N];
+  const validate = validator(name);
+  if (!validate(value)) throw new GameplayProblem(400, "INVALID_INPUT");
+  return value;
 }
 export function output<N extends keyof WireTypes>(name: N, value: unknown): WireTypes[N] {
-  if (!validator(name)(value)) throw new GameplayProblem(500, "RESPONSE_CONTRACT_ERROR");
-  // AJV validated this exact contract; its cached validator erases the generic.
-  return value as WireTypes[N];
+  const validate = validator(name);
+  if (!validate(value)) throw new GameplayProblem(500, "RESPONSE_CONTRACT_ERROR");
+  return value;
 }
 export const schemas = makeSchemas(inputSchema);
 export const uuid = z.uuid();

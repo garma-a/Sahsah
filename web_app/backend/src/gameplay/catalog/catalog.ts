@@ -130,7 +130,11 @@ export class CatalogService {
       : [];
     const covers = this.runtime.options.publicMediaBaseUrl;
     const last = page.at(-1);
-    invariant(!rows.length || last, "CATALOG_PAGE_LAST");
+    let nextCursor: string | undefined;
+    if (rows.length > limit) {
+      invariant(last, "CATALOG_PAGE_LAST");
+      nextCursor = next(last.category.displayOrder, last.category.id);
+    }
     return {
       items: page.map(({ category: r, section, coverKey }) => ({
         id: r.id,
@@ -151,11 +155,7 @@ export class CatalogService {
         publishedPackCount: startable.filter((p) => p.categoryId === r.id)
           .length,
       })),
-      ...(rows.length > limit
-        ? {
-            nextCursor: next(last!.category.displayOrder, last!.category.id),
-          }
-        : {}),
+      ...(nextCursor ? { nextCursor } : {}),
     };
   }
   async eligibility(

@@ -55,8 +55,8 @@ export class GameplayScheduler {
     } finally {
       this.running--;
       if (lane !== "protected") this.ordinary--;
-      // The scheduler only drains these two literal queue lanes.
-      for (const priority of ["protected", "public"] as const) {
+      const priorities: ("protected" | "public")[] = ["protected", "public"];
+      for (const priority of priorities) {
         const i = this.queue.findIndex((w) => w.lane === priority);
         if (i >= 0 && this.available(priority)) {
           const w = single(this.queue.splice(i, 1), "SCHEDULER_QUEUED_WORK");

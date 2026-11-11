@@ -8,10 +8,21 @@ import { freshTime, iso, plusDay } from "../platform/clock.js";
 import type { Actor, Game, Room, Tx } from "../platform/types.js";
 import { GameOperations } from "./operations.js";
 import { language as validLanguage } from "../catalog/catalog.js";
-import { answerView, local, questionView, suggested, timer } from "./content.js";
+import {
+  answerView,
+  local,
+  questionView,
+  suggested,
+  timer,
+} from "./content.js";
 import { requireState } from "../platform/problem.js";
 import type { Contract } from "../contract.js";
 import { invariant } from "../platform/invariant.js";
+
+function teamNumber(value: number | null): 1 | 2 | null {
+  invariant(value === null || value === 1 || value === 2, "MEMBER_TEAM_NUMBER");
+  return value;
+}
 
 const winner = (a: bigint | number, b: bigint | number) =>
   a === b ? null : a > b ? 1 : 2;
@@ -102,8 +113,7 @@ export class ProjectionService {
             members: members.map((member) => ({
               id: member.id,
               displayName: member.displayName,
-              // The room-membership table constrains nullable team numbers to 1 or 2.
-              teamNumber: member.lobbyTeamNumber as 1 | 2 | null,
+              teamNumber: teamNumber(member.lobbyTeamNumber),
               host: member.accountId === room.ownerAccountId,
               memberVersion: String(member.stateVersion),
               ready: member.readyForGeneration === room.lobbyGeneration,

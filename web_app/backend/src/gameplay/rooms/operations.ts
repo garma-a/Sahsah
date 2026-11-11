@@ -463,6 +463,7 @@ export class RoomOperations {
           .returning(),
         "ROOMS_UPDATEDMEMBER_ROW",
       );
+      versionIncrement(member.stateVersion, updatedMember.stateVersion);
       const updated = await this.bump(db, room, now, semantic);
       return this.receipts.saveReceipt(
         db,
@@ -585,8 +586,8 @@ export class RoomOperations {
         teamOneName: String(body.teamOneName).trim(),
         teamTwoName: String(body.teamTwoName).trim(),
       });
-      if (host.lobbyTeamNumber !== body.hostTeamNumber)
-        single(
+      if (host.lobbyTeamNumber !== body.hostTeamNumber) {
+        const updatedHost = single(
           await db
             .update(s.roomMemberships)
             .set({
@@ -597,6 +598,8 @@ export class RoomOperations {
             .returning(),
           "ROOMMEMBERSHIPS_WRITE_ROW",
         );
+        versionIncrement(host.stateVersion, updatedHost.stateVersion);
+      }
       await db
         .delete(s.roomPackSelections)
         .where(eq(s.roomPackSelections.roomId, roomId));

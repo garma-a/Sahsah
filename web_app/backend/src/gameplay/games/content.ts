@@ -1,4 +1,8 @@
-import { slotPoints, defaultPointStages, validPointStages } from "./rules/points.js";
+import {
+  slotPoints,
+  defaultPointStages,
+  validPointStages,
+} from "./rules/points.js";
 import { z } from "zod";
 import type { JsonObject } from "../../database/schema/types.js";
 import { requireState } from "../platform/problem.js";
@@ -79,14 +83,24 @@ export const remaining = (q: Question, now: Date) =>
       )
     : q.remainingMs;
 export function timer(q: Question, now: Date): Contract<"Timer"> {
-  // Timer state and its literal bounds are enforced by database checks.
-  return {
-    state: q.timerState,
-    remainingMs: remaining(q, now),
-    ...(q.timerState === "running"
-      ? { deadlineAt: new Date(q.timerDeadlineAt!).toISOString() }
-      : {}),
-  } as Contract<"Timer">;
+  const remainingMs = remaining(q, now);
+  if (q.timerState === "running") {
+    invariant(q.timerDeadlineAt, "TIMER_RUNNING_DEADLINE");
+    return {
+      state: q.timerState,
+      remainingMs,
+      deadlineAt: new Date(q.timerDeadlineAt).toISOString(),
+    };
+  }
+  if (q.timerState === "ready") {
+    invariant(remainingMs === 60000, "TIMER_READY_REMAINING");
+    return { state: q.timerState, remainingMs };
+  }
+  if (q.timerState === "elapsed") {
+    invariant(remainingMs === 0, "TIMER_ELAPSED_REMAINING");
+    return { state: q.timerState, remainingMs };
+  }
+  return { state: q.timerState, remainingMs };
 }
 export function ref(
   q: Question,
