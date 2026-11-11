@@ -1,3 +1,6 @@
+import { orderSeats } from "./games/rules/turn-order.js";
+import { questionAward, scoreChange } from "./games/rules/scoring.js";
+import { isPosition } from "./games/rules/positions.js";
 import { writtenAtMost, written } from "./invariant.js";
 import { scoped, enrichContext, log, errorStack } from "./logging.js";
 import { single, invariant, versionIncrement } from "./invariant.js";
@@ -499,15 +502,7 @@ export class GameOperations {
           .returning(), "GAMES_GAME_ROW");
         enrichContext({ gameId, roomId, operationId });
         this.core.afterCommit(db, () => log.info("games.start", { outcome: "created" }));
-        const ordered = [...roster].sort((a, b) =>
-          a.accountId === room.ownerAccountId
-            ? -1
-            : b.accountId === room.ownerAccountId
-              ? 1
-              : a.id < b.id
-                ? -1
-                : 1,
-        );
+        const ordered = orderSeats(roster, room.ownerAccountId);
         await written(db.insert(s.gamePlayers).values(
           ordered.map((m, i) => ({
             gameId,
@@ -728,6 +723,7 @@ export class GameOperations {
     );
   }
   slot(q: Pick<Question, "gameId" | "boardPosition" | "questionPosition">) {
+    invariant(isPosition(q.boardPosition) && isPosition(q.questionPosition), "QUESTION_POSITIONS");
     return and(
       eq(s.gameQuestions.gameId, q.gameId),
       eq(s.gameQuestions.boardPosition, q.boardPosition),
@@ -859,6 +855,7 @@ export class GameOperations {
           const team = Number(body.teamNumber),
             before = team === 1 ? game.teamOneScore : game.teamTwoScore,
             after = BigInt(String(body.targetTotal));
+          const change = scoreChange(before, after);
           if (before === after)
             return this.receipt(
               db,
@@ -877,7 +874,7 @@ export class GameOperations {
             scoreTeamNumber: team,
             scoreTotalBefore: before,
             scoreTotalAfter: after,
-            scoreDelta: after - before,
+            scoreDelta: change.delta,
           };
         } else {
           const q = (
@@ -950,12 +947,7 @@ export class GameOperations {
                 "INVALID_AWARD",
                 400,
               );
-              const award =
-                winner === null
-                  ? 0
-                  : body.awardedPoints === undefined
-                    ? suggested(q)
-                    : Number(body.awardedPoints);
+              const award = questionAward(winner, body.awardedPoints, suggested(q));
               requireState(award <= q.basePoints, "AWARD_EXCEEDS_CAP", 400);
               Object.assign(qc, {
                 winningTeamNumber: winner,

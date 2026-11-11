@@ -1,3 +1,4 @@
+import { slotPoints, defaultPointStages, validPointStages } from "./games/rules/points.js";
 import { z } from "zod";
 import type { JsonObject } from "../database/schema/types.js";
 import { requireState } from "./problem.js";
@@ -27,8 +28,7 @@ const configSchema = z
       .optional(),
   })
   .strict();
-export const points = (slot: number) =>
-  slot <= 2 ? 200 : slot <= 4 ? 400 : 600;
+export const points = slotPoints;
 export function settings(
   format: string,
   value: unknown,
@@ -38,15 +38,12 @@ export function settings(
   requireState(parsed.success, "CONTENT_NOT_READY");
   const config = parsed.data;
   if (["IMAGE_BLUR", "IMAGE_ZOOM"].includes(format)) {
-    invariant([200, 400, 600].includes(cap), "SLOT_POINTS_CAP");
+    invariant(cap === 200 || cap === 400 || cap === 600, "SLOT_POINTS_CAP");
     const suggestions =
       config.stageSuggestions ??
-      { 200: [200, 150, 50], 400: [400, 250, 150], 600: [600, 400, 200] }[
-        cap === 200 ? 200 : cap === 400 ? 400 : 600
-      ];
+      defaultPointStages(cap);
     requireState(
-      suggestions[0] === cap &&
-        suggestions.every((n, i) => n <= cap && (!i || n < (suggestions[i - 1] ?? Infinity))),
+      validPointStages(suggestions, cap),
       "CONTENT_NOT_READY",
     );
     return { ...config, stageSuggestions: suggestions };
