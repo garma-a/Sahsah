@@ -1,14 +1,6 @@
 import { type Handler } from "../command-types.js";
-import { requireState } from "../../problem.js";
-import {
-  loadQuestion,
-  currentQuestion,
-  unrevealed,
-  running,
-  writeQuestion,
-  changed,
-  type QuestionChanges,
-} from "./question.js";
+import { requireState } from "../../platform/problem.js";
+import { loadQuestion, currentQuestion, unrevealed, running, writeQuestion, changed, type QuestionChanges } from "./question.js";
 export const hide_memory: Handler<"hide_memory"> = async (ctx) => {
   const { body, game, now, db, operations, operationId } = ctx;
   const q = await loadQuestion(ctx, body);

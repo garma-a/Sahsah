@@ -1,8 +1,6 @@
 import { and, inArray, isNull } from "drizzle-orm";
-
 import * as s from "../../../database/schema/index.js";
-
-import type { Tx } from "../../service.js";
+import type { Tx } from "../../platform/types.js";
 import type { Selections } from "./types.js";
 export async function lockStartContent(db: Tx, selections: Selections) {
   // Stable catalog locks prevent publication/media edits racing the copy.

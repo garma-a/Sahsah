@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { WireTypes } from "./contracts/wire-types.js";
 import { makeSchemas } from "./contracts/schema-registry.js";
 export type Contract<N extends keyof typeof schemas> = z.output<(typeof schemas)[N]>;
-import { GameplayProblem } from "./problem.js";
+import { GameplayProblem } from "./platform/problem.js";
 
 export const openapi = JSON.parse(
   readFileSync(new URL("./contracts/openapi.json", import.meta.url), "utf8"),

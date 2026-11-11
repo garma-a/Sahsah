@@ -1,35 +1,40 @@
-import { startGame } from "./games/start/index.js";
-import { runGameCommand } from "./games/pipeline.js";
-
-import { isPosition } from "./games/rules/positions.js";
-import { writtenAtMost } from "./invariant.js";
-import { scoped, enrichContext, log } from "./logging.js";
-import { single, invariant, versionIncrement } from "./invariant.js";
+import { DatabaseService } from "../../database/database.module.js";
+import { GameplayTransactions } from "../platform/transaction.js";
+import { GameplayOutbox } from "../platform/outbox.js";
+import { RoomReceipts } from "../platform/receipts.js";
+import { RoomAccess } from "../rooms/access.js";
+import { GameplayIdentity } from "../platform/identity.js";
+import { GameplayRuntime } from "../platform/runtime.js";
+import { startGame } from "./start/index.js";
+import { runGameCommand } from "./pipeline.js";
+import { isPosition } from "./rules/positions.js";
+import { writtenAtMost } from "../platform/invariant.js";
+import { scoped, enrichContext, log } from "../platform/logging.js";
+import { single, invariant, versionIncrement } from "../platform/invariant.js";
 import { Injectable } from "@nestjs/common";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
-import * as s from "../database/schema/index.js";
-
-import { CatalogService } from "./catalog.js";
+import * as s from "../../database/schema/index.js";
+import { CatalogService } from "../catalog/catalog.js";
 import { remaining } from "./content.js";
-import { revision } from "./contract.js";
-import { digest, equalProof, proof } from "./proof.js";
-import { requireState } from "./problem.js";
-import type { Contract } from "./contract.js";
-import { RoomOperations } from "./rooms.js";
-import {
-  GameplayService,
-  freshTime,
-  type Actor,
-  type Game,
-  type Question,
-  type Tx,
-} from "./service.js";
+import { revision } from "../contract.js";
+import { digest, equalProof, proof } from "../platform/proof.js";
+import { requireState } from "../platform/problem.js";
+import type { Contract } from "../contract.js";
+import { RoomOperations } from "../rooms/operations.js";
+import { freshTime } from "../platform/clock.js";
+import type { Actor, Game, Question, Tx } from "../platform/types.js";
 
 @Injectable()
 export class GameOperations {
   constructor(
-    readonly core: GameplayService,
+    readonly runtime: GameplayRuntime,
+    readonly identity: GameplayIdentity,
+    readonly access: RoomAccess,
+    readonly receipts: RoomReceipts,
+    readonly outbox: GameplayOutbox,
+    readonly transactions: GameplayTransactions,
+    readonly database: DatabaseService,
     readonly rooms: RoomOperations,
     readonly catalog: CatalogService,
   ) {}
@@ -260,7 +265,7 @@ export class GameOperations {
         "TOKENLEDGERENTRIES_WRITE_COUNT",
       );
     }
-    await this.core.hint(
+    await this.outbox.hint(
       db,
       game.roomId,
       0n,
@@ -271,14 +276,14 @@ export class GameOperations {
     // never acquire room after game, even through a membership trigger.
     versionIncrement(game.stateVersion, updated.stateVersion);
     versionIncrement(game.projectionVersion, updated.projectionVersion);
-    this.core.afterCommit(db, () =>
+    this.transactions.afterCommit(db, () =>
       log.info("games.finish", { outcome: updated.status }),
     );
     return updated;
   }
   @scoped("games.expire")
   async expire(gameId: string) {
-    return this.core.transaction(async (db) => {
+    return this.transactions.transaction(async (db) => {
       const game = await this.game(db, gameId),
         now = await freshTime(db);
       if (
@@ -290,12 +295,12 @@ export class GameOperations {
     });
   }
   async preflight(roomId: string) {
-    const room = await this.core.room(this.core.database.db, roomId, false);
+    const room = await this.access.room(this.database.db, roomId, false);
     if (room.currentGameId) await this.expire(room.currentGameId);
-    const members = await this.core.members(this.core.database.db, roomId),
+    const members = await this.access.members(this.database.db, roomId),
       ids = members.flatMap((m) => (m.accountId ? [m.accountId] : []));
     const accounts = ids.length
-      ? await this.core.database.db
+      ? await this.database.db
           .select()
           .from(s.accounts)
           .where(inArray(s.accounts.id, ids))
@@ -424,7 +429,7 @@ export class GameOperations {
       boardPosition,
       questionPosition,
     });
-    return this.core.transaction(async (db) => {
+    return this.transactions.transaction(async (db) => {
       const game = await this.game(db, gameId);
       this.host(game, actor, false);
       const prior = await this.recover(db, gameId, operationId, hash);
@@ -487,7 +492,7 @@ export class GameOperations {
         updated.stateVersion === game.stateVersion,
         "FEEDBACK_GAME_VERSION_STABLE",
       );
-      await this.core.hint(
+      await this.outbox.hint(
         db,
         game.roomId,
         0n,

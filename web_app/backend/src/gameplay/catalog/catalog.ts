@@ -1,19 +1,17 @@
-import { scoped, enrichContext, log, errorStack } from "./logging.js";
+import { DatabaseService } from "../../database/database.module.js";
+import { RoomAccess } from "../rooms/access.js";
+import { GameplayRuntime } from "../platform/runtime.js";
+import { scoped } from "../platform/logging.js";
 import { Injectable } from "@nestjs/common";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
-import * as s from "../database/schema/index.js";
-import { digest } from "./proof.js";
-import { local } from "./content.js";
-import { id } from "./contract.js";
-import { requireState } from "./problem.js";
-import {
-  GameplayService,
-  type Actor,
-  type Member,
-  type Tx,
-} from "./service.js";
-import type { Contract } from "./contract.js";
-import { invariant } from "./invariant.js";
+import * as s from "../../database/schema/index.js";
+import { digest } from "../platform/proof.js";
+import { local } from "../games/content.js";
+import { id } from "../contract.js";
+import { requireState } from "../platform/problem.js";
+import type { Actor, Member, Tx } from "../platform/types.js";
+import type { Contract } from "../contract.js";
+import { invariant } from "../platform/invariant.js";
 type RosterMember = Pick<Member, "id" | "accountId" | "lobbyTeamNumber">;
 
 export function language(value?: unknown) {
@@ -60,13 +58,19 @@ const next = (n: number, id: string) =>
 
 @Injectable()
 export class CatalogService {
-  constructor(private core: GameplayService) {}
+  constructor(
+    readonly runtime: GameplayRuntime,
+    readonly access: RoomAccess,
+    readonly database: DatabaseService,
+  ) {}
   @scoped("catalog.categories")
-  async categories(query: Record<string, unknown>): Promise<Contract<"CategoryPage">> {
-    this.core.enabled();
+  async categories(
+    query: Record<string, unknown>,
+  ): Promise<Contract<"CategoryPage">> {
+    this.runtime.enabled();
     const lang = language(query.language),
       { limit, cursor } = paging(query, 20);
-    const { db } = this.core.database,
+    const { db } = this.database,
       c = s.categories,
       m = s.mediaAssets;
     const rows = await db
@@ -120,7 +124,7 @@ export class CatalogService {
           .groupBy(s.questionPacks.categoryId, s.questionPacks.id)
           .having(sql`count(*) = 6`)
       : [];
-    const covers = this.core.options.publicMediaBaseUrl;
+    const covers = this.runtime.options.publicMediaBaseUrl;
     const last = page.at(-1);
     invariant(!rows.length || last, "CATALOG_PAGE_LAST");
     return {
@@ -145,10 +149,7 @@ export class CatalogService {
       })),
       ...(rows.length > limit
         ? {
-            nextCursor: next(
-              last!.category.displayOrder,
-              last!.category.id,
-            ),
+            nextCursor: next(last!.category.displayOrder, last!.category.id),
           }
         : {}),
     };
@@ -228,7 +229,7 @@ export class CatalogService {
     categoryId: string,
     query: Record<string, unknown>,
   ): Promise<Contract<"PackPage">> {
-    this.core.enabled();
+    this.runtime.enabled();
     language(query.language);
     const { limit, cursor } = paging(query, 20);
     requireState(
@@ -239,14 +240,14 @@ export class CatalogService {
       400,
     );
     const roomId = query.roomId === undefined ? undefined : id(query.roomId);
-    return this.core.database.transaction(
+    return this.database.transaction(
       async (db) => {
         let members: RosterMember[] = [];
         if (roomId) {
           requireState(actor, "UNAUTHENTICATED", 401);
-          const room = await this.core.room(db, roomId, false);
-          await this.core.membership(db, room, actor);
-          members = await this.core.members(db, roomId);
+          const room = await this.access.room(db, roomId, false);
+          await this.access.membership(db, room, actor);
+          members = await this.access.members(db, roomId);
         } else if (actor?.account)
           members = [
             {
@@ -272,7 +273,10 @@ export class CatalogService {
         const own = actor?.account?.accountId;
         const history =
           own && rows.length
-            ? await db.execute<{ pack_id: string; current: boolean }>(sql`SELECT p.pack_id, bool_or(NOT EXISTS(SELECT 1 FROM questions q WHERE q.pack_id=p.pack_id AND q.retired_at IS NULL AND NOT EXISTS(SELECT 1 FROM game_questions gq WHERE gq.game_id=c.game_id AND gq.board_position=c.board_position AND gq.source_question_id=q.id))) AS current
+            ? await db.execute<{
+                pack_id: string;
+                current: boolean;
+              }>(sql`SELECT p.pack_id, bool_or(NOT EXISTS(SELECT 1 FROM questions q WHERE q.pack_id=p.pack_id AND q.retired_at IS NULL AND NOT EXISTS(SELECT 1 FROM game_questions gq WHERE gq.game_id=c.game_id AND gq.board_position=c.board_position AND gq.source_question_id=q.id))) AS current
         FROM account_pack_completions c JOIN game_packs p USING(game_id,board_position) WHERE c.account_id=${own} AND p.pack_id IN (${sql.join(
           rows.map((p) => sql`${p.id}::uuid`),
           sql`,`,

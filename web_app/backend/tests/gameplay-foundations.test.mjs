@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Writable } from "node:stream";
 import { pino } from "pino";
-import { context, errorStack, logLevel, loggerOptions, requestId, withContext, enrichContext } from "../dist/gameplay/logging.js";
+import { context, errorStack, logLevel, loggerOptions, requestId, withContext, enrichContext } from "../dist/gameplay/platform/logging.js";
 
 test("request IDs accept UUIDs and replace every other value", () => {
   const id = "0b7d2f8e-6c1a-4f3e-9d2b-5a8c7e6f1d20";
@@ -52,7 +52,7 @@ test("structured log serializers omit private payloads and error messages", () =
 
 
 test("invariants assert impossible states and exact single-row results", async () => {
-  const { invariant, single } = await import("../dist/gameplay/invariant.js");
+  const { invariant, single } = await import("../dist/gameplay/platform/invariant.js");
   invariant(true, "VALID_STATE");
   assert.equal(single([42], "ONE_ROW"), 42);
   for (const check of [() => invariant(false, "IMPOSSIBLE"), () => single([], "MISSING"), () => single([1, 2], "EXTRA")]) {
@@ -62,7 +62,7 @@ test("invariants assert impossible states and exact single-row results", async (
 
 
 test("state helpers reject impossible scores, positions and version transitions", async () => {
-  const { stateInvariants, versionIncrement, written, writtenAtMost } = await import("../dist/gameplay/invariant.js");
+  const { stateInvariants, versionIncrement, written, writtenAtMost } = await import("../dist/gameplay/platform/invariant.js");
   stateInvariants({ teamOneScore: 0n, teamTwoScore: 10n, boardPosition: 1, questionPosition: 6, stageIndex: 2, remainingMs: 0 });
   versionIncrement(4n, 5n);
   await written(Promise.resolve([{ boardPosition: 3 }]), 1, "EXACT");
@@ -76,7 +76,7 @@ test("state helpers reject impossible scores, positions and version transitions"
 
 
 test("problem bodies, headers and logs share one request ID", async () => {
-  const { GameplayProblem, GameplayProblemFilter } = await import("../dist/gameplay/problem.js");
+  const { GameplayProblem, GameplayProblemFilter } = await import("../dist/gameplay/platform/problem.js");
   const { output } = await import("../dist/gameplay/contract.js");
   const headers = new Map();
   let body;

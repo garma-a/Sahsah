@@ -1,7 +1,6 @@
 import * as s from "../../../database/schema/index.js";
-import { requireState } from "../../problem.js";
-
-import { settings, points } from "../../content.js";
+import { requireState } from "../../platform/problem.js";
+import { settings, points } from "../content.js";
 import type { StartState } from "./types.js";
 export function prepareQuestionMedia(
   state: StartState,

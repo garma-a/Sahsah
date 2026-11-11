@@ -1,7 +1,7 @@
 import * as s from "../../../database/schema/index.js";
-import { requireState } from "../../problem.js";
-import { written } from "../../invariant.js";
-import { points } from "../../content.js";
+import { requireState } from "../../platform/problem.js";
+import { written } from "../../platform/invariant.js";
+import { points } from "../content.js";
 import { prepareQuestionMedia } from "./media.js";
 import type { StartState } from "./types.js";
 export async function copyQuestionSnapshots(state: StartState, gameId: string) {

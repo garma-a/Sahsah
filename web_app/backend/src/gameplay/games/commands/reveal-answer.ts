@@ -1,14 +1,5 @@
 import { type Handler } from "../command-types.js";
-import {
-  loadQuestion,
-  currentQuestion,
-  unrevealed,
-  answering,
-  checkpoint,
-  writeQuestion,
-  changed,
-  type QuestionChanges,
-} from "./question.js";
+import { loadQuestion, currentQuestion, unrevealed, answering, checkpoint, writeQuestion, changed, type QuestionChanges } from "./question.js";
 export const reveal_answer: Handler<"reveal_answer"> = async (ctx) => {
   const { body, game, now, db, operations, operationId } = ctx;
   const q = await loadQuestion(ctx, body);

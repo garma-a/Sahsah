@@ -1,12 +1,11 @@
 import { sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import * as s from "../../../database/schema/index.js";
-
-import { single, written } from "../../invariant.js";
+import { single, written } from "../../platform/invariant.js";
 import { orderSeats } from "../rules/turn-order.js";
-import { enrichContext, log } from "../../logging.js";
-import { proof } from "../../proof.js";
-import { plusDay } from "../../service.js";
+import { enrichContext, log } from "../../platform/logging.js";
+import { proof } from "../../platform/proof.js";
+import { plusDay } from "../../platform/clock.js";
 import type { StartState } from "./types.js";
 export async function createGameSnapshot(state: StartState) {
   const {
@@ -53,7 +52,7 @@ export async function createGameSnapshot(state: StartState) {
     "GAMES_GAME_ROW",
   );
   enrichContext({ gameId, roomId, operationId });
-  operations.core.afterCommit(db, () =>
+  operations.transactions.afterCommit(db, () =>
     log.info("games.start", { outcome: "created" }),
   );
   const ordered = orderSeats(roster, room.ownerAccountId);

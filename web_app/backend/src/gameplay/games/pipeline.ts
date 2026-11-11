@@ -1,14 +1,14 @@
 import { eq, sql } from "drizzle-orm";
 import * as s from "../../database/schema/index.js";
-import type { GameOperations } from "../games.js";
-import type { Actor } from "../service.js";
-import { freshTime, plusDay } from "../service.js";
+import type { GameOperations } from "./operations.js";
+import type { Actor } from "../platform/types.js";
+import { freshTime, plusDay } from "../platform/clock.js";
 import type { Contract } from "../contract.js";
 import { revision } from "../contract.js";
-import { digest } from "../proof.js";
-import { requireState } from "../problem.js";
-import { single, versionIncrement } from "../invariant.js";
-import { enrichContext, log, withContext } from "../logging.js";
+import { digest } from "../platform/proof.js";
+import { requireState } from "../platform/problem.js";
+import { single, versionIncrement } from "../platform/invariant.js";
+import { enrichContext, log, withContext } from "../platform/logging.js";
 import { handleCommand } from "./commands.js";
 export async function runGameCommand(
   operations: GameOperations,
@@ -21,7 +21,7 @@ export async function runGameCommand(
   let versionBefore = body.expectedGameVersion;
   let recovered = false;
   const hash = digest("gameCommand", gameId, body);
-  return operations.core
+  return operations.transactions
     .transaction(async (db) => {
       let game = await operations.game(db, gameId);
       versionBefore = String(game.stateVersion);
@@ -106,7 +106,7 @@ export async function runGameCommand(
         versionIncrement(game.projectionVersion, updated.projectionVersion);
         game = updated;
       }
-      await operations.core.hint(
+      await operations.outbox.hint(
         db,
         game.roomId,
         0n,

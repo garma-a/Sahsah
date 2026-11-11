@@ -6,7 +6,7 @@ import {
 } from "@nestjs/common";
 import { context, currentRequestId, log, errorStack } from "./logging.js";
 import type { Response } from "express";
-import type { JsonObject } from "../database/schema/types.js";
+import type { JsonObject } from "../../database/schema/types.js";
 
 export class GameplayProblem extends Error {
   constructor(
@@ -28,12 +28,20 @@ export function requireState(
 export function databaseCode(error: unknown): string | undefined {
   if (!error || typeof error !== "object") return;
   const e = error;
-  return ("code" in e && typeof e.code === "string" ? e.code : undefined) ?? databaseCode("cause" in e ? e.cause : undefined);
+  return (
+    ("code" in e && typeof e.code === "string" ? e.code : undefined) ??
+    databaseCode("cause" in e ? e.cause : undefined)
+  );
 }
 export function databaseConstraint(error: unknown): string | undefined {
   if (!error || typeof error !== "object") return;
   const value = error;
-  return ("constraint" in value && typeof value.constraint === "string" ? value.constraint : undefined) ?? databaseConstraint("cause" in value ? value.cause : undefined);
+  return (
+    ("constraint" in value && typeof value.constraint === "string"
+      ? value.constraint
+      : undefined) ??
+    databaseConstraint("cause" in value ? value.cause : undefined)
+  );
 }
 @Catch()
 export class GameplayProblemFilter implements ExceptionFilter {

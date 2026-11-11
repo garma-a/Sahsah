@@ -1,16 +1,11 @@
-import {
-  Injectable,
-  type CallHandler,
-  type ExecutionContext,
-  type NestInterceptor,
-  type OnModuleInit,
-} from "@nestjs/common";
+import { GameplayIdentity } from "./identity.js";
+import { GameplayRuntime } from "./runtime.js";
+import { Injectable, type CallHandler, type ExecutionContext, type NestInterceptor, type OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { from, lastValueFrom } from "rxjs";
 import type { Request, Response } from "express";
 import type { IncomingMessage } from "node:http";
 import { context as loggingContext } from "./logging.js";
-import { GameplayService } from "./service.js";
 import { GameplayRates } from "./rates.js";
 import { requireState } from "./problem.js";
 
@@ -45,11 +40,12 @@ export class GameplayHttpInterceptor implements NestInterceptor, OnModuleInit {
     subjectBurst: 240,
   };
   constructor(
-    private core: GameplayService,
+    readonly runtime: GameplayRuntime,
+    readonly identity: GameplayIdentity,
     private config: ConfigService,
   ) {}
   onModuleInit() {
-    if (!this.core.options.enabled) return;
+    if (!this.runtime.options.enabled) return;
     const setting = (name: string, fallback: number) => {
       const raw = this.config.get<string>(name, String(fallback));
       const n = Number(raw);
@@ -79,7 +75,7 @@ export class GameplayHttpInterceptor implements NestInterceptor, OnModuleInit {
   private async execute(req: Request, next: CallHandler) {
     const started = performance.now(),
       path = req.path.toLowerCase();
-    this.core.enabled();
+    this.runtime.enabled();
     this.rates.take(
       `ip:${req.ip ?? req.socket.remoteAddress}`,
       this.policy.ipRate,
@@ -103,16 +99,16 @@ export class GameplayHttpInterceptor implements NestInterceptor, OnModuleInit {
       (invitation && req.method === "GET");
     let subject: string | undefined;
     if (anonymousJoin && typeof req.body.reconnectSecret === "string")
-      subject = `proposal:${this.core.fingerprint(req.body.reconnectSecret)}`;
+      subject = `proposal:${this.identity.fingerprint(req.body.reconnectSecret)}`;
     else if (
       !publicRead ||
       (req.headers.authorization && path.includes("/packs"))
     ) {
-      const actor = await this.core.scheduler.run(
-        this.core.knownCredential(req.headers.authorization)
+      const actor = await this.runtime.scheduler.run(
+        this.identity.knownCredential(req.headers.authorization)
           ? "protected"
           : "public",
-        () => this.core.actor(req),
+        () => this.identity.actor(req),
       );
       subject = actor.account
         ? `account:${actor.account.accountId}`
@@ -135,7 +131,7 @@ export class GameplayHttpInterceptor implements NestInterceptor, OnModuleInit {
     const lane =
       publicRead || (allocation && !recovery) ? "public" : "protected";
     try {
-      const result = await this.core.scheduler.run(lane, () =>
+      const result = await this.runtime.scheduler.run(lane, () =>
         lastValueFrom(next.handle()),
       );
       // The category list is identical for every caller, so browsers and the
@@ -148,7 +144,7 @@ export class GameplayHttpInterceptor implements NestInterceptor, OnModuleInit {
         this.sources.set(sourceKey, Date.now() + 3600000);
       }
       if (path.endsWith("/commands") && req.method === "POST")
-        this.core.metrics.command(performance.now() - started);
+        this.runtime.metrics.command(performance.now() - started);
       return result;
     } catch (error) {
       if (
@@ -159,7 +155,7 @@ export class GameplayHttpInterceptor implements NestInterceptor, OnModuleInit {
           String(error.code),
         )
       )
-        this.core.metrics.refused++;
+        this.runtime.metrics.refused++;
       throw error;
     }
   }

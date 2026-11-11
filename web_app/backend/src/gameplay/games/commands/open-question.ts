@@ -1,12 +1,6 @@
 import { type Handler } from "../command-types.js";
-import { requireState } from "../../problem.js";
-import {
-  loadQuestion,
-  running,
-  writeQuestion,
-  changed,
-  type QuestionChanges,
-} from "./question.js";
+import { requireState } from "../../platform/problem.js";
+import { loadQuestion, running, writeQuestion, changed, type QuestionChanges } from "./question.js";
 export const open_question: Handler<"open_question"> = async (ctx) => {
   const { body, game, now, db, operations, operationId } = ctx;
   const q = await loadQuestion(ctx, body);

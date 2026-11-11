@@ -1,14 +1,9 @@
 import { type Handler, type ScoreEntry } from "../command-types.js";
-import { type Game } from "../../service.js";
-import { requireState } from "../../problem.js";
-import { suggested } from "../../content.js";
+import type { Game } from "../../platform/types.js";
+import { requireState } from "../../platform/problem.js";
+import { suggested } from "../content.js";
 import { questionAward } from "../rules/scoring.js";
-import {
-  loadQuestion,
-  currentQuestion,
-  writeQuestion,
-  type QuestionChanges,
-} from "./question.js";
+import { loadQuestion, currentQuestion, writeQuestion, type QuestionChanges } from "./question.js";
 export const resolve_question: Handler<"resolve_question"> = async (ctx) => {
   const { body, game, now, db, operations, operationId } = ctx;
   const q = await loadQuestion(ctx, body);
