@@ -10,8 +10,30 @@ import { reveal_answer } from "./commands/reveal-answer.js";
 import { resolve_question } from "./commands/resolve-question.js";
 import { adjust_score } from "./commands/adjust-score.js";
 import { end_game } from "./commands/end-game.js";
-import type { ActionContext, CommandBodies, CommandName, HandlerMap } from "./command-types.js";
-export const commands: HandlerMap = { open_question, return_to_board, advance_hint, show_memory, hide_memory, pause_timer, resume_timer, reset_timer, reveal_answer, resolve_question, adjust_score, end_game };
-export function handleCommand<N extends CommandName>(name: N, context: ActionContext, body: CommandBodies[N]) {
+import type {
+  ActionContext,
+  CommandBodies,
+  CommandName,
+  HandlerMap,
+} from "./command-types.js";
+export const commands: HandlerMap = {
+  open_question,
+  return_to_board,
+  advance_hint,
+  show_memory,
+  hide_memory,
+  pause_timer,
+  resume_timer,
+  reset_timer,
+  reveal_answer,
+  resolve_question,
+  adjust_score,
+  end_game,
+};
+export function handleCommand<N extends CommandName>(
+  name: N,
+  context: ActionContext,
+  body: CommandBodies[N],
+) {
   return commands[name]({ ...context, body });
 }

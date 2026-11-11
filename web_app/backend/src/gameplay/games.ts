@@ -1,16 +1,17 @@
+import { startGame } from "./games/start/index.js";
 import { runGameCommand } from "./games/pipeline.js";
-import { orderSeats } from "./games/rules/turn-order.js";
+
 import { isPosition } from "./games/rules/positions.js";
-import { writtenAtMost, written } from "./invariant.js";
-import { scoped, enrichContext, log, errorStack } from "./logging.js";
+import { writtenAtMost } from "./invariant.js";
+import { scoped, enrichContext, log } from "./logging.js";
 import { single, invariant, versionIncrement } from "./invariant.js";
 import { Injectable } from "@nestjs/common";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import * as s from "../database/schema/index.js";
-import type { JsonObject } from "../database/schema/types.js";
+
 import { CatalogService } from "./catalog.js";
-import { points, remaining, settings, suggested } from "./content.js";
+import { remaining } from "./content.js";
 import { revision } from "./contract.js";
 import { digest, equalProof, proof } from "./proof.js";
 import { requireState } from "./problem.js";
@@ -19,8 +20,6 @@ import { RoomOperations } from "./rooms.js";
 import {
   GameplayService,
   freshTime,
-  iso,
-  plusDay,
   type Actor,
   type Game,
   type Question,
@@ -31,14 +30,15 @@ import {
 export class GameOperations {
   constructor(
     readonly core: GameplayService,
-    private rooms: RoomOperations,
-    private catalog: CatalogService,
+    readonly rooms: RoomOperations,
+    readonly catalog: CatalogService,
   ) {}
   async game(db: Tx, gameId: string, lock = true): Promise<Game> {
     const query = db.select().from(s.games).where(eq(s.games.id, gameId));
     const waiting = performance.now();
     const game = (await (lock ? query.for("update") : query))[0];
-    if (lock) log.debug("games.game.lock", { waitMs: performance.now() - waiting });
+    if (lock)
+      log.debug("games.game.lock", { waitMs: performance.now() - waiting });
     requireState(game, "NOT_FOUND", 404);
     enrichContext({ gameId: game.id, roomId: game.roomId });
     return game;
@@ -85,7 +85,12 @@ export class GameOperations {
       ...players.flatMap((p) => (p.accountId ? [p.accountId] : [])),
     ]);
   }
-  fields(game: Game): Pick<Contract<"GameCommandReceipt">, "gameId" | "gameVersion" | "gameProjectionVersion"> {
+  fields(
+    game: Game,
+  ): Pick<
+    Contract<"GameCommandReceipt">,
+    "gameId" | "gameVersion" | "gameProjectionVersion"
+  > {
     return {
       gameId: game.id,
       gameVersion: String(game.stateVersion),
@@ -132,19 +137,25 @@ export class GameOperations {
       ...this.fields(game),
       ...outcome,
     };
-    single(await db.insert(s.gameActions).values({
-      gameId: game.id,
-      commandId: operationId,
-      hostAccountId: actor.account!.accountId,
-      commandName: name,
-      requestDigest: hash,
-      controllerGeneration: game.controllerGeneration,
-      expectedVersion: expected,
-      resultVersion: game.stateVersion,
-      resultData: result,
-      acceptedAt: now.toISOString(),
-      ...score,
-    }).returning(), "GAMEACTIONS_WRITE_ROW");
+    single(
+      await db
+        .insert(s.gameActions)
+        .values({
+          gameId: game.id,
+          commandId: operationId,
+          hostAccountId: actor.account!.accountId,
+          commandName: name,
+          requestDigest: hash,
+          controllerGeneration: game.controllerGeneration,
+          expectedVersion: expected,
+          resultVersion: game.stateVersion,
+          resultData: result,
+          acceptedAt: now.toISOString(),
+          ...score,
+        })
+        .returning(),
+      "GAMEACTIONS_WRITE_ROW",
+    );
     return result;
   }
   @scoped("games.finish")
@@ -178,32 +189,39 @@ export class GameOperations {
       );
     for (const q of running) {
       const ms = remaining(q, ended);
-      single(await db
-        .update(s.gameQuestions)
-        .set({
-          timerState: ms ? "paused" : "elapsed",
-          remainingMs: ms,
-          timerDeadlineAt: null,
-          resumeTimerOnReopen: false,
-        })
-        .where(this.slot(q)).returning(), "GAMEQUESTIONS_WRITE_ROW");
+      single(
+        await db
+          .update(s.gameQuestions)
+          .set({
+            timerState: ms ? "paused" : "elapsed",
+            remainingMs: ms,
+            timerDeadlineAt: null,
+            resumeTimerOnReopen: false,
+          })
+          .where(this.slot(q))
+          .returning(),
+        "GAMEQUESTIONS_WRITE_ROW",
+      );
     }
-    const updated = single(await db
-      .update(s.games)
-      .set({
-        status: reason === "idle_timeout" ? "expired" : "finished",
-        endReason: reason,
-        endedAt,
-        contentPurgeAfter: sql`${endedAt}::timestamptz + interval '12 months'`,
-        stateVersion: game.stateVersion + 1n,
-        projectionVersion: game.projectionVersion + 1n,
-        teamOneScore: game.teamOneScore,
-        teamTwoScore: game.teamTwoScore,
-        activeBoardPosition: null,
-        activeQuestionPosition: null,
-      })
-      .where(eq(s.games.id, game.id))
-      .returning(), "GAMES_UPDATED_ROW");
+    const updated = single(
+      await db
+        .update(s.games)
+        .set({
+          status: reason === "idle_timeout" ? "expired" : "finished",
+          endReason: reason,
+          endedAt,
+          contentPurgeAfter: sql`${endedAt}::timestamptz + interval '12 months'`,
+          stateVersion: game.stateVersion + 1n,
+          projectionVersion: game.projectionVersion + 1n,
+          teamOneScore: game.teamOneScore,
+          teamTwoScore: game.teamTwoScore,
+          activeBoardPosition: null,
+          activeQuestionPosition: null,
+        })
+        .where(eq(s.games.id, game.id))
+        .returning(),
+      "GAMES_UPDATED_ROW",
+    );
     await db
       .update(s.accounts)
       .set({ activeGameId: null, activeGameClaimedAt: null })
@@ -221,21 +239,26 @@ export class GameOperations {
           )
       )[0];
       requireState(debit, "GAME_DEBIT_MISSING", 500);
-      await writtenAtMost(db
-        .insert(s.tokenLedgerEntries)
-        .values({
-          id: randomUUID(),
-          accountId: game.hostAccountId,
-          entryKind: "game_restoration",
-          amount: 1,
-          idempotencyKey: `unopened:${game.id}`,
-          gameId: game.id,
-          sourceDebitId: debit.id,
-          sourceDebitKind: "game_debit",
-          restorationReason: "unopened_game",
-          createdAt: now.toISOString(),
-        })
-        .onConflictDoNothing().returning(), 1, "TOKENLEDGERENTRIES_WRITE_COUNT");
+      await writtenAtMost(
+        db
+          .insert(s.tokenLedgerEntries)
+          .values({
+            id: randomUUID(),
+            accountId: game.hostAccountId,
+            entryKind: "game_restoration",
+            amount: 1,
+            idempotencyKey: `unopened:${game.id}`,
+            gameId: game.id,
+            sourceDebitId: debit.id,
+            sourceDebitKind: "game_debit",
+            restorationReason: "unopened_game",
+            createdAt: now.toISOString(),
+          })
+          .onConflictDoNothing()
+          .returning(),
+        1,
+        "TOKENLEDGERENTRIES_WRITE_COUNT",
+      );
     }
     await this.core.hint(
       db,
@@ -248,7 +271,9 @@ export class GameOperations {
     // never acquire room after game, even through a membership trigger.
     versionIncrement(game.stateVersion, updated.stateVersion);
     versionIncrement(game.projectionVersion, updated.projectionVersion);
-    this.core.afterCommit(db, () => log.info("games.finish", { outcome: updated.status }));
+    this.core.afterCommit(db, () =>
+      log.info("games.finish", { outcome: updated.status }),
+    );
     return updated;
   }
   @scoped("games.expire")
@@ -289,441 +314,13 @@ export class GameOperations {
     operationId: string,
     body: Contract<"StartGame">,
   ): Promise<Contract<"Receipt">> {
-    const hash = digest("startGame", roomId, body);
-    const original = (
-      await this.core.database.db
-        .select()
-        .from(s.games)
-        .where(eq(s.games.startRequestId, operationId))
-    )[0];
-    if (original) {
-      this.host(original, actor, false);
-      requireState(
-        original.roomId === roomId &&
-          equalProof(original.startRequestDigest, hash),
-        "OPERATION_CONFLICT",
-      );
-      const receipt = await this.core.receipt(
-        this.core.database.db,
-        operationId,
-        hash,
-      );
-      if (receipt) return receipt;
-      const room = await this.core.room(this.core.database.db, roomId, false);
-      return {
-        operationId,
-        roomId,
-        acceptedAt: iso(original.startedAt),
-        effect: "changed",
-        roomVersion: String(room.stateVersion),
-        readyGeneration: room.lobbyGeneration,
-        ...this.fields(original),
-        controllerGeneration: String(original.controllerGeneration),
-      };
-    }
-    const initialRoom = await this.core.room(
-      this.core.database.db,
-      roomId,
-      false,
-    );
-    this.core.host(initialRoom, actor);
-    requireState(
-      this.core.admission.availability().admission === "open",
-      "SERVER_AT_CAPACITY",
-      503,
-    );
-    await this.preflight(roomId);
-    return this.core.admission.allocate(`start:${operationId}`, hash, () =>
-      this.core.transaction(async (db) => {
-        const room = await this.core.room(db, roomId);
-        this.core.host(room, actor);
-        const prior = await this.core.receipt(db, operationId, hash);
-        if (prior) return prior;
-        const roster = await this.core.members(db, roomId);
-        requireState(
-          roster.length > 0 &&
-            roster.length <= 6 &&
-            roster.every(
-              (m) =>
-                m.accountId === room.ownerAccountId ||
-                m.readyForGeneration === room.lobbyGeneration,
-            ),
-          "MEMBERS_NOT_READY",
-        );
-        const selections = await db
-          .select()
-          .from(s.roomPackSelections)
-          .where(eq(s.roomPackSelections.roomId, roomId))
-          .orderBy(s.roomPackSelections.boardPosition);
-        requireState(
-          selections.length === 6 &&
-            selections.every((v, i) => v.boardPosition === i + 1),
-          "SIX_CATEGORIES_REQUIRED",
-        );
-        // Stable catalog locks prevent publication/media edits racing the copy.
-        const categories = await db
-          .select()
-          .from(s.categories)
-          .where(
-            inArray(
-              s.categories.id,
-              selections.map((p) => p.categoryId).sort(),
-            ),
-          )
-          .orderBy(s.categories.id)
-          .for("share");
-        const packs = await db
-          .select()
-          .from(s.questionPacks)
-          .where(
-            inArray(s.questionPacks.id, selections.map((p) => p.packId).sort()),
-          )
-          .orderBy(s.questionPacks.id)
-          .for("share");
-        const questions = await db
-          .select()
-          .from(s.questions)
-          .where(
-            and(
-              inArray(
-                s.questions.packId,
-                packs.map((p) => p.id),
-              ),
-              isNull(s.questions.retiredAt),
-            ),
-          )
-          .orderBy(s.questions.id)
-          .for("share");
-        const media = await db
-          .select()
-          .from(s.questionMedia)
-          .where(
-            inArray(
-              s.questionMedia.questionId,
-              questions.map((q) => q.id),
-            ),
-          )
-          .orderBy(
-            s.questionMedia.questionId,
-            s.questionMedia.mediaRole,
-            s.questionMedia.variantNumber,
-          )
-          .for("share");
-        const assets = media.length
-          ? await db
-              .select()
-              .from(s.mediaAssets)
-              .where(
-                inArray(
-                  s.mediaAssets.id,
-                  [...new Set(media.map((m) => m.mediaAssetId))].sort(),
-                ),
-              )
-              .orderBy(s.mediaAssets.id)
-              .for("share")
-          : [];
-        const accounts = await this.accounts(
-          db,
-          roster.flatMap((m) => (m.accountId ? [m.accountId] : [])),
-        );
-        const now = await freshTime(db);
-        await this.rooms.lobby(db, room, now);
-        requireState(room.presentationMode === "lobby", "LOBBY_NOT_OPEN");
-        requireState(
-          revision(body.expectedRoomVersion) === room.stateVersion &&
-            body.expectedReadyGeneration === room.lobbyGeneration,
-          "STALE_ROOM_VERSION",
-        );
-        requireState(
-          accounts.every((a) => a.state === "active" && !a.activeGameId),
-          "ACCOUNT_ALREADY_PLAYING",
-        );
-        requireState(
-          accounts.find((a) => a.id === room.ownerAccountId)!.tokenBalance >= 1,
-          "INSUFFICIENT_TOKENS",
-        );
-        const eligibility = await this.catalog.eligibilities(db, packs, roster);
-        for (const choice of selections) {
-          const pack = packs.find((p) => p.id === choice.packId),
-            category = categories.find((c) => c.id === choice.categoryId);
-          requireState(
-            category &&
-              !category.archivedAt &&
-              pack &&
-              !pack.archivedAt &&
-              pack.publicationState === "published" &&
-              pack.categoryId === category.id &&
-              pack.contentRevision === choice.observedRevision,
-            "SELECTION_CHANGED",
-          );
-          requireState(
-            category.nameAr.trim().length > 0 &&
-              category.nameAr.length <= 160 &&
-              (!category.nameFranco || category.nameFranco.length <= 160),
-            "CONTENT_NOT_READY",
-          );
-          const e = eligibility.get(pack.id)!;
-          requireState(e.questions.length === 6, "CONTENT_NOT_READY");
-          requireState(
-            e.fresh ||
-              (choice.repeatAcceptedAt &&
-                choice.repeatConsentBasis?.toString("hex") === e.basis),
-            "REPEAT_CONSENT_REQUIRED",
-            409,
-            { packId: pack.id, eligibilityBasis: e.basis },
-          );
-        }
-        const gameId = randomUUID();
-        const sequence = await db.execute(
-          sql`SELECT coalesce(max(sequence_number),0)+1 AS n FROM games WHERE room_id=${roomId}`,
-        );
-        const game = single(await db
-          .insert(s.games)
-          .values({
-            id: gameId,
-            roomId,
-            sequenceNumber: Number(single(sequence.rows, "GAME_SEQUENCE_ROW").n),
-            startRequestId: operationId,
-            startRequestDigest: hash,
-            hostAccountId: room.ownerAccountId,
-            teamOneName: room.teamOneName,
-            teamTwoName: room.teamTwoName,
-            startedAt: now.toISOString(),
-            lastGameplayAt: now.toISOString(),
-            idleExpiresAt: plusDay(now),
-            controllerCredentialHash: proof(
-              "game-control",
-              gameId,
-              actor.controlSecret,
-            ),
-            controllerGeneration: room.controllerGeneration,
-            controllerAcquiredAt: now.toISOString(),
-          })
-          .returning(), "GAMES_GAME_ROW");
-        enrichContext({ gameId, roomId, operationId });
-        this.core.afterCommit(db, () => log.info("games.start", { outcome: "created" }));
-        const ordered = orderSeats(roster, room.ownerAccountId);
-        await written(db.insert(s.gamePlayers).values(
-          ordered.map((m, i) => ({
-            gameId,
-            roomId,
-            roomMemberId: m.id,
-            seatNumber: i + 1,
-            accountId: m.accountId,
-            teamNumber: m.lobbyTeamNumber,
-            displayName: m.displayName,
-            joinedAt: now.toISOString(),
-          })),
-        ).returning(), ordered.length, "GAMEPLAYERS_WRITE_COUNT");
-        await written(db.insert(s.gamePacks).values(
-          selections.map((choice) => {
-            const pack = packs.find((p) => p.id === choice.packId)!,
-              category = categories.find((c) => c.id === choice.categoryId)!;
-            return {
-              gameId,
-              categoryId: category.id,
-              packId: pack.id,
-              boardPosition: choice.boardPosition,
-              packNumber: pack.packNumber,
-              sourceContentRevision: pack.contentRevision,
-              categoryNameAr: category.nameAr,
-              categoryNameFranco: category.nameFranco,
-              repeatAcceptedAt: choice.repeatAcceptedAt,
-              repeatAcceptedBySeat: choice.repeatAcceptedAt ? 1 : null,
-            };
-          }),
-        ).returning(), selections.length, "GAMEPACKS_WRITE_COUNT");
-        const copied: (typeof s.gameQuestions.$inferInsert)[] = [],
-          pins: (typeof s.gameQuestionMedia.$inferInsert)[] = [];
-        for (const q of questions) {
-          const choice = selections.find((p) => p.packId === q.packId)!;
-          const qmedia = media.filter((m) => m.questionId === q.id);
-          const stages = qmedia
-            .filter((m) => m.mediaRole === "hint_image")
-            .sort((a, b) => a.variantNumber - b.variantNumber);
-          const cfg = settings(
-            q.format,
-            {
-              ...q.formatConfig,
-              ...(["IMAGE_BLUR", "IMAGE_ZOOM"].includes(q.format)
-                ? { stageSuggestions: stages.map((m) => m.suggestedPoints) }
-                : {}),
-            },
-            points(q.slotNumber),
-          );
-          requireState(
-            q.promptAr.trim().length > 0 &&
-              q.promptAr.length <= 4000 &&
-              q.answerAr.trim().length > 0 &&
-              q.answerAr.length <= 4000 &&
-              (!q.promptFranco || q.promptFranco.length <= 4000) &&
-              (!q.answerFranco || q.answerFranco.length <= 4000),
-            "CONTENT_NOT_READY",
-          );
-          const has = (role: string, variant = 0) =>
-            qmedia.some(
-              (m) => m.mediaRole === role && m.variantNumber === variant,
-            );
-          if (["IMAGE_BLUR", "IMAGE_ZOOM"].includes(q.format))
-            requireState(
-              [0, 1, 2].every((v) => has("hint_image", v)) &&
-                has("answer_image"),
-              "CONTENT_NOT_READY",
-            );
-          else if (q.format.startsWith("IMAGE_"))
-            requireState(
-              has("prompt_image") &&
-                (["IMAGE_PERSON", "IMAGE_COLOR", "IMAGE_MEMORY"].includes(
-                  q.format,
-                )
-                  ? has("answer_image")
-                  : true),
-              "CONTENT_NOT_READY",
-            );
-          if (q.format.startsWith("AUDIO_"))
-            requireState(
-              has("question_audio") &&
-                (q.format !== "AUDIO_REVERSE" ||
-                  !cfg.allowForward ||
-                  has("answer_audio")),
-              "CONTENT_NOT_READY",
-            );
-          const original = qmedia.find(
-            (m) =>
-              m.mediaRole ===
-              (q.format.startsWith("AUDIO_") ? "source_audio" : "answer_image"),
-          )?.mediaAssetId;
-          const rendition = (role: string, operation: string, variant = 0) => {
-            const m = qmedia.find(
-                (m) => m.mediaRole === role && m.variantNumber === variant,
-              ),
-              asset = assets.find((a) => a.id === m?.mediaAssetId);
-            requireState(
-              asset &&
-                original &&
-                asset.id !== original &&
-                asset.sourceAssetId === original &&
-                asset.transformSpec.operation === operation,
-              "UNSAFE_MEDIA_RENDITION",
-            );
-          };
-          if (["IMAGE_BLUR", "IMAGE_ZOOM"].includes(q.format))
-            for (const stage of [0, 1, 2])
-              rendition(
-                "hint_image",
-                q.format === "IMAGE_BLUR" ? "blur" : "crop",
-                stage,
-              );
-          if (["IMAGE_PERSON", "IMAGE_COLOR"].includes(q.format))
-            rendition(
-              "prompt_image",
-              q.format === "IMAGE_COLOR" ? "grayscale" : "crop",
-            );
-          if (q.format === "AUDIO_REVERSE")
-            rendition("question_audio", "reverse");
-          for (const m of qmedia) {
-            if (m.mediaRole.startsWith("source_")) continue;
-            const asset = assets.find((a) => a.id === m.mediaAssetId)!;
-            requireState(
-              asset.state === "ready" &&
-                !asset.archivedAt &&
-                asset.accessScope === "private" &&
-                ["r2", "local"].includes(asset.storageProvider) &&
-                asset.contentType &&
-                asset.contentType.length <= 100 &&
-                asset.byteSize !== null &&
-                (asset.widthPx === null || asset.widthPx <= 16384) &&
-                (asset.heightPx === null || asset.heightPx <= 16384),
-              "CONTENT_NOT_READY",
-            );
-            requireState(
-              (m.mediaRole.endsWith("audio") &&
-                asset.mediaKind === "audio" &&
-                asset.durationMs &&
-                asset.durationMs <= 1800000) ||
-                (!m.mediaRole.endsWith("audio") && asset.mediaKind === "image"),
-              "CONTENT_NOT_READY",
-            );
-            pins.push({
-              gameId,
-              boardPosition: choice.boardPosition,
-              questionPosition: q.slotNumber,
-              mediaRole: m.mediaRole,
-              variantNumber: m.variantNumber,
-              mediaAssetId: m.mediaAssetId,
-            });
-          }
-          copied.push({
-            gameId,
-            boardPosition: choice.boardPosition,
-            questionPosition: q.slotNumber,
-            sourceQuestionId: q.id,
-            basePoints: points(q.slotNumber),
-            format: q.format,
-            contentSnapshot: {
-              promptAr: q.promptAr,
-              promptFranco: q.promptFranco,
-              answerAr: q.answerAr,
-              answerFranco: q.answerFranco,
-              config: cfg,
-            },
-          });
-        }
-        requireState(copied.length === 36, "CONTENT_NOT_READY");
-        await written(db.insert(s.gameQuestions).values(copied).returning(), copied.length, "GAMEQUESTIONS_WRITE_COUNT");
-        if (pins.length) await written(db.insert(s.gameQuestionMedia).values(pins).returning(), pins.length, "GAMEQUESTIONMEDIA_WRITE_COUNT");
-        await db
-          .update(s.accounts)
-          .set({ activeGameId: gameId, activeGameClaimedAt: now.toISOString() })
-          .where(
-            inArray(
-              s.accounts.id,
-              accounts.map((a) => a.id),
-            ),
-          );
-        single(await db.insert(s.tokenLedgerEntries).values({
-          id: randomUUID(),
-          accountId: room.ownerAccountId,
-          entryKind: "game_debit",
-          amount: -1,
-          idempotencyKey: `start:${operationId}`,
-          gameId,
-          createdAt: now.toISOString(),
-        }).returning(), "TOKENLEDGERENTRIES_WRITE_ROW");
-        const updated = await this.rooms.bump(
-          db,
-          room,
-          now,
-          false,
-          { currentGameId: gameId, presentationMode: "game" },
-          false,
-        );
-        await this.core.hint(
-          db,
-          roomId,
-          updated.stateVersion,
-          game.id,
-          game.projectionVersion,
-        );
-        return this.core.saveReceipt(
-          db,
-          updated,
-          actor,
-          operationId,
-          "startGame",
-          hash,
-          now,
-          {
-            ...this.rooms.fields(updated),
-            ...this.fields(game),
-            controllerGeneration: String(game.controllerGeneration),
-          },
-        );
-      }),
-    );
+    return startGame(this, actor, roomId, operationId, body);
   }
   slot(q: Pick<Question, "gameId" | "boardPosition" | "questionPosition">) {
-    invariant(isPosition(q.boardPosition) && isPosition(q.questionPosition), "QUESTION_POSITIONS");
+    invariant(
+      isPosition(q.boardPosition) && isPosition(q.questionPosition),
+      "QUESTION_POSITIONS",
+    );
     return and(
       eq(s.gameQuestions.gameId, q.gameId),
       eq(s.gameQuestions.boardPosition, q.boardPosition),
@@ -745,17 +342,22 @@ export class GameOperations {
       (a) => a.state === "active" && a.activeGameId === game.id,
     );
     if (eligible.length)
-      await writtenAtMost(db
-        .insert(s.accountQuestionExposures)
-        .values(
-          eligible.map((a) => ({
-            accountId: a.id,
-            questionId: q.sourceQuestionId,
-            firstGameId: game.id,
-            firstExposedAt: now.toISOString(),
-          })),
-        )
-        .onConflictDoNothing().returning(), eligible.length, "ACCOUNTQUESTIONEXPOSURES_WRITE_COUNT");
+      await writtenAtMost(
+        db
+          .insert(s.accountQuestionExposures)
+          .values(
+            eligible.map((a) => ({
+              accountId: a.id,
+              questionId: q.sourceQuestionId,
+              firstGameId: game.id,
+              firstExposedAt: now.toISOString(),
+            })),
+          )
+          .onConflictDoNothing()
+          .returning(),
+        eligible.length,
+        "ACCOUNTQUESTIONEXPOSURES_WRITE_COUNT",
+      );
   }
   async completion(db: Tx, game: Game, q: Question, now: Date) {
     const all = await db
@@ -782,17 +384,22 @@ export class GameOperations {
       (a) => a.state === "active" && a.activeGameId === game.id,
     );
     if (eligible.length)
-      await writtenAtMost(db
-        .insert(s.accountPackCompletions)
-        .values(
-          eligible.map((a) => ({
-            accountId: a.id,
-            gameId: game.id,
-            boardPosition: q.boardPosition,
-            completedAt: now.toISOString(),
-          })),
-        )
-        .onConflictDoNothing().returning(), eligible.length, "ACCOUNTPACKCOMPLETIONS_WRITE_COUNT");
+      await writtenAtMost(
+        db
+          .insert(s.accountPackCompletions)
+          .values(
+            eligible.map((a) => ({
+              accountId: a.id,
+              gameId: game.id,
+              boardPosition: q.boardPosition,
+              completedAt: now.toISOString(),
+            })),
+          )
+          .onConflictDoNothing()
+          .returning(),
+        eligible.length,
+        "ACCOUNTPACKCOMPLETIONS_WRITE_COUNT",
+      );
   }
   @scoped("games.command")
   async command(
@@ -853,23 +460,33 @@ export class GameOperations {
           now,
           { feedbackVersion: String(q.feedbackVersion), effect: "none" },
         );
-      single(await db
-        .update(s.gameQuestions)
-        .set({
-          feedbackVote: body.vote,
-          feedbackVersion: q.feedbackVersion + 1n,
-          feedbackByAccountId: game.hostAccountId,
-          feedbackCreatedAt: q.feedbackCreatedAt ?? now.toISOString(),
-          feedbackUpdatedAt: now.toISOString(),
-        })
-        .where(this.slot(q)).returning(), "GAMEQUESTIONS_WRITE_ROW");
-      const updated = single(await db
-        .update(s.games)
-        .set({ projectionVersion: game.projectionVersion + 1n })
-        .where(eq(s.games.id, gameId))
-        .returning(), "GAMES_UPDATED_ROW");
+      single(
+        await db
+          .update(s.gameQuestions)
+          .set({
+            feedbackVote: body.vote,
+            feedbackVersion: q.feedbackVersion + 1n,
+            feedbackByAccountId: game.hostAccountId,
+            feedbackCreatedAt: q.feedbackCreatedAt ?? now.toISOString(),
+            feedbackUpdatedAt: now.toISOString(),
+          })
+          .where(this.slot(q))
+          .returning(),
+        "GAMEQUESTIONS_WRITE_ROW",
+      );
+      const updated = single(
+        await db
+          .update(s.games)
+          .set({ projectionVersion: game.projectionVersion + 1n })
+          .where(eq(s.games.id, gameId))
+          .returning(),
+        "GAMES_UPDATED_ROW",
+      );
       versionIncrement(game.projectionVersion, updated.projectionVersion);
-      invariant(updated.stateVersion === game.stateVersion, "FEEDBACK_GAME_VERSION_STABLE");
+      invariant(
+        updated.stateVersion === game.stateVersion,
+        "FEEDBACK_GAME_VERSION_STABLE",
+      );
       await this.core.hint(
         db,
         game.roomId,
