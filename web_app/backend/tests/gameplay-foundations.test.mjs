@@ -44,3 +44,13 @@ test("structured log serializers omit private payloads and error messages", () =
   assert.match(record.err.stack, /gameplay-foundations.test.mjs/);
   assert.equal(errorStack(error).includes(secret), false);
 });
+
+
+test("invariants assert impossible states and exact single-row results", async () => {
+  const { invariant, single } = await import("../dist/gameplay/invariant.js");
+  invariant(true, "VALID_STATE");
+  assert.equal(single([42], "ONE_ROW"), 42);
+  for (const check of [() => invariant(false, "IMPOSSIBLE"), () => single([], "MISSING"), () => single([1, 2], "EXTRA")]) {
+    assert.throws(check, (error) => error.status === 500 && error.code === "INTERNAL_INVARIANT");
+  }
+});

@@ -1,3 +1,4 @@
+import { single } from "./invariant.js";
 import { GameplayProblem } from "./problem.js";
 type Lane = "protected" | "public" | "background";
 interface Waiting {
@@ -54,10 +55,11 @@ export class GameplayScheduler {
     } finally {
       this.running--;
       if (lane !== "protected") this.ordinary--;
+      // The scheduler only drains these two literal queue lanes.
       for (const priority of ["protected", "public"] as const) {
         const i = this.queue.findIndex((w) => w.lane === priority);
         if (i >= 0 && this.available(priority)) {
-          const [w] = this.queue.splice(i, 1);
+          const w = single(this.queue.splice(i, 1), "SCHEDULER_QUEUED_WORK");
           clearTimeout(w.timer);
           this.running++;
           if (priority !== "protected") this.ordinary++;

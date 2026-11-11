@@ -1,6 +1,5 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { GameplayProblem } from "./problem.js";
-import type { Data } from "./ports.js";
 
 export function secretBytes(secret: unknown): Buffer {
   if (typeof secret !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(secret))
@@ -36,9 +35,9 @@ export function canonical(value: unknown): string {
 export function digest(
   operation: string,
   resource: string,
-  body: Data,
+  body: object,
 ): Buffer {
-  const semantic = { ...body };
+  const semantic: Record<string, unknown> = { ...body };
   for (const key of ["proposedControlSecret", "reconnectSecret"])
     if (key in semantic)
       semantic[key] = createHash("sha256")

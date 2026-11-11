@@ -1,8 +1,9 @@
+import { single, invariant } from "./invariant.js";
 import { Injectable } from "@nestjs/common";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { randomInt, randomUUID } from "node:crypto";
 import * as s from "../database/schema/index.js";
-import type { Data } from "./ports.js";
+import type { Contract } from "./contract.js";
 import { digest, equalProof, proof } from "./proof.js";
 import { GameplayProblem, requireState } from "./problem.js";
 import { revision } from "./contract.js";
@@ -37,7 +38,7 @@ export class RoomOperations {
         .update(s.roomPackSelections)
         .set({ repeatConsentBasis: null, repeatAcceptedAt: null })
         .where(eq(s.roomPackSelections.roomId, room.id));
-    const [updated] = await db
+    const updated = single(await db
       .update(s.rooms)
       .set({
         stateVersion: room.stateVersion + 1n,
@@ -51,11 +52,11 @@ export class RoomOperations {
         ...changes,
       })
       .where(eq(s.rooms.id, room.id))
-      .returning();
+      .returning(), "ROOMS_UPDATED_ROW");
     await this.core.hint(db, room.id, updated.stateVersion);
     return updated;
   }
-  fields(room: Room, member?: Member): Data {
+  fields(room: Room, member?: Member): Partial<Contract<"Receipt">> {
     return {
       roomVersion: String(room.stateVersion),
       readyGeneration: room.lobbyGeneration,
@@ -85,7 +86,7 @@ export class RoomOperations {
     requireState(now.getTime() < base + 86400000, "ROOM_EXPIRED", 410);
     return game;
   }
-  async invitation(actor: Actor, roomId: string): Promise<Data> {
+  async invitation(actor: Actor, roomId: string): Promise<Contract<"Invitation">> {
     const room = await this.core.room(this.core.database.db, roomId, false);
     this.core.host(room, actor);
     requireState(
@@ -107,7 +108,7 @@ export class RoomOperations {
       expiresAt: iso(room.invitationExpiresAt!),
     };
   }
-  async preview(code: string): Promise<Data> {
+  async preview(code: string): Promise<Contract<"InvitationPreview">> {
     this.core.enabled();
     requireState(/^\d{6}$/.test(code), "INVALID_INVITATION", 400);
     const room = (
@@ -154,8 +155,8 @@ export class RoomOperations {
     code: string,
     actor: Actor | undefined,
     operationId: string,
-    body: Data,
-  ): Promise<Data> {
+    body: Contract<"JoinRoom">,
+  ): Promise<Contract<"Receipt">> {
     this.core.enabled();
     requireState(/^\d{6}$/.test(code), "INVALID_INVITATION", 400);
     const hash = digest("joinRoom", code, {
@@ -180,7 +181,7 @@ export class RoomOperations {
         requireState(
           equalProof(
             member.reconnectCredentialHash,
-            proof("guest", member.id, body.reconnectSecret),
+            proof("guest", member.id, (body.identity === "anonymous" ? body.reconnectSecret : undefined)),
           ),
           "INVALID_PROOF",
           401,
@@ -255,7 +256,7 @@ export class RoomOperations {
             "ALREADY_JOINED",
           );
         const memberId = randomUUID();
-        const [member] = await db
+        const member = single(await db
           .insert(s.roomMemberships)
           .values({
             id: memberId,
@@ -271,13 +272,13 @@ export class RoomOperations {
                   reconnectCredentialHash: proof(
                     "guest",
                     memberId,
-                    body.reconnectSecret,
+                    (body.identity === "anonymous" ? body.reconnectSecret : undefined),
                   ),
                   reconnectIssuedAt: now.toISOString(),
                 }
               : {}),
           })
-          .returning();
+          .returning(), "ROOMS_MEMBER_ROW");
         const updated = await this.bump(db, room, now, true);
         return this.core.saveReceipt(
           db,
@@ -296,8 +297,8 @@ export class RoomOperations {
     actor: Actor,
     roomId: string,
     operationId: string,
-    body: Data,
-  ): Promise<Data> {
+    body: Contract<"RoomMutation">,
+  ): Promise<Contract<"Receipt">> {
     const hash = digest("rotateInvitation", roomId, body);
     return this.core.transaction(async (db) => {
       const room = await this.core.room(db, roomId);
@@ -350,9 +351,9 @@ export class RoomOperations {
     actor: Actor,
     roomId: string,
     operationId: string,
-    body: Data,
+    body: Pick<Contract<"Ready">, "expectedMembershipVersion" | "expectedReadyGeneration"> & Partial<Contract<"Ready"> & Contract<"MemberPatch">>,
     ready: boolean,
-  ): Promise<Data> {
+  ): Promise<Contract<"Receipt">> {
     const operation = ready ? "setReadiness" : "updateOwnMembership",
       hash = digest(operation, roomId, {
         ...body,
@@ -423,11 +424,11 @@ export class RoomOperations {
           now,
           { ...this.fields(room, member), effect: "none" },
         );
-      const [updatedMember] = await db
+      const updatedMember = single(await db
         .update(s.roomMemberships)
         .set({ ...changes, stateVersion: member.stateVersion + 1n })
         .where(eq(s.roomMemberships.id, member.id))
-        .returning();
+        .returning(), "ROOMS_UPDATEDMEMBER_ROW");
       const updated = await this.bump(db, room, now, semantic);
       return this.core.saveReceipt(
         db,
@@ -445,8 +446,8 @@ export class RoomOperations {
     actor: Actor,
     roomId: string,
     operationId: string,
-    body: Data,
-  ): Promise<Data> {
+    body: Contract<"SaveSetup">,
+  ): Promise<Contract<"Receipt">> {
     const hash = digest("saveRoomSetup", roomId, body);
     return this.core.transaction(async (db) => {
       const room = await this.core.room(db, roomId);
@@ -462,7 +463,7 @@ export class RoomOperations {
         409,
         { currentRoomVersion: String(room.stateVersion) },
       );
-      const choices = body.selections as Data[];
+      const choices = body.selections;
       requireState(
         new Set(choices.map((item) => item.categoryId)).size ===
           choices.length &&
@@ -508,7 +509,7 @@ export class RoomOperations {
         packs,
         members.map((m) =>
           m.id === host.id
-            ? { ...m, lobbyTeamNumber: body.hostTeamNumber as number | null }
+            ? { ...m, lobbyTeamNumber: body.hostTeamNumber }
             : m,
         ),
       );
@@ -555,7 +556,7 @@ export class RoomOperations {
         await db
           .update(s.roomMemberships)
           .set({
-            lobbyTeamNumber: body.hostTeamNumber as number | null,
+            lobbyTeamNumber: body.hostTeamNumber,
             stateVersion: host.stateVersion + 1n,
           })
           .where(eq(s.roomMemberships.id, host.id));

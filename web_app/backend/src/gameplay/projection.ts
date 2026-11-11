@@ -21,7 +21,8 @@ import {
   timer,
 } from "./content.js";
 import { requireState } from "./problem.js";
-import type { Data } from "./ports.js";
+import type { Contract } from "./contract.js";
+import { invariant } from "./invariant.js";
 
 const winner = (a: bigint | number, b: bigint | number) =>
   a === b ? null : a > b ? 1 : 2;
@@ -64,7 +65,7 @@ export class ProjectionService {
     actor: Actor,
     roomId: string,
     requestedLanguage?: string,
-  ): Promise<Data> {
+  ): Promise<Contract<"Snapshot">> {
     const language = validLanguage(requestedLanguage);
     return this.core.database.transaction(
       async (db) => {
@@ -110,7 +111,8 @@ export class ProjectionService {
             members: members.map((member) => ({
               id: member.id,
               displayName: member.displayName,
-              teamNumber: member.lobbyTeamNumber,
+              // The room-membership table constrains nullable team numbers to 1 or 2.
+              teamNumber: member.lobbyTeamNumber as 1 | 2 | null,
               host: member.accountId === room.ownerAccountId,
               memberVersion: String(member.stateVersion),
               ready: member.readyForGeneration === room.lobbyGeneration,
@@ -142,7 +144,7 @@ export class ProjectionService {
     gameId: string,
     requestedLanguage?: string,
     resultOnly = false,
-  ): Promise<Data> {
+  ): Promise<Contract<"Snapshot"> | Contract<"Result">> {
     const language = validLanguage(requestedLanguage),
       initial = await this.games.game(this.core.database.db, gameId, false);
     await this.authorize(
@@ -171,7 +173,8 @@ export class ProjectionService {
       { consistentRead: true },
     );
   }
-  async result(db: Tx, game: Game, language: string): Promise<Data> {
+  async result(db: Tx, game: Game, language: Contract<"Language">): Promise<Contract<"Result">> {
+    invariant(game.status !== "active" && game.endReason, "RESULT_TERMINAL");
     const questions = await db
       .select()
       .from(s.gameQuestions)
@@ -226,12 +229,12 @@ export class ProjectionService {
     room: Room,
     game: Game,
     actor: Actor,
-    language: string,
+    language: Contract<"Language">,
     now: Date,
-  ): Promise<Data> {
+  ): Promise<Contract<"Snapshot">> {
     await this.authorize(db, game, actor, game.status !== "active");
     const host = actor.account?.accountId === game.hostAccountId,
-      audience = host ? "host" : "viewer";
+      audience: "host" | "viewer" = host ? "host" : "viewer";
     const base = {
       source: {
         roomVersion: String(room.stateVersion),
@@ -282,7 +285,7 @@ export class ProjectionService {
           s.gameQuestions.boardPosition,
           s.gameQuestions.questionPosition,
         );
-      return {
+      const boardSnapshot = {
         ...base,
         view: {
           phase: "board",
@@ -314,6 +317,8 @@ export class ProjectionService {
           })),
         },
       };
+      // The database constrains tile points/teams; the serializer checks the phase union.
+      return boardSnapshot as Contract<"Snapshot">;
     }
     const q = (
       await db
@@ -359,7 +364,7 @@ export class ProjectionService {
         if (q.timerState === "paused") controls.push("resume_timer");
       }
     }
-    return {
+    const snapshot = {
       ...base,
       view: {
         phase: q.revealedAt ? "answer" : "question",
@@ -388,5 +393,7 @@ export class ProjectionService {
           : {}),
       },
     };
+    // Phase/format are assembled together; Standard Schema checks their correlated union.
+    return snapshot as Contract<"Snapshot">;
   }
 }

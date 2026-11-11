@@ -48,12 +48,14 @@ export class DatabaseConnection {
       const result = await client.query<{ acquired: boolean; pid: number }>(
         "SELECT pg_try_advisory_lock(1935763505, 1) AS acquired,pg_backend_pid() AS pid",
       );
-      if (!result.rows[0].acquired) {
+      const row = result.rows[0];
+      if (!row) throw new Error("Missing advisory lock result.");
+      if (!row.acquired) {
         client.release();
         return false;
       }
       this.gameplayLease = client;
-      this.leaseBackendId = result.rows[0].pid;
+      this.leaseBackendId = row.pid;
       client.on("error", () => {
         this.initialized = false;
         this.leaseLost = true;
@@ -147,7 +149,7 @@ export class DatabaseConnection {
           "SELECT EXISTS(SELECT 1 FROM pg_locks WHERE locktype='advisory' AND classid=1935763505 AND objid=1 AND objsubid=2 AND pid=$1 AND mode='ExclusiveLock' AND granted) AS owned",
           [this.leaseBackendId],
         );
-        if (!owned.rows[0].owned || this.leaseLost) {
+        if (!owned.rows[0]?.owned || this.leaseLost) {
           this.leaseLost = true;
           this.initialized = false;
           throw new DatabaseDrainingError(

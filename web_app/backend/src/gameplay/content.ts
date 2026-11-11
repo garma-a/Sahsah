@@ -2,7 +2,11 @@ import { z } from "zod";
 import type { JsonObject } from "../database/schema/types.js";
 import { requireState } from "./problem.js";
 import type { Question } from "./service.js";
-import type { Data } from "./ports.js";
+import type { Contract } from "./contract.js";
+import { invariant } from "./invariant.js";
+export type UnionFields<U> = { [K in U extends unknown ? keyof U : never]?: U extends unknown ? K extends keyof U ? U[K] : never : never };
+export type QuestionPresentation = UnionFields<Contract<"HostQuestion"> | Contract<"ViewerQuestion">> & { format: Question["format"] };
+export type AnswerPresentation = Omit<UnionFields<Contract<"StandardHostAnswer"> | Contract<"AudioReverseHostAnswer"> | Contract<"ImageColorHostAnswer">>, "format"> & { format: Question["format"]; text: string };
 
 // Only these authored settings become executable game rules. No source URLs or
 // arbitrary configuration fields are copied into a public projection.
@@ -34,14 +38,15 @@ export function settings(
   requireState(parsed.success, "CONTENT_NOT_READY");
   const config = parsed.data;
   if (["IMAGE_BLUR", "IMAGE_ZOOM"].includes(format)) {
+    invariant([200, 400, 600].includes(cap), "SLOT_POINTS_CAP");
     const suggestions =
       config.stageSuggestions ??
       { 200: [200, 150, 50], 400: [400, 250, 150], 600: [600, 400, 200] }[
-        cap as 200 | 400 | 600
+        cap === 200 ? 200 : cap === 400 ? 400 : 600
       ];
     requireState(
       suggestions[0] === cap &&
-        suggestions.every((n, i) => n <= cap && (!i || n < suggestions[i - 1])),
+        suggestions.every((n, i) => n <= cap && (!i || n < (suggestions[i - 1] ?? Infinity))),
       "CONTENT_NOT_READY",
     );
     return { ...config, stageSuggestions: suggestions };
@@ -52,14 +57,9 @@ export function local(ar: unknown, franco: unknown, language: string): string {
   return String(language === "franco" && franco ? franco : ar);
 }
 export function suggested(q: Question): number {
-  return Number(
-    (q.contentSnapshot?.config as Data | undefined)?.stageSuggestions instanceof
-      Array
-      ? ((q.contentSnapshot!.config as Data).stageSuggestions as number[])[
-          q.stageIndex
-        ]
-      : q.basePoints,
-  );
+  const config = q.contentSnapshot?.config;
+  const stages = config && typeof config === "object" && !Array.isArray(config) ? config.stageSuggestions : undefined;
+  return Number(Array.isArray(stages) ? stages[q.stageIndex] : q.basePoints);
 }
 export const remaining = (q: Question, now: Date) =>
   q.timerState === "running"
@@ -68,22 +68,26 @@ export const remaining = (q: Question, now: Date) =>
         Math.min(60000, new Date(q.timerDeadlineAt!).getTime() - now.getTime()),
       )
     : q.remainingMs;
-export function timer(q: Question, now: Date): Data {
+export function timer(q: Question, now: Date): Contract<"Timer"> {
+  // Timer state and its literal bounds are enforced by database checks.
   return {
     state: q.timerState,
     remainingMs: remaining(q, now),
     ...(q.timerState === "running"
       ? { deadlineAt: new Date(q.timerDeadlineAt!).toISOString() }
       : {}),
-  };
+  } as Contract<"Timer">;
 }
-export const ref = (q: Question, role: string, variantNumber = 0): Data => ({
-  kind: role.endsWith("audio") ? "audio" : "image",
-  boardPosition: q.boardPosition,
-  questionPosition: q.questionPosition,
-  role,
-  variantNumber,
-});
+export function ref(q: Question, role: "question_audio" | "answer_audio", variantNumber?: 0): Contract<"AudioRef">;
+export function ref(q: Question, role: "prompt_image" | "answer_image" | "hint_image", variantNumber?: number): Contract<"ImageRef">;
+export function ref(q: Question, role: Contract<"MediaRef">["role"], variantNumber = 0): Contract<"MediaRef"> {
+  const positions = { boardPosition: q.boardPosition, questionPosition: q.questionPosition };
+  if (role === "question_audio" || role === "answer_audio") {
+    invariant(variantNumber === 0, "AUDIO_VARIANT");
+    return { kind: "audio", ...positions, role, variantNumber };
+  }
+  return { kind: "image", ...positions, role, variantNumber };
+}
 export type Pin = {
   mediaRole: string;
   variantNumber: number;
@@ -94,11 +98,12 @@ export function questionView(
   pins: Pin[],
   host: boolean,
   language: string,
-): Data {
+): QuestionPresentation {
   const c = q.contentSnapshot!;
-  const cfg = c.config as Data;
+  // Copied configuration comes from settings() before the snapshot is persisted.
+  const cfg = c.config as z.output<typeof configSchema>;
   const prompt = local(c.promptAr, c.promptFranco, language);
-  const result: Data = { format: q.format, prompt };
+  const result: QuestionPresentation = { format: q.format, prompt };
   const has = (role: string, variant = 0) =>
     pins.some((p) => p.mediaRole === role && p.variantNumber === variant);
   if (q.format === "IMAGE_MEMORY") {
@@ -127,9 +132,9 @@ export function questionView(
     });
   else if (has("prompt_image")) result.image = ref(q, "prompt_image");
   if (q.format.startsWith("AUDIO_")) {
-    result.durationMs = pins.find(
-      (p) => p.mediaRole === "question_audio",
-    )!.durationMs;
+    const duration = pins.find((p) => p.mediaRole === "question_audio")?.durationMs;
+    invariant(duration != null, "AUDIO_DURATION");
+    result.durationMs = duration;
     if (host) result.audio = ref(q, "question_audio");
     if (q.format === "AUDIO_VOICE" && cfg.hintAr)
       result.hint = local(cfg.hintAr, cfg.hintFranco, language);
@@ -141,9 +146,10 @@ export function answerView(
   pins: Pin[],
   host: boolean,
   language: string,
-): Data {
+): AnswerPresentation {
   const c = q.contentSnapshot!,
-    cfg = c.config as Data;
+    // Copied configuration comes from settings() before the snapshot is persisted.
+    cfg = c.config as z.output<typeof configSchema>;
   return {
     format: q.format,
     text: local(c.answerAr, c.answerFranco, language),

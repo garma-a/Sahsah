@@ -11,9 +11,11 @@ import {
   type Member,
   type Tx,
 } from "./service.js";
-import type { Data } from "./ports.js";
+import type { Contract } from "./contract.js";
+import { invariant } from "./invariant.js";
+type RosterMember = Pick<Member, "id" | "accountId" | "lobbyTeamNumber">;
 
-export function language(value?: string) {
+export function language(value?: unknown) {
   requireState(
     value === undefined || value === "ar" || value === "franco",
     "INVALID_LANGUAGE",
@@ -58,9 +60,9 @@ const next = (n: number, id: string) =>
 @Injectable()
 export class CatalogService {
   constructor(private core: GameplayService) {}
-  async categories(query: Record<string, unknown>): Promise<Data> {
+  async categories(query: Record<string, unknown>): Promise<Contract<"CategoryPage">> {
     this.core.enabled();
-    const lang = language(query.language as string | undefined),
+    const lang = language(query.language),
       { limit, cursor } = paging(query, 20);
     const { db } = this.core.database,
       c = s.categories,
@@ -117,6 +119,8 @@ export class CatalogService {
           .having(sql`count(*) = 6`)
       : [];
     const covers = this.core.options.publicMediaBaseUrl;
+    const last = page.at(-1);
+    invariant(!rows.length || last, "CATALOG_PAGE_LAST");
     return {
       items: page.map(({ category: r, section, coverKey }) => ({
         id: r.id,
@@ -140,8 +144,8 @@ export class CatalogService {
       ...(rows.length > limit
         ? {
             nextCursor: next(
-              rows[limit - 1].category.displayOrder,
-              rows[limit - 1].category.id,
+              last!.category.displayOrder,
+              last!.category.id,
             ),
           }
         : {}),
@@ -150,14 +154,14 @@ export class CatalogService {
   async eligibility(
     db: Tx,
     pack: typeof s.questionPacks.$inferSelect,
-    members: Member[],
+    members: RosterMember[],
   ) {
     return (await this.eligibilities(db, [pack], members)).get(pack.id)!;
   }
   async eligibilities(
     db: Tx,
     packs: (typeof s.questionPacks.$inferSelect)[],
-    members: Member[],
+    members: RosterMember[],
   ) {
     const questions = packs.length
       ? await db
@@ -220,9 +224,9 @@ export class CatalogService {
     actor: Actor | undefined,
     categoryId: string,
     query: Record<string, unknown>,
-  ): Promise<Data> {
+  ): Promise<Contract<"PackPage">> {
     this.core.enabled();
-    language(query.language as string | undefined);
+    language(query.language);
     const { limit, cursor } = paging(query, 20);
     requireState(
       query.freshOnly === undefined ||
@@ -234,7 +238,7 @@ export class CatalogService {
     const roomId = query.roomId === undefined ? undefined : id(query.roomId);
     return this.core.database.transaction(
       async (db) => {
-        let members: Member[] = [];
+        let members: RosterMember[] = [];
         if (roomId) {
           requireState(actor, "UNAUTHENTICATED", 401);
           const room = await this.core.room(db, roomId, false);
@@ -246,7 +250,7 @@ export class CatalogService {
               id: actor.account.accountId,
               accountId: actor.account.accountId,
               lobbyTeamNumber: null,
-            } as Member,
+            },
           ];
         const rows = await db
           .select()
@@ -265,23 +269,22 @@ export class CatalogService {
         const own = actor?.account?.accountId;
         const history =
           own && rows.length
-            ? await db.execute(sql`SELECT p.pack_id, bool_or(NOT EXISTS(SELECT 1 FROM questions q WHERE q.pack_id=p.pack_id AND q.retired_at IS NULL AND NOT EXISTS(SELECT 1 FROM game_questions gq WHERE gq.game_id=c.game_id AND gq.board_position=c.board_position AND gq.source_question_id=q.id))) AS current
+            ? await db.execute<{ pack_id: string; current: boolean }>(sql`SELECT p.pack_id, bool_or(NOT EXISTS(SELECT 1 FROM questions q WHERE q.pack_id=p.pack_id AND q.retired_at IS NULL AND NOT EXISTS(SELECT 1 FROM game_questions gq WHERE gq.game_id=c.game_id AND gq.board_position=c.board_position AND gq.source_question_id=q.id))) AS current
         FROM account_pack_completions c JOIN game_packs p USING(game_id,board_position) WHERE c.account_id=${own} AND p.pack_id IN (${sql.join(
           rows.map((p) => sql`${p.id}::uuid`),
           sql`,`,
         )}) GROUP BY p.pack_id`)
             : { rows: [] };
-        const items: Data[] = [];
+        const items: Contract<"Pack">[] = [];
         let scanned: (typeof rows)[number] | undefined;
         for (const pack of rows) {
           scanned = pack;
           const e = eligibility.get(pack.id)!;
           if (e.questions.length !== 6) continue;
           if (query.freshOnly === "true" && !e.fresh) continue;
-          let progress: Data | undefined;
+          let progress: Contract<"Pack">["progress"] | undefined;
           if (own) {
-            const row = history.rows.find((r) => r.pack_id === pack.id) as
-              { current: boolean } | undefined;
+            const row = history.rows.find((r) => r.pack_id === pack.id);
             progress = {
               completed: row?.current ?? false,
               updated: !!row && !row.current,

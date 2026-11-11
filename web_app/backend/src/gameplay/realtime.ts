@@ -17,27 +17,34 @@ import { canonical, equalProof, proof } from "./proof.js";
 import { questionView, answerView } from "./content.js";
 import { GameplayProblem, requireState } from "./problem.js";
 import { clientAddress } from "./http.js";
-import type { Data } from "./ports.js";
+import type { Contract } from "./contract.js";
+import type { RealtimeTypes } from "./contracts/realtime-types.js";
+import type { ServerFrame } from "./realtime-contract.js";
+import type { UnionFields } from "./content.js";
+type Snapshot = Contract<"Snapshot">;
+type ServerPayload = UnionFields<ServerFrame["data"]>;
+
 import type { IncomingMessage } from "node:http";
 
-function viewerSnapshot(snapshot: Data): Data {
-  const view = snapshot.view as Data;
-  const { controls: _controls, feedback: _feedback, ...publicView } = view;
-  const result: Data = { ...publicView, audience: "viewer" };
-  if (view.question) {
-    const { audio: _audio, ...question } = view.question as Data;
+function viewerSnapshot(snapshot: Snapshot): Snapshot {
+  const view = snapshot.view;
+  const { controls: _controls, feedback: _feedback, ...publicView } = { controls: undefined, feedback: undefined, ...view };
+  const result: UnionFields<Snapshot["view"]> = { ...publicView, audience: "viewer" };
+  if ("question" in view) {
+    const { audio: _audio, ...question } = { audio: undefined, ...view.question };
     result.question = question;
   }
-  if (view.answer) {
-    const { forwardAudio: _forward, ...answer } = view.answer as Data;
+  if ("answer" in view) {
+    const { forwardAudio: _forward, ...answer } = { forwardAudio: undefined, ...view.answer };
     result.answer = answer;
   }
-  return { ...snapshot, view: result };
+  // Removing host-only fields preserves the corresponding viewer contract branch.
+  return { ...snapshot, view: result } as Snapshot;
 }
-function timedSnapshot(snapshot: Data, now: string): Data {
-  const view = snapshot.view as Data,
-    timer = view.timer as Data | undefined;
-  return {
+function timedSnapshot(snapshot: Snapshot, now: string): Snapshot {
+  const view = snapshot.view,
+    timer = "timer" in view ? view.timer : undefined;
+  const result = {
     ...snapshot,
     serverTime: now,
     view:
@@ -57,6 +64,8 @@ function timedSnapshot(snapshot: Data, now: string): Data {
           }
         : view,
   };
+  // Updating only the existing timer preserves its correlated snapshot branch.
+  return result as Snapshot;
 }
 
 const pendingSources = new Map<string, number>();
@@ -102,7 +111,7 @@ interface Connection {
   roomId?: string;
   memberId?: string;
   actor?: Actor;
-  language: string;
+  language: Contract<"Language">;
   busy: boolean;
   closed: boolean;
   queue: RawData[];
@@ -121,9 +130,9 @@ interface RoomStream {
   dirty: number;
   running: boolean;
   published?: number;
-  playback?: Data;
+  playback?: RealtimeTypes["PresenceData"]["playback"];
   playbackSource?: string;
-  cache?: Map<string, { source: string; host: boolean; value: Data }>;
+  cache?: Map<string, { source: string; host: boolean; value: Snapshot }>;
 }
 
 @WebSocketGateway({
@@ -263,7 +272,7 @@ export class GameplayRealtime
             await this.authority(c);
             if (!this.current(c)) return;
             if (message.event === "set_language") {
-              c.language = String(message.data.language);
+              c.language = message.data.language;
               this.invalidate(c.roomId!);
             } else if (message.event === "resync") {
               requireState(
@@ -290,7 +299,7 @@ export class GameplayRealtime
   }
   private async authenticate(
     c: Connection,
-    data: Data,
+    data: Omit<RealtimeTypes["ClientAuthenticateData"], "roomId" | "language" | "protocolVersion"> & { roomId?: string; language?: Contract<"Language"> },
     refresh: boolean,
     actor: Actor,
   ) {
@@ -299,7 +308,7 @@ export class GameplayRealtime
       String(data.roomId),
       false,
     );
-    actor.controlSecret = data.controllerSecret as string | undefined;
+    actor.controlSecret = data.controllerSecret;
     actor.generation = room.controllerGeneration;
     const member = await this.core.membership(
       this.core.database.db,
@@ -338,7 +347,7 @@ export class GameplayRealtime
     c.actor = actor;
     c.roomId = room.id;
     c.memberId = member.id;
-    c.language = String(data.language);
+    c.language = data.language!;
     c.warned = false;
     clearTimeout(c.authTimer);
     c.releaseUpgrade?.();
@@ -491,7 +500,7 @@ export class GameplayRealtime
         if (!recipients.length) break;
         const groups = new Map<
           string,
-          { actor: Actor; language: string; recipients: Connection[] }
+          { actor: Actor; language: Contract<"Language">; recipients: Connection[] }
         >();
         const initial = await this.fence(roomId);
         for (const c of recipients) {
@@ -511,9 +520,9 @@ export class GameplayRealtime
           groups.set(key, group);
         }
         const built: {
-          value: Data;
+          value: Snapshot;
           recipients: Connection[];
-          language: string;
+          language: Contract<"Language">;
         }[] = [];
         const sourceKey = canonical({
           roomVersion: String(initial.room.stateVersion),
@@ -554,7 +563,7 @@ export class GameplayRealtime
           });
         }
         const fence = await this.fence(roomId);
-        const source: Data = {
+        const source: Contract<"LobbySource"> | Contract<"GameSource"> = {
           roomVersion: String(fence.room.stateVersion),
           ...(fence.game && fence.room.presentationMode === "game"
             ? this.games.fields(fence.game)
@@ -651,7 +660,7 @@ export class GameplayRealtime
       ...(room.playback ? { playback: room.playback } : {}),
     });
   }
-  private async playback(c: Connection, data: Data) {
+  private async playback(c: Connection, data: RealtimeTypes["PlaybackData"]) {
     const { game, room } = await this.authority(c);
     requireState(
       game?.status === "active" && game.id === data.gameId,
@@ -668,17 +677,17 @@ export class GameplayRealtime
     requireState(Date.now() - c.playbackAt >= 250, "RATE_LIMITED", 429);
     c.playbackAt = Date.now();
     const snapshot = await this.projections.room(c.actor!, room.id, c.language),
-      view = snapshot.view as Data;
+      view = snapshot.view;
     const permitted = [
-      (view.question as Data | undefined)?.audio,
-      (view.answer as Data | undefined)?.forwardAudio,
+      ("question" in view && "audio" in view.question ? view.question.audio : undefined),
+      ("answer" in view && "forwardAudio" in view.answer ? view.answer.forwardAudio : undefined),
     ].filter(Boolean);
     requireState(
       permitted.some((r) => canonical(r) === canonical(data.media)),
       "PLAYBACK_UNAVAILABLE",
       403,
     );
-    const media = data.media as Data;
+    const media = data.media;
     const metadata = await this.core.database.db
       .select({ duration: s.mediaAssets.durationMs })
       .from(s.gameQuestionMedia)
@@ -696,7 +705,7 @@ export class GameplayRealtime
           ),
           eq(
             s.gameQuestionMedia.mediaRole,
-            media.role as "question_audio" | "answer_audio",
+            media.role,
           ),
           eq(s.gameQuestionMedia.variantNumber, 0),
         ),
@@ -720,7 +729,7 @@ export class GameplayRealtime
     stream.playbackSource = canonical(snapshot.source);
     this.invalidate(c.roomId!);
   }
-  private send(c: Connection, event: string, data: Data) {
+  private send(c: Connection, event: ServerFrame["event"], data: ServerPayload) {
     if (c.closed || c.socket.readyState !== WebSocket.OPEN) return;
     if (c.socket.bufferedAmount > 262144) {
       c.socket.terminate();
@@ -763,7 +772,7 @@ export class GameplayRealtime
       code,
     );
   }
-  private stop(c: Connection, event: string, code: string) {
+  private stop(c: Connection, event: ServerFrame["event"], code: string) {
     try {
       this.send(c, event, { code });
     } finally {

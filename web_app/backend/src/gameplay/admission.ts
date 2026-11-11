@@ -1,4 +1,5 @@
 import { GameplayProblem, requireState } from "./problem.js";
+import type { Contract } from "./contract.js";
 import type { PressureSample } from "./ports.js";
 export interface CapacityVector {
   rooms: number;
@@ -6,6 +7,7 @@ export interface CapacityVector {
   games: number;
 }
 type Allocation = "create" | "join" | "start";
+const capacityKeys: (keyof CapacityVector)[] = ["rooms", "members", "games"];
 const delta: Record<Allocation, CapacityVector> = {
   create: { rooms: 1, members: 1, games: 0 },
   join: { rooms: 0, members: 1, games: 0 },
@@ -84,7 +86,7 @@ export class Admission {
     )
       this.closed = false;
   }
-  availability() {
+  availability(): Contract<"Availability"> {
     const now = Date.now();
     if (!this.fresh(now)) {
       if (!this.unavailableSince) this.unavailableSince = now;
@@ -95,10 +97,10 @@ export class Admission {
     const full =
       !this.occupancy ||
       !this.ceiling ||
-      Object.keys(this.occupancy).some(
+      capacityKeys.some(
         (key) =>
-          this.occupancy![key as keyof CapacityVector] >=
-          Math.floor(this.ceiling![key as keyof CapacityVector] * 0.85),
+          this.occupancy![key] >=
+          Math.floor(this.ceiling![key] * 0.85),
       );
     return this.closed || full
       ? { admission: "paused", retryAfterSeconds: 15 }
@@ -115,10 +117,11 @@ export class Admission {
         existing.digest === hash.toString("hex"),
         "OPERATION_CONFLICT",
       );
+      // The durable allocation key/digest identifies the same operation and result type.
       return existing.promise as Promise<T>;
     }
-    const kind = key.split(":")[0] as Allocation;
-    requireState(delta[kind], "INVALID_ALLOCATION", 500);
+    const kind = key.split(":")[0];
+    requireState(kind === "create" || kind === "join" || kind === "start", "INVALID_ALLOCATION", 500);
     const reserved = [...this.pending.values()].reduce(
       (counts, row) => ({
         rooms: counts.rooms + delta[row.kind].rooms,
@@ -130,7 +133,7 @@ export class Admission {
     const over =
       this.occupancy &&
       this.ceiling &&
-      (Object.keys(reserved) as (keyof CapacityVector)[]).some(
+      capacityKeys.some(
         (k) =>
           this.occupancy![k] + reserved[k] + delta[kind][k] >
           Math.floor(this.ceiling![k] * 0.85),
@@ -147,7 +150,7 @@ export class Admission {
       .then(work)
       .then((value) => {
         if (this.occupancy)
-          for (const k of Object.keys(delta[kind]) as (keyof CapacityVector)[])
+          for (const k of capacityKeys)
             this.occupancy[k] += delta[kind][k];
         this.revision++;
         return value;

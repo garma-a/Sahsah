@@ -1,3 +1,4 @@
+import { single, invariant } from "./invariant.js";
 import {
   Injectable,
   Logger,
@@ -64,7 +65,7 @@ export class GameplayMaintenance implements OnModuleInit, OnModuleDestroy {
               sql`SELECT id FROM rooms WHERE invitation_code IS NOT NULL AND invitation_expires_at<=clock_timestamp() ORDER BY invitation_expires_at,id FOR UPDATE SKIP LOCKED LIMIT 100`,
             );
             for (const row of dueCodes.rows) {
-              const [room] = await db
+              const room = single(await db
                 .update(s.rooms)
                 .set({
                   invitationCode: null,
@@ -74,7 +75,7 @@ export class GameplayMaintenance implements OnModuleInit, OnModuleDestroy {
                   stateVersion: sql`${s.rooms.stateVersion}+1`,
                 })
                 .where(eq(s.rooms.id, String(row.id)))
-                .returning();
+                .returning(), "MAINTENANCE_ROOM_ROW");
               await this.core.hint(db, room.id, room.stateVersion);
             }
           });
@@ -107,14 +108,9 @@ export class GameplayMaintenance implements OnModuleInit, OnModuleDestroy {
     const lease = randomUUID();
     const events = await this.core.database.transaction(async (db) => {
       const result =
-        await db.execute(sql`WITH candidates AS (SELECT id FROM outbox_events WHERE topic IN ('room.changed','game.changed','account.gameplay.changed') AND ((state='pending' AND available_at<=clock_timestamp()) OR (state='running' AND lease_until<=clock_timestamp())) AND attempt_count<max_attempts ORDER BY available_at,id FOR UPDATE SKIP LOCKED LIMIT 50)
+        await db.execute<{ id: string; payload: { roomId: string }; created_at: Date; deduplication_key: string }>(sql`WITH candidates AS (SELECT id FROM outbox_events WHERE topic IN ('room.changed','game.changed','account.gameplay.changed') AND ((state='pending' AND available_at<=clock_timestamp()) OR (state='running' AND lease_until<=clock_timestamp())) AND attempt_count<max_attempts ORDER BY available_at,id FOR UPDATE SKIP LOCKED LIMIT 50)
         UPDATE outbox_events e SET state='running',attempt_count=e.attempt_count+1,lease_token=${lease},lease_until=clock_timestamp()+interval '30 seconds' FROM candidates c WHERE e.id=c.id RETURNING e.id,e.payload,e.created_at,e.deduplication_key`);
-      return result.rows as {
-        id: string;
-        payload: { roomId: string };
-        created_at: Date;
-        deduplication_key: string;
-      }[];
+      return result.rows;
     });
     // Hints already pushed in-process after their commit are only acknowledged.
     for (const roomId of new Set(
@@ -146,7 +142,7 @@ export class GameplayMaintenance implements OnModuleInit, OnModuleDestroy {
         sql`SELECT id FROM games WHERE status<>'active' AND content_purged_at IS NULL AND content_purge_after<=clock_timestamp() ORDER BY content_purge_after,id FOR UPDATE SKIP LOCKED LIMIT 1`,
       );
       if (!result.rows.length) return;
-      const id = String(result.rows[0].id),
+      const id = String(single(result.rows, "PURGE_CANDIDATE_ROW").id),
         game = await this.games.game(db, id),
         now = await freshTime(db);
       await db

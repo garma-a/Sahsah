@@ -6,13 +6,13 @@ import {
 } from "@nestjs/common";
 import { context, log, errorStack } from "./logging.js";
 import type { Response } from "express";
-import type { Data } from "./ports.js";
+import type { JsonObject } from "../database/schema/types.js";
 
 export class GameplayProblem extends Error {
   constructor(
     public status: number,
     public code: string,
-    public details: Data = {},
+    public details: JsonObject = {},
   ) {
     super(code);
   }
@@ -21,19 +21,19 @@ export function requireState(
   condition: unknown,
   code = "INVALID_TRANSITION",
   status = 409,
-  details: Data = {},
+  details: JsonObject = {},
 ): asserts condition {
   if (!condition) throw new GameplayProblem(status, code, details);
 }
 export function databaseCode(error: unknown): string | undefined {
   if (!error || typeof error !== "object") return;
-  const e = error as { code?: string; cause?: unknown };
-  return e.code ?? databaseCode(e.cause);
+  const e = error;
+  return ("code" in e && typeof e.code === "string" ? e.code : undefined) ?? databaseCode("cause" in e ? e.cause : undefined);
 }
 export function databaseConstraint(error: unknown): string | undefined {
   if (!error || typeof error !== "object") return;
-  const value = error as { constraint?: string; cause?: unknown };
-  return value.constraint ?? databaseConstraint(value.cause);
+  const value = error;
+  return ("constraint" in value && typeof value.constraint === "string" ? value.constraint : undefined) ?? databaseConstraint("cause" in value ? value.cause : undefined);
 }
 @Catch()
 export class GameplayProblemFilter implements ExceptionFilter {

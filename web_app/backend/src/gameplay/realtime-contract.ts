@@ -1,7 +1,9 @@
 import { readFileSync } from "node:fs";
 import { Ajv2020 } from "ajv/dist/2020.js";
 import addFormats = require("ajv-formats");
-import type { Data } from "./ports.js";
+import type { RealtimeTypes } from "./contracts/realtime-types.js";
+export type ClientFrame = { [K in keyof RealtimeTypes]: K extends `Client${string}Frame` ? RealtimeTypes[K] : never }[keyof RealtimeTypes];
+export type ServerFrame = { [K in keyof RealtimeTypes]: K extends `Server${string}Frame` ? RealtimeTypes[K] : never }[keyof RealtimeTypes];
 import { requireState } from "./problem.js";
 const schema = JSON.parse(
   readFileSync(
@@ -35,11 +37,13 @@ const checks = Object.fromEntries(
     ajv.compile({ $ref: `${schema.$id}#/$defs/${name}` }),
   ]),
 );
+export function frame(value: unknown, client?: true): ClientFrame;
+export function frame(value: unknown, client: false): ServerFrame;
 export function frame(
   value: unknown,
   client = true,
-): { event: string; data: Data } {
-  const candidate = value as { event: string; data: Data };
+): ClientFrame | ServerFrame {
+  const candidate = value && typeof value === "object" && "event" in value ? value : undefined;
   requireState(
     candidate &&
       typeof candidate.event === "string" &&
@@ -56,5 +60,6 @@ export function frame(
     "INVALID_FRAME",
     400,
   );
-  return candidate;
+  // The unchanged AJV check above validates the selected frame before this boundary.
+  return value as ClientFrame | ServerFrame;
 }

@@ -18,7 +18,7 @@ import type { Request } from "express";
 import { id, position, schemas } from "./contract.js";
 import { GameplayProblemFilter } from "./problem.js";
 import { GameplayService } from "./service.js";
-import type { Data } from "./ports.js";
+import type { Contract } from "./contract.js";
 import { RoomOperations } from "./rooms.js";
 import { ProjectionService } from "./projection.js";
 import { GameOperations } from "./games.js";
@@ -68,7 +68,7 @@ export class GameplayController {
   @SerializeOptions({ schema: schemas.CreateRoomReceipt })
   async create(
     @Req() req: Request,
-    @Body({ schema: schemas.CreateRoom }) body: Data,
+    @Body({ schema: schemas.CreateRoom }) body: Contract<"CreateRoom">,
   ) {
     const actor = await this.service.actor(req),
       operationId = this.service.operation(req);
@@ -90,7 +90,7 @@ export class GameplayController {
   async join(
     @Req() req: Request,
     @Param("code") code: string,
-    @Body({ schema: schemas.JoinRoom }) body: Data,
+    @Body({ schema: schemas.JoinRoom }) body: Contract<"JoinRoom">,
   ) {
     const actor =
         body.identity === "account" ? await this.service.actor(req) : undefined,
@@ -122,7 +122,7 @@ export class GameplayController {
   async rotate(
     @Req() req: Request,
     @Param("roomId") roomId: string,
-    @Body({ schema: schemas.RoomMutation }) body: Data,
+    @Body({ schema: schemas.RoomMutation }) body: Contract<"RoomMutation">,
   ) {
     return this.rooms.rotate(
       await this.service.actor(req),
@@ -136,7 +136,7 @@ export class GameplayController {
   async ready(
     @Req() req: Request,
     @Param("roomId") roomId: string,
-    @Body({ schema: schemas.Ready }) body: Data,
+    @Body({ schema: schemas.Ready }) body: Contract<"Ready">,
   ) {
     return this.rooms.memberChange(
       await this.service.actor(req),
@@ -151,7 +151,7 @@ export class GameplayController {
   async member(
     @Req() req: Request,
     @Param("roomId") roomId: string,
-    @Body({ schema: schemas.MemberPatch }) body: Data,
+    @Body({ schema: schemas.MemberPatch }) body: Contract<"MemberPatch">,
   ) {
     return this.rooms.memberChange(
       await this.service.actor(req),
@@ -166,7 +166,7 @@ export class GameplayController {
   async setup(
     @Req() req: Request,
     @Param("roomId") roomId: string,
-    @Body({ schema: schemas.SaveSetup }) body: Data,
+    @Body({ schema: schemas.SaveSetup }) body: Contract<"SaveSetup">,
   ) {
     return this.rooms.saveSetup(
       await this.service.actor(req),
@@ -180,7 +180,7 @@ export class GameplayController {
   async start(
     @Req() req: Request,
     @Param("roomId") roomId: string,
-    @Body({ schema: schemas.StartGame }) body: Data,
+    @Body({ schema: schemas.StartGame }) body: Contract<"StartGame">,
   ) {
     return this.games.start(
       await this.service.actor(req),
@@ -222,7 +222,7 @@ export class GameplayController {
   async command(
     @Req() req: Request,
     @Param("gameId") gameId: string,
-    @Body({ schema: schemas.GameCommand }) body: Data,
+    @Body({ schema: schemas.GameCommand }) body: Contract<"GameCommand">,
   ) {
     return this.games.command(
       await this.service.actor(req),
@@ -238,7 +238,7 @@ export class GameplayController {
     @Param("gameId") gameId: string,
     @Param("boardPosition") board: string,
     @Param("questionPosition") question: string,
-    @Body({ schema: schemas.FeedbackRequest }) body: Data,
+    @Body({ schema: schemas.FeedbackRequest }) body: Contract<"FeedbackRequest">,
   ) {
     return this.games.feedback(
       await this.service.actor(req),
@@ -260,7 +260,7 @@ export class GameplayController {
   async takeover(
     @Req() req: Request,
     @Param("roomId") roomId: string,
-    @Body({ schema: schemas.TakeControl }) body: Data,
+    @Body({ schema: schemas.TakeControl }) body: Contract<"TakeControl">,
   ) {
     return this.lifecycle.takeover(
       await this.service.actor(req),
@@ -275,7 +275,7 @@ export class GameplayController {
   async lobby(
     @Req() req: Request,
     @Param("roomId") roomId: string,
-    @Body({ schema: schemas.RoomMutation }) body: Data,
+    @Body({ schema: schemas.RoomMutation }) body: Contract<"RoomMutation">,
   ) {
     return this.lifecycle.replay(
       await this.service.actor(req),
@@ -290,7 +290,7 @@ export class GameplayController {
   async close(
     @Req() req: Request,
     @Param("roomId") roomId: string,
-    @Body({ schema: schemas.RoomMutation }) body: Data,
+    @Body({ schema: schemas.RoomMutation }) body: Contract<"RoomMutation">,
   ) {
     return this.lifecycle.close(
       await this.service.actor(req),
@@ -305,7 +305,7 @@ export class GameplayController {
   async leave(
     @Req() req: Request,
     @Param("roomId") roomId: string,
-    @Body({ schema: schemas.Departure }) body: Data,
+    @Body({ schema: schemas.Departure }) body: Contract<"Departure">,
   ) {
     return this.lifecycle.memberAction(
       await this.service.actor(req),
@@ -322,7 +322,7 @@ export class GameplayController {
     @Req() req: Request,
     @Param("roomId") roomId: string,
     @Param("membershipId") memberId: string,
-    @Body({ schema: schemas.RoomMutation }) body: Data,
+    @Body({ schema: schemas.RoomMutation }) body: Contract<"RoomMutation">,
   ) {
     return this.lifecycle.memberAction(
       await this.service.actor(req),
@@ -340,7 +340,7 @@ export class GameplayController {
     @Req() req: Request,
     @Param("roomId") roomId: string,
     @Param("membershipId") memberId: string,
-    @Body({ schema: schemas.RoomMutation }) body: Data,
+    @Body({ schema: schemas.RoomMutation }) body: Contract<"RoomMutation">,
   ) {
     return this.lifecycle.memberAction(
       await this.service.actor(req),
@@ -357,7 +357,7 @@ export class GameplayController {
   async binding(
     @Req() req: Request,
     @Param("roomId") roomId: string,
-    @Body({ schema: schemas.Binding }) body: Data,
+    @Body({ schema: schemas.Binding }) body: Contract<"Binding">,
   ) {
     return this.lifecycle.bind(
       await this.service.actor(req),
@@ -373,7 +373,7 @@ export class GameplayController {
   async authorizeMedia(
     @Req() req: Request,
     @Param("gameId") gameId: string,
-    @Body({ schema: schemas.MediaRequest }) body: Data,
+    @Body({ schema: schemas.MediaRequest }) body: Contract<"MediaRequest">,
   ) {
     return this.media.access(await this.service.actor(req), id(gameId), body);
   }

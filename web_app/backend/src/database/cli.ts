@@ -4,7 +4,7 @@ import { applyMigrations, migrationStatus } from "./migrations.js";
 import { grantRuntime } from "./permissions.js";
 
 async function main() {
-  const command = process.argv[2];
+  const command = process.argv[2] ?? "";
   if (!["migrate", "status", "grant-runtime"].includes(command)) throw new Error("Use migrate, status or grant-runtime.");
   const client = new Client({
     connectionString: databaseUrl(process.env.MIGRATION_DATABASE_URL, "MIGRATION_DATABASE_URL"),

@@ -12,7 +12,7 @@ export async function grantRuntime(client: Client, runtimeRole: string) {
       OR has_database_privilege(oid, current_database(), 'CREATE') AS unsafe
       FROM pg_roles WHERE rolname=$1
   `, [runtimeRole]);
-  if (role.rows.length !== 1 || role.rows[0].unsafe) throw new Error("Runtime role must exist without administrative privileges or migration ownership.");
+  if (role.rows.length !== 1 || role.rows[0]?.unsafe) throw new Error("Runtime role must exist without administrative privileges or migration ownership.");
   const app = identifier(runtimeRole);
   await client.query("BEGIN");
   try {

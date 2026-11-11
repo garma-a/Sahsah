@@ -24,6 +24,7 @@
     "build": "nest build",
     "start": "node dist/main.js",
     "check": "tsc --noEmit",
+    "types:contracts": "node scripts/generate-contract-types.mjs",
     "test": "npm run build && node --test tests/*.test.mjs",
     "db:generate": "drizzle-kit generate",
     "db:check": "drizzle-kit check",
