@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm";
+import { eq, max, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import * as s from "../../../database/schema/index.js";
 import { single, written } from "../../platform/invariant.js";
@@ -22,16 +22,20 @@ export async function createGameSnapshot(state: StartState) {
     content: { packs, categories },
   } = state;
   const gameId = randomUUID();
-  const sequence = await db.execute(
-    sql`SELECT coalesce(max(sequence_number),0)+1 AS n FROM games WHERE room_id=${roomId}`,
-  );
+  const sequence = await db
+    .select({
+      // Preserve PostgreSQL integer coalesce/max/+1 for the room-local sequence.
+      n: sql<number>`coalesce(${max(s.games.sequenceNumber)},0)+1`,
+    })
+    .from(s.games)
+    .where(eq(s.games.roomId, roomId));
   const game = single(
     await db
       .insert(s.games)
       .values({
         id: gameId,
         roomId,
-        sequenceNumber: Number(single(sequence.rows, "GAME_SEQUENCE_ROW").n),
+        sequenceNumber: Number(single(sequence, "GAME_SEQUENCE_ROW").n),
         startRequestId: operationId,
         startRequestDigest: hash,
         hostAccountId: room.ownerAccountId,

@@ -1,9 +1,10 @@
+import { completionHistory } from "./history.js";
 import { DatabaseService } from "../../database/database.module.js";
 import { RoomAccess } from "../rooms/access.js";
 import { GameplayRuntime } from "../platform/runtime.js";
 import { scoped } from "../platform/logging.js";
 import { Injectable } from "@nestjs/common";
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, count, eq, gt, inArray, isNull, or } from "drizzle-orm";
 import * as s from "../../database/schema/index.js";
 import { digest } from "../platform/proof.js";
 import { local } from "../games/content.js";
@@ -93,7 +94,10 @@ export class CatalogService {
       .where(
         and(
           isNull(c.archivedAt),
-          sql`(${c.displayOrder},${c.id}) > (${cursor[0]},${cursor[1]}::uuid)`,
+          or(
+            gt(c.displayOrder, cursor[0]),
+            and(eq(c.displayOrder, cursor[0]), gt(c.id, cursor[1])),
+          ),
         ),
       )
       .orderBy(c.displayOrder, c.id)
@@ -122,7 +126,7 @@ export class CatalogService {
             ),
           )
           .groupBy(s.questionPacks.categoryId, s.questionPacks.id)
-          .having(sql`count(*) = 6`)
+          .having(eq(count(), 6))
       : [];
     const covers = this.runtime.options.publicMediaBaseUrl;
     const last = page.at(-1);
@@ -264,7 +268,13 @@ export class CatalogService {
               eq(s.questionPacks.categoryId, categoryId),
               eq(s.questionPacks.publicationState, "published"),
               isNull(s.questionPacks.archivedAt),
-              sql`(${s.questionPacks.packNumber},${s.questionPacks.id}) > (${cursor[0]},${cursor[1]}::uuid)`,
+              or(
+                gt(s.questionPacks.packNumber, cursor[0]),
+                and(
+                  eq(s.questionPacks.packNumber, cursor[0]),
+                  gt(s.questionPacks.id, cursor[1]),
+                ),
+              ),
             ),
           )
           .orderBy(s.questionPacks.packNumber, s.questionPacks.id)
@@ -273,15 +283,12 @@ export class CatalogService {
         const own = actor?.account?.accountId;
         const history =
           own && rows.length
-            ? await db.execute<{
-                pack_id: string;
-                current: boolean;
-              }>(sql`SELECT p.pack_id, bool_or(NOT EXISTS(SELECT 1 FROM questions q WHERE q.pack_id=p.pack_id AND q.retired_at IS NULL AND NOT EXISTS(SELECT 1 FROM game_questions gq WHERE gq.game_id=c.game_id AND gq.board_position=c.board_position AND gq.source_question_id=q.id))) AS current
-        FROM account_pack_completions c JOIN game_packs p USING(game_id,board_position) WHERE c.account_id=${own} AND p.pack_id IN (${sql.join(
-          rows.map((p) => sql`${p.id}::uuid`),
-          sql`,`,
-        )}) GROUP BY p.pack_id`)
-            : { rows: [] };
+            ? await completionHistory(
+                db,
+                own,
+                rows.map((p) => p.id),
+              )
+            : [];
         const items: Contract<"Pack">[] = [];
         let scanned: (typeof rows)[number] | undefined;
         for (const pack of rows) {
@@ -291,7 +298,7 @@ export class CatalogService {
           if (query.freshOnly === "true" && !e.fresh) continue;
           let progress: Contract<"Pack">["progress"] | undefined;
           if (own) {
-            const row = history.rows.find((r) => r.pack_id === pack.id);
+            const row = history.find((r) => r.packId === pack.id);
             progress = {
               completed: row?.current ?? false,
               updated: !!row && !row.current,

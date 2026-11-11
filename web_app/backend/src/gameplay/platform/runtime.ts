@@ -1,5 +1,9 @@
 import { single } from "./invariant.js";
-import { Injectable, type OnModuleDestroy, type OnModuleInit } from "@nestjs/common";
+import {
+  Injectable,
+  type OnModuleDestroy,
+  type OnModuleInit,
+} from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { sql } from "drizzle-orm";
 import { DatabaseService } from "../../database/database.module.js";
@@ -9,7 +13,11 @@ import { GameplayProblem, requireState } from "./problem.js";
 import type { GameplayOptions } from "./ports.js";
 import { GameplayScheduler } from "./scheduler.js";
 import { GameplayMetrics } from "./metrics.js";
-import { existingIdentity, previewPressure, resourcePressure } from "./integrations.js";
+import {
+  existingIdentity,
+  previewPressure,
+  resourcePressure,
+} from "./integrations.js";
 import { previewIdentity, previewMode } from "../preview/identity.js";
 
 @Injectable()
@@ -79,6 +87,8 @@ export class GameplayRuntime implements OnModuleInit, OnModuleDestroy {
   }
   async reconcileOccupancy() {
     const revision = this.admission.revision;
+    // Keep all three bounded counts in one no-FROM statement/MVCC snapshot.
+    // Drizzle 0.45 cannot execute select() without FROM; the result is explicitly typed.
     const result = await this.database.db.execute<{
       rooms: number;
       members: number;

@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { and, count, eq, isNotNull } from "drizzle-orm";
 import * as s from "../../database/schema/index.js";
 import type { GameOperations } from "./operations.js";
 import type { Actor } from "../platform/types.js";
@@ -75,10 +75,16 @@ export async function runGameCommand(
       const { changes, score = {} } = effect;
       let complete = false;
       if (name === "resolve_question") {
-        const count = await db.execute(
-          sql`SELECT count(*)::int AS n FROM game_questions WHERE game_id=${gameId} AND resolved_at IS NOT NULL`,
-        );
-        complete = single(count.rows, "GAME_RESOLVED_COUNT_ROW").n === 36;
+        const resolved = await db
+          .select({ n: count() })
+          .from(s.gameQuestions)
+          .where(
+            and(
+              eq(s.gameQuestions.gameId, gameId),
+              isNotNull(s.gameQuestions.resolvedAt),
+            ),
+          );
+        complete = single(resolved, "GAME_RESOLVED_COUNT_ROW").n === 36;
       }
       if (complete)
         game = await operations.finish(

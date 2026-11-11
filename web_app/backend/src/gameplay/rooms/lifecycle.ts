@@ -577,7 +577,8 @@ export class RoomLifecycle {
       .update(s.roomMemberships)
       .set({
         leftAt: now.toISOString(),
-        stateVersion: sql`${s.roomMemberships.stateVersion}+1`,
+        // Advance every live membership atomically within the closure transaction.
+        stateVersion: sql<bigint>`${s.roomMemberships.stateVersion}+1`,
       })
       .where(
         and(

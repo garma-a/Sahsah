@@ -35,8 +35,9 @@ export class GameplayOutbox {
           resourceKind: gameId ? "game" : "room",
           resourceId: resource,
           payload: { roomId, ...(gameId ? { gameId } : {}) },
-          availableAt: sql`clock_timestamp()`,
-          createdAt: sql`clock_timestamp()`,
+          // Evaluate database wall time separately for both existing timestamp fields.
+          availableAt: sql<string>`clock_timestamp()`,
+          createdAt: sql<string>`clock_timestamp()`,
         })
         .onConflictDoNothing()
         .returning(),

@@ -97,7 +97,8 @@ export class PreviewController {
             id,
             displayName,
             phoneE164: `+2000${String(randomInt(1e10)).padStart(10, "0")}`,
-            phoneVerifiedAt: sql`clock_timestamp()`,
+            // Preview verification uses database wall time in the insert.
+            phoneVerifiedAt: sql<string>`clock_timestamp()`,
           })
           .returning(),
         "ACCOUNTS_WRITE_ROW",

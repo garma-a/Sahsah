@@ -215,7 +215,8 @@ export class GameOperations {
           status: reason === "idle_timeout" ? "expired" : "finished",
           endReason: reason,
           endedAt,
-          contentPurgeAfter: sql`${endedAt}::timestamptz + interval '12 months'`,
+          // PostgreSQL calendar months preserve the original retention deadline.
+          contentPurgeAfter: sql<string>`${endedAt}::timestamptz + interval '12 months'`,
           stateVersion: game.stateVersion + 1n,
           projectionVersion: game.projectionVersion + 1n,
           teamOneScore: game.teamOneScore,

@@ -426,7 +426,8 @@ export class GameplayRealtime
         game: s.games,
         member: s.roomMemberships,
         state: s.accounts.state,
-        now: sql<string>`clock_timestamp()`,
+        // Wall time shares the source-vector SQL statement; pg decodes timestamptz as Date.
+        now: sql<Date>`clock_timestamp()`,
       })
       .from(s.rooms)
       .leftJoin(s.games, eq(s.games.id, s.rooms.currentGameId))

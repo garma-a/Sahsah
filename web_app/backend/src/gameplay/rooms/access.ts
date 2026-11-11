@@ -1,7 +1,7 @@
 import { GameplayIdentity } from "../platform/identity.js";
 import { scoped, enrichContext, log } from "../platform/logging.js";
 import { Injectable } from "@nestjs/common";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import * as s from "../../database/schema/index.js";
 import { requireState } from "../platform/problem.js";
 import type { Actor, Tx, Room, Member } from "../platform/types.js";
@@ -55,8 +55,13 @@ export class RoomAccess {
         .from(s.roomMemberships)
         .where(and(eq(s.roomMemberships.roomId, room.id), predicate))
         .orderBy(
-          sql`(${s.roomMemberships.leftAt} IS NULL AND ${s.roomMemberships.removedAt} IS NULL) DESC`,
-          sql`${s.roomMemberships.joinedAt} DESC`,
+          desc(
+            and(
+              isNull(s.roomMemberships.leftAt),
+              isNull(s.roomMemberships.removedAt),
+            )!,
+          ),
+          desc(s.roomMemberships.joinedAt),
         )
     )[0];
     requireState(member, "NOT_FOUND", 404);
