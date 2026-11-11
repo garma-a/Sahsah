@@ -9,7 +9,7 @@ import { ConfigService } from "@nestjs/config";
 import { from, lastValueFrom } from "rxjs";
 import type { Request, Response } from "express";
 import type { IncomingMessage } from "node:http";
-import { randomUUID } from "node:crypto";
+import { context as loggingContext } from "./logging.js";
 import { GameplayService } from "./service.js";
 import { GameplayRates } from "./rates.js";
 import { requireState } from "./problem.js";
@@ -73,7 +73,7 @@ export class GameplayHttpInterceptor implements NestInterceptor, OnModuleInit {
       res = http.getResponse<Response>();
     res.setHeader("Cache-Control", "private, no-store");
     res.setHeader("X-Content-Type-Options", "nosniff");
-    res.setHeader("X-Request-ID", randomUUID());
+    res.setHeader("X-Request-ID", loggingContext().requestId);
     return from(this.execute(req, next));
   }
   private async execute(req: Request, next: CallHandler) {

@@ -1,5 +1,6 @@
 import { ConfigService } from "@nestjs/config";
 import { createApplication } from "./application.js";
+import { log, errorStack } from "./gameplay/logging.js";
 
 async function bootstrap() {
   const app = await createApplication();
@@ -9,6 +10,6 @@ async function bootstrap() {
 }
 
 bootstrap().catch((error: unknown) => {
-  console.error(error);
+  log.error("platform.bootstrap", { code: "BOOTSTRAP_FAILED", stack: errorStack(error) });
   process.exitCode = 1;
 });
