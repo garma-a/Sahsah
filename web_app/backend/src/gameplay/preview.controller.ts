@@ -14,7 +14,8 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 import type { Request } from "express";
-import { sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
+import * as s from "../database/schema/index.js";
 import { z } from "zod";
 import { clientAddress } from "./http.js";
 import { previewCredential, previewIdentity } from "./preview.js";
@@ -63,27 +64,57 @@ export class PreviewController {
     );
     const accountId = await this.core.database.transaction(async (db) => {
       if (held) {
-        const renewed = await db.execute(
-          sql`UPDATE accounts SET display_name=${displayName} WHERE id=${held.accountId} AND state='active' RETURNING id`,
-        );
-        requireState(renewed.rows.length, "UNAUTHENTICATED", 401);
+        const renewed = await db
+          .update(s.accounts)
+          .set({ displayName })
+          .where(
+            and(
+              eq(s.accounts.id, held.accountId),
+              eq(s.accounts.state, "active"),
+            ),
+          )
+          .returning({ id: s.accounts.id });
+        requireState(renewed.length, "UNAUTHENTICATED", 401);
         return held.accountId;
       }
       const id = randomUUID(),
         audit = randomUUID();
-      await db.execute(
-        sql`INSERT INTO staff_accounts(id,role,normalized_email,password_hash) VALUES(${staffId},'admin','preview@sahsah.invalid','disabled') ON CONFLICT DO NOTHING`,
-      );
+      // Ledger credits require an active granting staff account; "disabled" is
+      // not a password hash, so this account can never sign in to AdminJS.
+      await db
+        .insert(s.staffAccounts)
+        .values({
+          id: staffId,
+          role: "admin",
+          normalizedEmail: "preview@sahsah.invalid",
+          passwordHash: "disabled",
+        })
+        .onConflictDoNothing();
       // +2000… is outside every Egyptian numbering range, so it cannot be a real phone.
-      await db.execute(
-        sql`INSERT INTO accounts(id,display_name,phone_e164,phone_verified_at) VALUES(${id},${displayName},${`+2000${String(randomInt(1e10)).padStart(10, "0")}`},clock_timestamp())`,
-      );
-      await db.execute(
-        sql`INSERT INTO staff_audit_events(id,staff_account_id,action_code,target_kind,target_key,request_key,reason) VALUES(${audit},${staffId},'token_grant','account',${id},${randomUUID()},'Preview host grant (ADR 0017)')`,
-      );
-      await db.execute(
-        sql`INSERT INTO token_ledger_entries(id,account_id,entry_kind,amount,idempotency_key,staff_audit_event_id,reason_text) VALUES(${randomUUID()},${id},'credit',${grant},${`preview:${id}`},${audit},'Preview host grant')`,
-      );
+      await db.insert(s.accounts).values({
+        id,
+        displayName,
+        phoneE164: `+2000${String(randomInt(1e10)).padStart(10, "0")}`,
+        phoneVerifiedAt: sql`clock_timestamp()`,
+      });
+      await db.insert(s.staffAuditEvents).values({
+        id: audit,
+        staffAccountId: staffId,
+        actionCode: "token_grant",
+        targetKind: "account",
+        targetKey: id,
+        requestKey: randomUUID(),
+        reason: "Preview host grant (ADR 0017)",
+      });
+      await db.insert(s.tokenLedgerEntries).values({
+        id: randomUUID(),
+        accountId: id,
+        entryKind: "credit",
+        amount: grant,
+        idempotencyKey: `preview:${id}`,
+        staffAuditEventId: audit,
+        reasonText: "Preview host grant",
+      });
       return id;
     });
     return {
