@@ -1,10 +1,11 @@
+import { randomUUID } from "node:crypto";
 import {
   Catch,
   type ArgumentsHost,
   type ExceptionFilter,
   HttpException,
 } from "@nestjs/common";
-import { context, log, errorStack } from "./logging.js";
+import { context, log, errorStack, enrichContext } from "./logging.js";
 import type { Response } from "express";
 import type { JsonObject } from "../database/schema/types.js";
 
@@ -63,10 +64,12 @@ export class GameplayProblemFilter implements ExceptionFilter {
           : "INTERNAL_ERROR");
     if (status === 429 || status === 503)
       response.setHeader("Retry-After", "15");
-    const requestId = context().requestId;
+    // Problem.requestId remains a generated UUID; the response header carries correlation.
+    const requestId = randomUUID();
+    enrichContext({ problemId: requestId });
     if (status >= 500 && !(error instanceof GameplayProblem)) log.error("platform.problem.catch", { code: applicationCode, status, stack: errorStack(error) });
 
-    response.setHeader("X-Request-Id", requestId);
+    response.setHeader("X-Request-Id", context().requestId);
     response.setHeader("Cache-Control", "private, no-store");
     response
       .status(status)

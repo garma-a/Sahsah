@@ -8,6 +8,7 @@ import { PinoLogger } from "nestjs-pino";
 
 export interface LogContext {
   requestId: string;
+  problemId?: string;
   operationId?: string;
   roomId?: string;
   gameId?: string;

@@ -68,3 +68,24 @@ test("state helpers reject impossible scores, positions and version transitions"
   assert.throws(() => versionIncrement(4n, 6n), { code: "INTERNAL_INVARIANT" });
   await assert.rejects(written(Promise.resolve([]), 1, "EXACT"), { code: "INTERNAL_INVARIANT" });
 });
+
+
+test("problem bodies retain UUID IDs while headers accept safe correlation tokens", async () => {
+  const { GameplayProblem, GameplayProblemFilter } = await import("../dist/gameplay/problem.js");
+  const { output } = await import("../dist/gameplay/contract.js");
+  const headers = new Map();
+  let body;
+  const response = {
+    setHeader(name, value) { headers.set(name.toLowerCase(), value); return this; },
+    status() { return this; }, type() { return this; }, json(value) { body = value; return this; },
+  };
+  withContext("platform.problem.test", () => {
+    new GameplayProblemFilter().catch(new GameplayProblem(400, "INVALID_INPUT"), {
+      switchToHttp: () => ({ getResponse: () => response }),
+    });
+    assert.equal(context().problemId, body.requestId);
+  }, { requestId: "client.token-42" });
+  assert.equal(headers.get("x-request-id"), "client.token-42");
+  assert.match(body.requestId, /^[a-f0-9-]{36}$/);
+  assert.equal(output("Problem", body), body);
+});
