@@ -1,5 +1,5 @@
 import * as s from "../../../database/schema/index.js";
-import { remaining } from "../content.js";
+import { checkedQuestionColumns, remaining } from "../content.js";
 import { single } from "../../platform/invariant.js";
 import { requireState } from "../../platform/problem.js";
 import type { Game, Question } from "../../platform/types.js";
@@ -74,7 +74,7 @@ export async function writeQuestion(
         .update(s.gameQuestions)
         .set(changes)
         .where(context.operations.slot(q))
-        .returning(),
+        .returning(checkedQuestionColumns),
       "GAMEQUESTIONS_WRITE_ROW",
     );
 }

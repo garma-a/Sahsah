@@ -339,11 +339,12 @@ export class GameplayRealtime
         }
       }
     } catch (error) {
-      this.stop(
-        c,
-        "protocol_error",
-        error instanceof GameplayProblem ? error.code : "PROTOCOL_FAILURE",
-      );
+      const code =
+        error instanceof GameplayProblem ? error.code : "PROTOCOL_FAILURE";
+      if (error instanceof GameplayProblem)
+        log.warn("realtime.consume", { code });
+      else log.error("realtime.consume", { code, stack: errorStack(error) });
+      this.stop(c, "protocol_error", code);
     } finally {
       c.busy = false;
     }
@@ -537,10 +538,6 @@ export class GameplayRealtime
     }
   }
   private async publish(roomId: string, stream: RoomStream) {
-    log.debug("realtime.publish", {
-      count: [...this.members.values()].filter((c) => c.roomId === roomId)
-        .length,
-    });
     try {
       for (
         let pass = 0;
@@ -552,6 +549,7 @@ export class GameplayRealtime
           (c) => c.roomId === roomId && this.current(c),
         );
         if (!recipients.length) break;
+        log.debug("realtime.publish", { count: recipients.length });
         const groups = new Map<
           string,
           {
@@ -824,8 +822,20 @@ export class GameplayRealtime
   private revoke(c: Connection, e: unknown) {
     const code =
       e instanceof GameplayProblem ? e.code : "PROJECTION_UNAVAILABLE";
-    if (e instanceof GameplayProblem) log.warn("realtime.revoke", { code });
-    else log.error("realtime.revoke", { code, stack: errorStack(e) });
+    withContext(
+      "realtime.revoke",
+      () => {
+        if (e instanceof GameplayProblem)
+          log.warn("realtime.revoke", { code });
+        else log.error("realtime.revoke", { code, stack: errorStack(e) });
+      },
+      {
+        requestId: c.streamId,
+        roomId: c.roomId,
+        gameId: c.gameId,
+        accountId: c.actor?.account?.accountId,
+      },
+    );
     this.stop(
       c,
       code === "CONTROLLER_FENCED"

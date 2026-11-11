@@ -61,6 +61,7 @@ export async function createApplication(
       "X-Control-Secret",
       "X-Controller-Generation",
       "X-Guest-Proof",
+      "X-Request-Id",
     ],
     exposedHeaders: ["X-Request-ID", "Retry-After"],
   });

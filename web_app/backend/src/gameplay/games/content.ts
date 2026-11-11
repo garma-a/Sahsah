@@ -9,6 +9,7 @@ import { requireState } from "../platform/problem.js";
 import type { Question } from "../platform/types.js";
 import type { Contract } from "../contract.js";
 import { invariant } from "../platform/invariant.js";
+import * as s from "../../database/schema/index.js";
 export type UnionFields<U> = {
   [K in U extends unknown ? keyof U : never]?: U extends unknown
     ? K extends keyof U
@@ -48,6 +49,17 @@ const configSchema = z
   })
   .strict();
 export const points = slotPoints;
+/** Question columns a write returns: the fields stateInvariants checks, without content. */
+export const checkedQuestionColumns = {
+  boardPosition: s.gameQuestions.boardPosition,
+  questionPosition: s.gameQuestions.questionPosition,
+  basePoints: s.gameQuestions.basePoints,
+  stageIndex: s.gameQuestions.stageIndex,
+  timerState: s.gameQuestions.timerState,
+  remainingMs: s.gameQuestions.remainingMs,
+  timerDeadlineAt: s.gameQuestions.timerDeadlineAt,
+  awardedPoints: s.gameQuestions.awardedPoints,
+};
 export function settings(
   format: string,
   value: unknown,

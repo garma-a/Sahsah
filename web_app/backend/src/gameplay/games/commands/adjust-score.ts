@@ -2,7 +2,7 @@ import { type Handler } from "../command-types.js";
 import { scoreChange } from "../rules/scoring.js";
 
 export const adjust_score: Handler<"adjust_score"> = async (ctx) => {
-  const { body, game, now, db, operations, operationId } = ctx;
+  const { body, game } = ctx;
   const team = Number(body.teamNumber),
     before = team === 1 ? game.teamOneScore : game.teamTwoScore,
     after = BigInt(String(body.targetTotal));

@@ -2,7 +2,7 @@ import { type Handler } from "../command-types.js";
 import { requireState } from "../../platform/problem.js";
 import { loadQuestion, currentQuestion, unrevealed, writeQuestion, changed } from "./question.js";
 export const advance_hint: Handler<"advance_hint"> = async (ctx) => {
-  const { body, game, now, db, operations, operationId } = ctx;
+  const { body, game } = ctx;
   const q = await loadQuestion(ctx, body);
   currentQuestion(game, q);
   unrevealed(q);
