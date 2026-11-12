@@ -394,6 +394,12 @@ test(
     assert.equal(question.body.view.phase, "question");
     assert.equal(question.body.view.question.prompt, "Question 1/1");
     assert.equal(JSON.stringify(question.body).includes("Answer 1/1"), false);
+    const seated = question.body.view.teams.flatMap((team) => team.players);
+    assert.equal(
+      seated.filter((p) => p.membershipId === joined.body.membershipId).length,
+      1,
+      "the guest is listed once under their team in live game views",
+    );
     const revealed = await command("reveal_answer", tile);
     assert.equal(revealed.status, 200, JSON.stringify(revealed.body));
     const answer = await call("GET", `/games/${gameId}`, undefined, {
@@ -436,6 +442,12 @@ test(
     assert.equal(result.status, 200, JSON.stringify(result.body));
     assert.equal(result.body.winningTeamNumber, 2);
     assert.equal(result.body.teams[1].manualAdjustmentTotal, "500");
+    assert.ok(
+      result.body.teams.some((team) =>
+        team.players.some((p) => p.membershipId === joined.body.membershipId),
+      ),
+      "the result lists the players of each team",
+    );
     assert.equal(result.body.categories[0].winningTeamNumber, null);
     assert.equal(
       (await command("adjust_score", { teamNumber: 1, targetTotal: "999" }))

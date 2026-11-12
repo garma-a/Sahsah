@@ -2,7 +2,7 @@ import { DatabaseService } from "../../database/database.module.js";
 import { RoomAccess } from "../rooms/access.js";
 import { GameplayIdentity } from "../platform/identity.js";
 import { Injectable } from "@nestjs/common";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import * as s from "../../database/schema/index.js";
 import { freshTime, iso, plusDay } from "../platform/clock.js";
 import type { Actor, Game, Room, Tx } from "../platform/types.js";
@@ -22,6 +22,27 @@ import { invariant } from "../platform/invariant.js";
 function teamNumber(value: number | null): 1 | 2 | null {
   invariant(value === null || value === 1 || value === 2, "MEMBER_TEAM_NUMBER");
   return value;
+}
+
+/** Seated players by team, in seat order; `current` leaves out players who left. */
+async function teamPlayers(db: Tx, gameId: string, current: boolean) {
+  const rows = await db
+    .select({
+      membershipId: s.gamePlayers.roomMemberId,
+      displayName: s.gamePlayers.displayName,
+      teamNumber: s.gamePlayers.teamNumber,
+    })
+    .from(s.gamePlayers)
+    .where(
+      current
+        ? and(eq(s.gamePlayers.gameId, gameId), isNull(s.gamePlayers.leftAt))
+        : eq(s.gamePlayers.gameId, gameId),
+    )
+    .orderBy(asc(s.gamePlayers.seatNumber));
+  return (number: 1 | 2) =>
+    rows
+      .filter((row) => teamNumber(row.teamNumber) === number)
+      .map(({ membershipId, displayName }) => ({ membershipId, displayName }));
 }
 
 const winner = (a: bigint | number, b: bigint | number) =>
@@ -189,6 +210,7 @@ export class ProjectionService {
       .from(s.gamePacks)
       .where(eq(s.gamePacks.gameId, game.id))
       .orderBy(s.gamePacks.boardPosition);
+    const players = await teamPlayers(db, game.id, false);
     const awards = (number: number, rows = questions) =>
       rows
         .filter((q) => q.winningTeamNumber === number)
@@ -201,12 +223,13 @@ export class ProjectionService {
       endedAt: iso(game.endedAt!),
       resolvedQuestionCount: questions.filter((q) => q.resolvedAt).length,
       winningTeamNumber: winner(game.teamOneScore, game.teamTwoScore),
-      teams: [1, 2].map((number) => {
+      teams: ([1, 2] as const).map((number) => {
         const score = number === 1 ? game.teamOneScore : game.teamTwoScore;
         return {
           number,
           name: number === 1 ? game.teamOneName : game.teamTwoName,
           score: String(score),
+          players: players(number),
           questionAwardTotal: awards(number),
           manualAdjustmentTotal: String(score - BigInt(awards(number))),
         };
@@ -264,10 +287,12 @@ export class ProjectionService {
       "GAME_EXPIRED",
       410,
     );
-    const teams = [1, 2].map((number) => ({
+    const players = await teamPlayers(db, game.id, true);
+    const teams = ([1, 2] as const).map((number) => ({
       number,
       name: number === 1 ? game.teamOneName : game.teamTwoName,
       score: String(number === 1 ? game.teamOneScore : game.teamTwoScore),
+      players: players(number),
     }));
     const common = {
       audience,
