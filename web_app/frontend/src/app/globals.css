@@ -167,6 +167,98 @@
   .tabular {
     font-variant-numeric: tabular-nums;
   }
+
+  /*
+    Flip card: the front (cover) and back (tiles) are two faces of one card. A card flips while it is
+    hovered (devices that can hover) or when `data-flipped="true"` is set by a click, tap or Enter.
+    The face that is turned away is also `visibility: hidden`, so its buttons leave the tab order;
+    the visibility switch is delayed to the half-turn so nothing pops while the card is rotating.
+  */
+  .flip {
+    perspective: 1200px;
+  }
+  .flip-inner {
+    position: relative;
+    height: 100%;
+    transform-style: preserve-3d;
+    transition: transform 0.55s cubic-bezier(0.3, 0.9, 0.3, 1);
+  }
+  .flip-face {
+    position: absolute;
+    inset: 0;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    transition: visibility 0s linear 0.26s;
+  }
+  .flip-back {
+    transform: rotateY(180deg);
+    visibility: hidden;
+  }
+  .flip[data-flipped="true"] .flip-inner {
+    transform: rotateY(180deg);
+  }
+  .flip[data-flipped="true"] .flip-front {
+    visibility: hidden;
+  }
+  .flip[data-flipped="true"] .flip-back {
+    visibility: visible;
+  }
+  @media (hover: hover) {
+    .flip:hover .flip-inner {
+      transform: rotateY(180deg);
+    }
+    .flip:hover .flip-front {
+      visibility: hidden;
+    }
+    .flip:hover .flip-back {
+      visibility: visible;
+    }
+  }
+  /* Reduced motion: the faces swap in place, nothing rotates. */
+  @media (prefers-reduced-motion: reduce) {
+    .flip-inner,
+    .flip[data-flipped="true"] .flip-inner,
+    .flip:hover .flip-inner {
+      transform: none;
+    }
+    .flip-back {
+      transform: none;
+    }
+    .flip-face {
+      transition: none;
+    }
+  }
+}
+
+/* The answer reveal: the slab turns up from its top edge, once. */
+@keyframes reveal {
+  0% {
+    opacity: 0;
+    transform: perspective(900px) rotateX(-80deg) scale(0.92);
+  }
+  60% {
+    opacity: 1;
+    transform: perspective(900px) rotateX(8deg) scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: perspective(900px) rotateX(0) scale(1);
+  }
+}
+@keyframes stamp {
+  0% {
+    opacity: 0;
+    transform: rotate(-14deg) scale(1.8);
+  }
+  100% {
+    opacity: 1;
+    transform: rotate(-14deg) scale(1);
+  }
+}
+@keyframes beat {
+  50% {
+    transform: scale(1.06);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
