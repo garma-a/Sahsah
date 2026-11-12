@@ -14,10 +14,12 @@ type RoomShellProps = {
   children: React.ReactNode;
   /** Let the content use the full width, as the board does on a TV. */
   wide?: boolean;
+  /** Visually hidden page heading, for screens that have no visible one. */
+  heading?: string;
 };
 
 /** The room frame: poster wall behind a red header bar with the logo, the connection light and actions. */
-export default function RoomShell({ covers, status, actions, children, wide }: RoomShellProps) {
+export default function RoomShell({ covers, status, actions, children, wide, heading }: RoomShellProps) {
   return (
     <div className="relative min-h-dvh">
       <PosterWall covers={covers} />
@@ -31,7 +33,10 @@ export default function RoomShell({ covers, status, actions, children, wide }: R
             <ConnectionLight status={status} />
           </div>
         </header>
-        <main className="relative z-10 flex flex-1 flex-col">{children}</main>
+        <main className="relative z-10 flex flex-1 flex-col">
+          {heading && <h1 className="sr-only">{heading}</h1>}
+          {children}
+        </main>
       </div>
     </div>
   );

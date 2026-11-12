@@ -10,7 +10,7 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-press text-white ring-4 ring-cyan shadow-chunk hover:bg-[#e2431f] active:translate-y-[3px] active:shadow-[0_2px_0_var(--color-press-deep)]",
+          "bg-press text-white ring-4 ring-cyan shadow-chunk hover:bg-[#e2431f] active:translate-y-[3px] active:shadow-[0_2px_0_var(--color-press-deep)] disabled:bg-ink/25 disabled:text-ink/70 disabled:opacity-100 disabled:shadow-none disabled:ring-ink/25",
         cyan: "bg-cyan text-ink ring-4 ring-ink hover:brightness-105 active:translate-y-px",
         outline:
           "border-[3px] border-ink bg-cream text-ink hover:bg-sun active:translate-y-px",

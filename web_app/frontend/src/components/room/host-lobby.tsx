@@ -49,7 +49,7 @@ export default function HostLobby({ roomId, view, roomVersion, auth, categories,
 
   const players = view.members.filter((m) => !m.host);
   const waiting = players.filter((m) => !m.ready);
-  const canStart = players.length > 0 && waiting.length === 0;
+  const canStart = waiting.length === 0;
 
   async function start() {
     setStarting(true);
@@ -88,14 +88,14 @@ export default function HostLobby({ roomId, view, roomVersion, auth, categories,
   return (
     <div className="grid flex-1 gap-4 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] lg:gap-6">
       {/* Invitation: code and QR, readable from across the room. */}
-      <section aria-labelledby="invite-title" className="paper-card flex flex-col items-center rounded-[1.6rem] border-4 border-ink p-5 text-center shadow-[0_10px_0_var(--color-ink)]">
+      <section aria-labelledby="invite-title" className="paper-card flex flex-col items-center justify-center rounded-[1.6rem] border-4 border-ink p-5 text-center shadow-[0_10px_0_var(--color-ink)]">
         <h2 id="invite-title" className="font-heading text-3xl leading-tight sm:text-4xl">
           ادخلوا بالكود أو امسحوا الـQR
         </h2>
         {invitation ? (
           <>
             <div className="mt-4 rounded-2xl border-4 border-ink bg-white p-3 shadow-[0_5px_0_var(--color-ink)]">
-              <QRCodeSVG value={invitation.joinUrl} size={208} level="M" marginSize={1} fgColor="#1d2321" bgColor="#ffffff" role="img" title="كود QR للانضمام للغرفة" />
+              <QRCodeSVG value={invitation.joinUrl} size={240} level="M" marginSize={1} fgColor="#1d2321" bgColor="#ffffff" role="img" title="كود QR للانضمام للغرفة" />
             </div>
             <p className="mt-4 text-base font-semibold" dir="ltr">
               {joinHost}/join
@@ -175,7 +175,7 @@ export default function HostLobby({ roomId, view, roomVersion, auth, categories,
         <div className="mt-auto flex flex-wrap items-center gap-4 rounded-[1.6rem] border-4 border-ink bg-cyan p-4 shadow-[0_8px_0_var(--color-ink)]">
           <p role="status" className="min-w-0 flex-1 font-heading text-2xl leading-snug">
             {players.length === 0
-              ? "مستنيين اللاعبين يدخلوا"
+              ? "لسه محدش دخل. استنى اللاعبين أو ابدأ."
               : waiting.length > 0
                 ? `لسه ${formatDigits(waiting.length)} من اللاعبين مش جاهزين`
                 : "كله جاهز. يلا نبدأ!"}

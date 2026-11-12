@@ -11,7 +11,7 @@ const lifts = [0, 14, -10, 8, -14, 12, -6, 16, -12, 4, 10, -8];
  * darkened so the cream board stays the brightest thing on screen. Pure CSS, no extra artwork.
  */
 export default function PosterWall({ covers }: { covers: string[] }) {
-  const tiles = covers.length ? Array.from({ length: 24 }, (_, i) => covers[i % covers.length]) : [];
+  const tiles = covers.length ? Array.from({ length: 40 }, (_, i) => covers[i % covers.length]) : [];
   return (
     <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-night">
       {tiles.length > 0 && (

@@ -201,8 +201,8 @@ function LiveRoom({ roomId, auth, role, membershipId, covers, categories }: Live
     </Button>
   ) : null;
 
-  const shell = (children: React.ReactNode, wide?: boolean) => (
-    <RoomShell covers={covers} status={status} actions={actions} wide={wide}>
+  const shell = (children: React.ReactNode, wide?: boolean, heading?: string) => (
+    <RoomShell covers={covers} status={status} actions={actions} wide={wide} heading={heading}>
       {closeError && (
         <p role="alert" className="mb-3 rounded-xl border-[3px] border-[#b3261e] bg-white px-4 py-2 font-semibold text-[#8c1c15]">
           {closeError}
@@ -241,9 +241,11 @@ function LiveRoom({ roomId, auth, role, membershipId, covers, categories }: Live
       ) : (
         <PlayerLobby roomId={roomId} view={view as LobbyView} auth={auth} membershipId={membershipId ?? ""} connected={channel.connected} onRefresh={channel.refresh} />
       ),
+      false,
+      isHost ? "غرفة اللعب" : undefined,
     );
   }
-  return shell(<GameScreen channel={channel} roomId={roomId} auth={auth} isHost={isHost} categories={categories} />, true);
+  return shell(<GameScreen channel={channel} roomId={roomId} auth={auth} isHost={isHost} categories={categories} />, true, view.phase === "board" ? "لوحة اللعبة" : undefined);
 }
 
 /** What the live game shows: the board, the holding panel for an opened tile, or the result. */
