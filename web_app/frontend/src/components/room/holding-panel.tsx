@@ -1,55 +1,11 @@
 "use client";
 
 import { teamTone } from "@/components/brand/tones";
-import Button from "@/components/ui/button";
-import ErrorBanner from "@/components/ui/error-banner";
-import type { QuestionView, ResultView } from "@/lib/api/types";
+import type { ResultView } from "@/lib/api/types";
 import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-/**
- * Stand-in for the question screen while it is built: it names the tile that was opened and, for the host,
- * returns to the board so the whole open / return loop can be played end to end.
- */
-export function QuestionHolding({
-  view,
-  categoryName,
-  isHost,
-  busy,
-  error,
-  onReturn,
-}: {
-  view: QuestionView;
-  categoryName: string;
-  isHost: boolean;
-  busy: boolean;
-  error: string | null;
-  onReturn: () => void;
-}) {
-  return (
-    <section
-      aria-labelledby="holding-title"
-      className="paper-card m-auto flex w-full max-w-2xl flex-col items-center gap-5 rounded-[2rem] border-4 border-ink p-8 text-center shadow-[0_12px_0_var(--color-ink)]"
-    >
-      <p className="grid size-28 -rotate-6 place-items-center rounded-full border-4 border-ink bg-sun font-heading text-5xl shadow-[0_6px_0_var(--color-ink)]">
-        {formatNumber(view.basePoints)}
-      </p>
-      <h1 id="holding-title" className="font-heading text-4xl leading-tight sm:text-5xl">
-        اتفتح سؤال في {categoryName}
-      </h1>
-      <p className="max-w-md text-lg font-medium text-charcoal/85">
-        {isHost ? "شاشة السؤال لسه بتتجهّز. ارجع للوحة واختار سؤال تاني." : "المضيف فاتح سؤال دلوقتي. استنى ويرجع للوحة."}
-      </p>
-      {error && <ErrorBanner>{error}</ErrorBanner>}
-      {isHost && (
-        <Button size="lg" onClick={onReturn} disabled={busy}>
-          {busy ? "ثانية…" : "ارجع للوحة"}
-        </Button>
-      )}
-    </section>
-  );
-}
-
+/** Stand-in for the result screen until it is built. */
 export function ResultHolding({ view }: { view: ResultView }) {
   const { result } = view;
   const winner = result.teams.find((t) => t.number === result.winningTeamNumber);

@@ -3,22 +3,21 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Board from "@/components/room/board";
+import GameScreen from "@/components/room/game-screen";
 import HostLobby from "@/components/room/host-lobby";
-import { QuestionHolding, ResultHolding } from "@/components/room/holding-panel";
+
 import PlayerLobby from "@/components/room/player-lobby";
 import RoomShell from "@/components/room/room-shell";
-import Scoreboard from "@/components/room/scoreboard";
 import Button from "@/components/ui/button";
 import ErrorBanner from "@/components/ui/error-banner";
 import StatusCard from "@/components/ui/status-card";
 import { type Auth } from "@/lib/api/client";
-import { closeRoom, executeCommand, getControlStatus, previewSession, takeControl } from "@/lib/api/endpoints";
+import { closeRoom, getControlStatus, previewSession, takeControl } from "@/lib/api/endpoints";
 import { isConflict, messageOf, requireField } from "@/lib/api/errors";
-import type { BoardView, Category, GameCommand, LobbyView, QuestionView } from "@/lib/api/types";
+import type { Category, LobbyView } from "@/lib/api/types";
 import { newOperationId, newSecret } from "@/lib/ids";
-import { loadRoster, saveRoster } from "@/lib/roster";
-import { useRoomChannel, type RoomChannel } from "@/lib/realtime/use-room-channel";
+import { saveRoster } from "@/lib/roster";
+import { useRoomChannel } from "@/lib/realtime/use-room-channel";
 import { useCategories } from "@/lib/use-categories";
 import { useIntentKeys } from "@/lib/use-intent-keys";
 import { useIdentity, useIdentityApi } from "@/providers/game-store-provider";
@@ -263,76 +262,3 @@ function LiveRoom({ roomId, auth, role, membershipId, covers, categories }: Live
   return shell(<GameScreen channel={channel} roomId={roomId} auth={auth} isHost={isHost} categories={categories} />, true, view.phase === "board" ? "لوحة اللعبة" : undefined);
 }
 
-/** What the live game shows: the board, the holding panel for an opened tile, or the result. */
-function GameScreen({ channel, roomId, auth, isHost, categories }: { channel: RoomChannel; roomId: string; auth: Auth; isHost: boolean; categories: CategoryIndex }) {
-  const { snapshot } = channel;
-  const intents = useIntentKeys();
-  const [pending, setPending] = useState<string | null>(null);
-  const [problem, setProblem] = useState<string | null>(null);
-  // The last board survives while a question is open, so the holding panel can name the category.
-  const [lastBoard, setLastBoard] = useState<BoardView | null>(null);
-  const [roster] = useState(() => loadRoster(roomId));
-  const view = snapshot?.view;
-  if (view?.phase === "board" && view !== lastBoard) setLastBoard(view);
-
-  const gameId = snapshot && "gameId" in snapshot.source ? snapshot.source.gameId : null;
-  const gameVersion = snapshot && "gameVersion" in snapshot.source ? snapshot.source.gameVersion : null;
-
-  const run = useCallback(
-    async (pendingKey: string, command: GameCommand) => {
-      if (!gameId) return;
-      setPending(pendingKey);
-      setProblem(null);
-      // The command names its game version, so the same click against the same state keeps the same key.
-      const signature = JSON.stringify(command);
-      try {
-        await executeCommand(gameId, auth, intents.key(signature), command);
-        intents.done(signature);
-        channel.refresh();
-      } catch (cause) {
-        setProblem(messageOf(cause));
-        if (isConflict(cause)) channel.refresh();
-      } finally {
-        setPending(null);
-      }
-    },
-    [gameId, auth, channel, intents],
-  );
-
-  if (!snapshot || !view || !gameVersion) return null;
-
-  if (view.phase === "result") return <ResultHolding view={view} />;
-
-  if (view.phase === "board") {
-    return (
-      <div className="flex flex-1 flex-col">
-        {problem && <ErrorBanner className="mb-3">{problem}</ErrorBanner>}
-        <Board
-          view={view}
-          categories={categories}
-          canOpen={isHost && view.audience === "host"}
-          pending={pending}
-          onOpen={(boardPosition, questionPosition) =>
-            run(`${boardPosition}:${questionPosition}`, { name: "open_question", expectedGameVersion: gameVersion, boardPosition, questionPosition })
-          }
-        />
-        <Scoreboard teams={view.teams} members={roster} connected={channel.connected} />
-      </div>
-    );
-  }
-
-  const question = view as QuestionView;
-  const column = lastBoard?.board.find((c) => c.boardPosition === question.boardPosition);
-  return (
-    <QuestionHolding
-      view={question}
-      categoryName={column?.name ?? "فئة"}
-      isHost={isHost && question.audience === "host"}
-      busy={pending !== null}
-      error={problem}
-      onReturn={() =>
-        run("return", { name: "return_to_board", expectedGameVersion: gameVersion, boardPosition: question.boardPosition, questionPosition: question.questionPosition })
-      }
-    />
-  );
-}
