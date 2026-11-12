@@ -23,6 +23,8 @@ export type RoomChannel = {
   error: ApiError | null;
   /** Membership ids with a live socket (presence is a separate, disposable channel). */
   connected: ReadonlySet<Id>;
+  /** Server clock minus this device clock (ms), taken from the newest state: deadlines are the server's. */
+  clockOffsetMs: number;
   /** Reload the current projection over HTTP, e.g. after a command or a conflict. */
   refresh: () => void;
 };
@@ -77,6 +79,7 @@ export function useRoomChannel(input: {
   const [error, setError] = useState<ApiError | null>(null);
   const [connected, setConnected] = useState<ReadonlySet<Id>>(new Set());
   const [reloads, setReloads] = useState(0);
+  const [clockOffsetMs, setClockOffsetMs] = useState(0);
 
   const snapshotRef = useRef<Snapshot | null>(null);
   const authRef = useRef<Auth | null>(auth);
@@ -89,6 +92,8 @@ export function useRoomChannel(input: {
   const accept = useCallback((next: Snapshot) => {
     if (isStale(snapshotRef.current, next.source)) return;
     snapshotRef.current = next;
+    const serverNow = Date.parse(next.serverTime);
+    if (Number.isFinite(serverNow)) setClockOffsetMs(serverNow - Date.now());
     setSnapshot(next);
   }, []);
 
@@ -279,5 +284,5 @@ export function useRoomChannel(input: {
     };
   }, [roomId, hasAuth, accept]);
 
-  return { snapshot, status, error, connected, refresh };
+  return { snapshot, status, error, connected, clockOffsetMs, refresh };
 }
