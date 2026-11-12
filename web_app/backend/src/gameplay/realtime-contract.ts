@@ -4,7 +4,7 @@ import addFormats = require("ajv-formats");
 import type { RealtimeTypes } from "./contracts/realtime-types.js";
 export type ClientFrame = { [K in keyof RealtimeTypes]: K extends `Client${string}Frame` ? RealtimeTypes[K] : never }[keyof RealtimeTypes];
 export type ServerFrame = { [K in keyof RealtimeTypes]: K extends `Server${string}Frame` ? RealtimeTypes[K] : never }[keyof RealtimeTypes];
-import { requireState } from "./problem.js";
+import { requireState } from "./platform/problem.js";
 const schema = JSON.parse(
   readFileSync(
     new URL("./contracts/realtime.schema.json", import.meta.url),

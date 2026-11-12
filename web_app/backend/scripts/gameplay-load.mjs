@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { writeFile } from "node:fs/promises";
 import { WebSocket } from "ws";
 import { gameplayFixture, secret } from "../tests/gameplay/fixture.mjs";
-import { GameplayService } from "../dist/gameplay/service.js";
+import { GameplayService } from "../dist/gameplay/platform/runtime.js";
 
 // Disposable local smoke measurement. It never contacts production or certifies
 // a Railway quota. Staging acceptance uses the separate declared profile/runbook.

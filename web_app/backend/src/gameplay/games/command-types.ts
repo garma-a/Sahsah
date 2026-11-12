@@ -1,6 +1,6 @@
 import type { Contract } from "../contract.js";
-import type { GameOperations } from "../games.js";
-import type { Actor, Game, Tx } from "../service.js";
+import type { GameOperations } from "./operations.js";
+import type { Actor, Game, Tx } from "../platform/types.js";
 import type * as s from "../../database/schema/index.js";
 export type Command = Contract<"GameCommand">;
 export type CommandName = Command["name"];

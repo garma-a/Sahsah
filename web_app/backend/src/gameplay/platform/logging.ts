@@ -35,17 +35,28 @@ export const logContext = new AsyncLocalStorage<LogContext>();
 const processId = randomUUID();
 const parents = new WeakMap<LogContext, LogContext>();
 export function context() {
-  return logContext.getStore() ?? { requestId: processId, scope: "platform.process" };
+  return (
+    logContext.getStore() ?? { requestId: processId, scope: "platform.process" }
+  );
 }
-export function withContext<T>(scope: string, work: () => T, fields: Partial<LogContext> = {}): T {
+export function withContext<T>(
+  scope: string,
+  work: () => T,
+  fields: Partial<LogContext> = {},
+): T {
   const parent = logContext.getStore();
   const next = { ...context(), ...fields, scope };
   if (parent && parent.requestId === next.requestId) parents.set(next, parent);
   return logContext.run(next, work);
 }
-export function enrichContext(fields: Partial<Omit<LogContext, "scope" | "requestId">>) {
+export function enrichContext(
+  fields: Partial<Omit<LogContext, "scope" | "requestId">>,
+) {
   let current = logContext.getStore();
-  while (current) { Object.assign(current, fields); current = parents.get(current); }
+  while (current) {
+    Object.assign(current, fields);
+    current = parents.get(current);
+  }
 }
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -103,36 +114,69 @@ export function loggerOptions(): LoggerOptions {
     level: logLevel(),
     base: undefined,
     // Pino otherwise copies err.message into msg before running serializers.
-    hooks: { logMethod(args, method) {
-      const [fields] = args;
-      if (fields instanceof Error) method.call(this, { err: fields }, "");
-      else if (fields && typeof fields === "object") {
-        const safe = Object.fromEntries(Object.entries(fields).filter(([key]) => key !== "msg"));
-        method.call(this, safe, "");
-      }
-      else method.call(this, { code: "LOG_MESSAGE_OMITTED" }, "");
-    } },
+    hooks: {
+      logMethod(args, method) {
+        const [fields] = args;
+        if (fields instanceof Error) method.call(this, { err: fields }, "");
+        else if (fields && typeof fields === "object") {
+          const safe = Object.fromEntries(
+            Object.entries(fields).filter(([key]) => key !== "msg"),
+          );
+          method.call(this, safe, "");
+        } else method.call(this, { code: "LOG_MESSAGE_OMITTED" }, "");
+      },
+    },
     mixin: () => ({ ...context() }),
     // Defense in depth; callers only send the bounded LogFields above.
-    redact: { paths: [
-      "req", "res", "body", "headers", "authorization", "credential", "token",
-      "secret", "controlSecret", "reconnectSecret", "passcode", "previewPasscode",
-      "invitationCode", "phone", "phoneE164", "url", "signedUrl",
-      '["x-guest-proof"]', '["x-control-secret"]',
-      "*.authorization", "*.credential", "*.secret", "*.passcode", "*.url",
-    ], remove: true },
+    redact: {
+      paths: [
+        "req",
+        "res",
+        "body",
+        "headers",
+        "authorization",
+        "credential",
+        "token",
+        "secret",
+        "controlSecret",
+        "reconnectSecret",
+        "passcode",
+        "previewPasscode",
+        "invitationCode",
+        "phone",
+        "phoneE164",
+        "url",
+        "signedUrl",
+        '["x-guest-proof"]',
+        '["x-control-secret"]',
+        "*.authorization",
+        "*.credential",
+        "*.secret",
+        "*.passcode",
+        "*.url",
+      ],
+      remove: true,
+    },
     serializers: { err: (error: unknown) => ({ stack: errorStack(error) }) },
   };
 }
 let logger: Logger | undefined;
 export function rootLogger() {
-  return logger ??= pino(loggerOptions());
+  return (logger ??= pino(loggerOptions()));
 }
 export const log = {
-  info(scope: string, fields: LogFields = {}) { withContext(scope, () => rootLogger().info(fields)); },
-  warn(scope: string, fields: LogFields = {}) { withContext(scope, () => rootLogger().warn(fields)); },
-  error(scope: string, fields: LogFields = {}) { withContext(scope, () => rootLogger().error(fields)); },
-  debug(scope: string, fields: LogFields = {}) { withContext(scope, () => rootLogger().debug(fields)); },
+  info(scope: string, fields: LogFields = {}) {
+    withContext(scope, () => rootLogger().info(fields));
+  },
+  warn(scope: string, fields: LogFields = {}) {
+    withContext(scope, () => rootLogger().warn(fields));
+  },
+  error(scope: string, fields: LogFields = {}) {
+    withContext(scope, () => rootLogger().error(fields));
+  },
+  debug(scope: string, fields: LogFields = {}) {
+    withContext(scope, () => rootLogger().debug(fields));
+  },
 };
 
 export function requestLogging(): RequestHandler {
@@ -145,18 +189,25 @@ export function requestLogging(): RequestHandler {
     // Logging only the template prevents invitation codes and signed paths leaking.
     customSuccessObject: (req, res, value) => ({
       scope: "platform.http.complete",
-      route: routeTemplate(req), status: res.statusCode, durationMs: value.responseTime,
+      route: routeTemplate(req),
+      status: res.statusCode,
+      durationMs: value.responseTime,
     }),
     customErrorObject: (req, res, _error, value) => ({
       scope: "platform.http.complete",
-      route: routeTemplate(req), status: res.statusCode, durationMs: value.responseTime,
+      route: routeTemplate(req),
+      status: res.statusCode,
+      durationMs: value.responseTime,
     }),
     customLogLevel: () => "info",
     customSuccessMessage: () => "http",
     customErrorMessage: () => "http",
   });
   return (req, res, next) => {
-    const requestContext = { requestId: requestId(req.headers["x-request-id"]), scope: "platform.http" };
+    const requestContext = {
+      requestId: requestId(req.headers["x-request-id"]),
+      scope: "platform.http",
+    };
     req.id = requestContext.requestId;
     res.setHeader("X-Request-Id", requestContext.requestId);
     logContext.run(requestContext, () => http(req, res, next));
@@ -174,19 +225,32 @@ export class SafeNestLogger implements LoggerService {
   log() {}
   debug() {}
   verbose() {}
-  warn() { withContext("platform.nest.warn", () => this.logger.warn({ code: "NEST_WARNING" })); }
-  error(error: unknown) {
-    withContext("platform.nest.error", () => this.logger.error({ code: "NEST_ERROR", stack: errorStack(error) }));
+  warn() {
+    withContext("platform.nest.warn", () =>
+      this.logger.warn({ code: "NEST_WARNING" }),
+    );
   }
-  fatal(error: unknown) { this.error(error); }
+  error(error: unknown) {
+    withContext("platform.nest.error", () =>
+      this.logger.error({ code: "NEST_ERROR", stack: errorStack(error) }),
+    );
+  }
+  fatal(error: unknown) {
+    this.error(error);
+  }
 }
 
 /** Preserve the async scope across existing methods without changing their arguments. */
 export function scoped(scope: string) {
-  return function <A extends unknown[], R>(_target: object, _name: string, descriptor: TypedPropertyDescriptor<(...args: A) => R>) {
+  return function <A extends unknown[], R>(
+    _target: object,
+    _name: string,
+    descriptor: TypedPropertyDescriptor<(...args: A) => R>,
+  ) {
     const work = descriptor.value;
-    if (work) descriptor.value = function (...args: A): R {
-      return withContext(scope, () => work.apply(this, args));
-    };
+    if (work)
+      descriptor.value = function (...args: A): R {
+        return withContext(scope, () => work.apply(this, args));
+      };
   };
 }

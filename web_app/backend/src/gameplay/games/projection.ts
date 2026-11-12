@@ -1,18 +1,13 @@
+import { DatabaseService } from "../../database/database.module.js";
+import { RoomAccess } from "../rooms/access.js";
+import { GameplayIdentity } from "../platform/identity.js";
 import { Injectable } from "@nestjs/common";
-import { and, eq, sql } from "drizzle-orm";
-import * as s from "../database/schema/index.js";
-import {
-  GameplayService,
-  freshTime,
-  iso,
-  plusDay,
-  type Actor,
-  type Game,
-  type Room,
-  type Tx,
-} from "./service.js";
-import { GameOperations } from "./games.js";
-import { language as validLanguage } from "./catalog.js";
+import { and, eq } from "drizzle-orm";
+import * as s from "../../database/schema/index.js";
+import { freshTime, iso, plusDay } from "../platform/clock.js";
+import type { Actor, Game, Room, Tx } from "../platform/types.js";
+import { GameOperations } from "./operations.js";
+import { language as validLanguage } from "../catalog/catalog.js";
 import {
   answerView,
   local,
@@ -20,9 +15,14 @@ import {
   suggested,
   timer,
 } from "./content.js";
-import { requireState } from "./problem.js";
-import type { Contract } from "./contract.js";
-import { invariant } from "./invariant.js";
+import { requireState } from "../platform/problem.js";
+import type { Contract } from "../contract.js";
+import { invariant } from "../platform/invariant.js";
+
+function teamNumber(value: number | null): 1 | 2 | null {
+  invariant(value === null || value === 1 || value === 2, "MEMBER_TEAM_NUMBER");
+  return value;
+}
 
 const winner = (a: bigint | number, b: bigint | number) =>
   a === b ? null : a > b ? 1 : 2;
@@ -30,7 +30,9 @@ const winner = (a: bigint | number, b: bigint | number) =>
 @Injectable()
 export class ProjectionService {
   constructor(
-    private core: GameplayService,
+    readonly identity: GameplayIdentity,
+    readonly access: RoomAccess,
+    readonly database: DatabaseService,
     private games: GameOperations,
   ) {}
   async authorize(db: Tx, game: Game, actor: Actor, historical: boolean) {
@@ -49,8 +51,8 @@ export class ProjectionService {
       403,
     );
     if (!historical) {
-      const room = await this.core.room(db, game.roomId, false);
-      await this.core.membership(db, room, actor);
+      const room = await this.access.room(db, game.roomId, false);
+      await this.access.membership(db, room, actor);
       requireState(
         !player.leftAt && room.currentGameId === game.id,
         "PARTICIPATION_ENDED",
@@ -67,13 +69,13 @@ export class ProjectionService {
     requestedLanguage?: string,
   ): Promise<Contract<"Snapshot">> {
     const language = validLanguage(requestedLanguage);
-    return this.core.database.transaction(
+    return this.database.transaction(
       async (db) => {
-        const room = await this.core.room(db, roomId, false);
-        await this.core.membership(db, room, actor);
+        const room = await this.access.room(db, roomId, false);
+        await this.access.membership(db, room, actor);
         const audience =
           actor.account?.accountId === room.ownerAccountId ? "host" : "viewer";
-        if (audience === "host") this.core.host(room, actor);
+        if (audience === "host") this.identity.host(room, actor);
         const now = await freshTime(db);
         if (room.currentGameId && room.presentationMode === "game")
           return this.snapshot(
@@ -92,7 +94,7 @@ export class ProjectionService {
           previous?.endedAt ? new Date(previous.endedAt).getTime() : 0,
         );
         requireState(now.getTime() < base + 86400000, "ROOM_EXPIRED", 410);
-        const members = await this.core.members(db, roomId);
+        const members = await this.access.members(db, roomId);
         const selections = await db
           .select()
           .from(s.roomPackSelections)
@@ -111,8 +113,7 @@ export class ProjectionService {
             members: members.map((member) => ({
               id: member.id,
               displayName: member.displayName,
-              // The room-membership table constrains nullable team numbers to 1 or 2.
-              teamNumber: member.lobbyTeamNumber as 1 | 2 | null,
+              teamNumber: teamNumber(member.lobbyTeamNumber),
               host: member.accountId === room.ownerAccountId,
               memberVersion: String(member.stateVersion),
               ready: member.readyForGeneration === room.lobbyGeneration,
@@ -146,9 +147,9 @@ export class ProjectionService {
     resultOnly = false,
   ): Promise<Contract<"Snapshot"> | Contract<"Result">> {
     const language = validLanguage(requestedLanguage),
-      initial = await this.games.game(this.core.database.db, gameId, false);
+      initial = await this.games.game(this.database.db, gameId, false);
     await this.authorize(
-      this.core.database.db,
+      this.database.db,
       initial,
       actor,
       initial.status !== "active",
@@ -158,10 +159,10 @@ export class ProjectionService {
       Date.now() >= new Date(initial.idleExpiresAt).getTime()
     )
       await this.games.expire(gameId);
-    return this.core.database.transaction(
+    return this.database.transaction(
       async (db) => {
         const game = await this.games.game(db, gameId, false),
-          room = await this.core.room(db, game.roomId, false),
+          room = await this.access.room(db, game.roomId, false),
           now = await freshTime(db);
         await this.authorize(db, game, actor, game.status !== "active");
         if (resultOnly) {
@@ -173,7 +174,11 @@ export class ProjectionService {
       { consistentRead: true },
     );
   }
-  async result(db: Tx, game: Game, language: Contract<"Language">): Promise<Contract<"Result">> {
+  async result(
+    db: Tx,
+    game: Game,
+    language: Contract<"Language">,
+  ): Promise<Contract<"Result">> {
     invariant(game.status !== "active" && game.endReason, "RESULT_TERMINAL");
     const questions = await db
       .select()

@@ -1,5 +1,5 @@
-import type { GameOperations } from "../../games.js";
-import type { Actor, Member, Room, Tx } from "../../service.js";
+import type { GameOperations } from "../operations.js";
+import type { Actor, Member, Room, Tx } from "../../platform/types.js";
 import type { Contract } from "../../contract.js";
 import type * as s from "../../../database/schema/index.js";
 import type { lockStartContent } from "./content.js";

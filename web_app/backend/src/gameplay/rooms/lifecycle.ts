@@ -1,46 +1,58 @@
-import { scoped, enrichContext, log, errorStack } from "./logging.js";
-import { single, invariant, writtenAtMost } from "./invariant.js";
+import { DatabaseService } from "../../database/database.module.js";
+import { GameplayTransactions } from "../platform/transaction.js";
+import { GameplayOutbox } from "../platform/outbox.js";
+import { RoomReceipts } from "../platform/receipts.js";
+import { RoomAccess } from "./access.js";
+import { GameplayIdentity } from "../platform/identity.js";
+import { GameplayRuntime } from "../platform/runtime.js";
+import { scoped, log } from "../platform/logging.js";
+import {
+  single,
+  versionIncrement,
+  writtenAtMost,
+} from "../platform/invariant.js";
 import { Injectable } from "@nestjs/common";
 import { and, eq, isNull, sql } from "drizzle-orm";
-import * as s from "../database/schema/index.js";
-import { revision } from "./contract.js";
-import { digest, equalProof, proof } from "./proof.js";
-import { requireState } from "./problem.js";
-import { GameOperations } from "./games.js";
-import { RoomOperations } from "./rooms.js";
-import {
-  GameplayService,
-  freshTime,
-  type Actor,
-  type Room,
-  type Tx,
-} from "./service.js";
-import type { Contract } from "./contract.js";
+import * as s from "../../database/schema/index.js";
+import { revision } from "../contract.js";
+import { digest, equalProof, proof } from "../platform/proof.js";
+import { requireState } from "../platform/problem.js";
+import { GameOperations } from "../games/operations.js";
+import { RoomOperations } from "./operations.js";
+import { freshTime } from "../platform/clock.js";
+import type { Actor, Room, Tx } from "../platform/types.js";
+import type { Contract } from "../contract.js";
 
 @Injectable()
 export class RoomLifecycle {
   constructor(
-    private core: GameplayService,
+    readonly runtime: GameplayRuntime,
+    readonly identity: GameplayIdentity,
+    readonly access: RoomAccess,
+    readonly receipts: RoomReceipts,
+    readonly outbox: GameplayOutbox,
+    readonly transactions: GameplayTransactions,
+    readonly database: DatabaseService,
     private rooms: RoomOperations,
     private games: GameOperations,
   ) {}
   async prepareCreate(actor: Actor, operationId: string) {
-    this.core.enabled();
+    this.runtime.enabled();
     if (!actor.account) return;
     const source = (
-      await this.core.database.db
+      await this.database.db
         .select({ id: s.rooms.id })
         .from(s.rooms)
         .where(eq(s.rooms.createRequestId, operationId))
     )[0];
     if (source) return;
     requireState(
-      this.core.admission.availability().admission === "open",
+      this.runtime.admission.availability().admission === "open",
       "SERVER_AT_CAPACITY",
       503,
     );
     const existing = (
-      await this.core.database.db
+      await this.database.db
         .select({ id: s.rooms.id })
         .from(s.rooms)
         .where(
@@ -53,21 +65,21 @@ export class RoomLifecycle {
     if (existing) await this.expireRoom(existing.id);
   }
   async prepareJoin(code: string, operationId: string) {
-    this.core.enabled();
+    this.runtime.enabled();
     const source = (
-      await this.core.database.db
+      await this.database.db
         .select({ id: s.roomMemberships.id })
         .from(s.roomMemberships)
         .where(eq(s.roomMemberships.joinRequestId, operationId))
     )[0];
     if (source) return;
     requireState(
-      this.core.admission.availability().admission === "open",
+      this.runtime.admission.availability().admission === "open",
       "SERVER_AT_CAPACITY",
       503,
     );
     const room = (
-      await this.core.database.db
+      await this.database.db
         .select({ id: s.rooms.id })
         .from(s.rooms)
         .where(eq(s.rooms.invitationCode, code))
@@ -78,7 +90,7 @@ export class RoomLifecycle {
   async current(actor: Actor): Promise<Contract<"CurrentRoomResponse">> {
     requireState(actor.account, "UNAUTHENTICATED", 401);
     const row = (
-      await this.core.database.db
+      await this.database.db
         .select()
         .from(s.rooms)
         .where(
@@ -90,10 +102,10 @@ export class RoomLifecycle {
     )[0];
     if (!row) return {};
     await this.expireRoom(row.id);
-    const room = await this.core.room(this.core.database.db, row.id, false);
+    const room = await this.access.room(this.database.db, row.id, false);
     if (room.closedAt) return {};
     const game = room.currentGameId
-      ? await this.games.game(this.core.database.db, room.currentGameId, false)
+      ? await this.games.game(this.database.db, room.currentGameId, false)
       : undefined;
     return {
       room: {
@@ -109,12 +121,15 @@ export class RoomLifecycle {
       },
     };
   }
-  async status(actor: Actor, roomId: string): Promise<Contract<"ControlStatus">> {
-    const room = await this.core.room(this.core.database.db, roomId, false);
-    this.core.host(room, actor, false);
+  async status(
+    actor: Actor,
+    roomId: string,
+  ): Promise<Contract<"ControlStatus">> {
+    const room = await this.access.room(this.database.db, roomId, false);
+    this.identity.host(room, actor, false);
     requireState(!room.closedAt, "ROOM_CLOSED", 410);
     const game = room.currentGameId
-      ? await this.games.game(this.core.database.db, room.currentGameId, false)
+      ? await this.games.game(this.database.db, room.currentGameId, false)
       : undefined;
     return {
       roomId,
@@ -135,14 +150,14 @@ export class RoomLifecycle {
     body: Contract<"TakeControl">,
   ): Promise<Contract<"Receipt">> {
     const hash = digest("takeControl", roomId, body);
-    return this.core.transaction(async (db) => {
-      const room = await this.core.room(db, roomId);
-      this.core.host(room, actor, false);
+    return this.transactions.transaction(async (db) => {
+      const room = await this.access.room(db, roomId);
+      this.identity.host(room, actor, false);
       const installed = equalProof(
         room.controllerCredentialHash,
         proof("room-control", roomId, body.proposedControlSecret),
       );
-      const receipt = await this.core.receipt(db, operationId, hash);
+      const receipt = await this.receipts.receipt(db, operationId, hash);
       if (receipt) {
         requireState(installed, "CONTROLLER_FENCED", 403);
         return receipt;
@@ -168,23 +183,28 @@ export class RoomLifecycle {
         await this.rooms.lobby(db, room, now);
       const generation = room.controllerGeneration + 1n;
       if (game?.status === "active") {
-        const updated = single(await db
-          .update(s.games)
-          .set({
-            controllerCredentialHash: proof(
-              "game-control",
-              game.id,
-              body.proposedControlSecret,
-            ),
-            controllerGeneration: generation,
-            controllerAcquiredAt: now.toISOString(),
-            stateVersion: game.stateVersion + 1n,
-            projectionVersion: game.projectionVersion + 1n,
-          })
-          .where(eq(s.games.id, game.id))
-          .returning(), "LIFECYCLE_UPDATED_ROW");
+        const updated = single(
+          await db
+            .update(s.games)
+            .set({
+              controllerCredentialHash: proof(
+                "game-control",
+                game.id,
+                body.proposedControlSecret,
+              ),
+              controllerGeneration: generation,
+              controllerAcquiredAt: now.toISOString(),
+              stateVersion: game.stateVersion + 1n,
+              projectionVersion: game.projectionVersion + 1n,
+            })
+            .where(eq(s.games.id, game.id))
+            .returning(),
+          "LIFECYCLE_UPDATED_ROW",
+        );
+        versionIncrement(game.stateVersion, updated.stateVersion);
+        versionIncrement(game.projectionVersion, updated.projectionVersion);
         game = updated;
-        await this.core.hint(db, roomId, 0n, game.id, game.projectionVersion);
+        await this.outbox.hint(db, roomId, 0n, game.id, game.projectionVersion);
       }
       const updated = await this.rooms.bump(
         db,
@@ -202,7 +222,7 @@ export class RoomLifecycle {
         },
         false,
       );
-      return this.core.saveReceipt(
+      return this.receipts.saveReceipt(
         db,
         updated,
         actor,
@@ -226,15 +246,15 @@ export class RoomLifecycle {
     body: Contract<"RoomMutation">,
   ): Promise<Contract<"Receipt">> {
     const hash = digest("openReplayLobby", roomId, body);
-    this.core.host(
-      await this.core.room(this.core.database.db, roomId, false),
+    this.identity.host(
+      await this.access.room(this.database.db, roomId, false),
       actor,
     );
     await this.games.preflight(roomId);
-    return this.core.transaction(async (db) => {
-      const room = await this.core.room(db, roomId);
-      this.core.host(room, actor);
-      const prior = await this.core.receipt(db, operationId, hash);
+    return this.transactions.transaction(async (db) => {
+      const room = await this.access.room(db, roomId);
+      this.identity.host(room, actor);
+      const prior = await this.receipts.receipt(db, operationId, hash);
       if (prior) return prior;
       const now = await freshTime(db);
       const game = await this.rooms.lobby(db, room, now);
@@ -244,7 +264,7 @@ export class RoomLifecycle {
         "STALE_ROOM_VERSION",
       );
       if (room.presentationMode === "lobby")
-        return this.core.saveReceipt(
+        return this.receipts.saveReceipt(
           db,
           room,
           actor,
@@ -257,7 +277,7 @@ export class RoomLifecycle {
       const updated = await this.rooms.bump(db, room, now, true, {
         presentationMode: "lobby",
       });
-      return this.core.saveReceipt(
+      return this.receipts.saveReceipt(
         db,
         updated,
         actor,
@@ -283,10 +303,10 @@ export class RoomLifecycle {
       account: actor.account.accountId,
       member: guest.member.id,
     });
-    return this.core.transaction(async (db) => {
-      const room = await this.core.room(db, roomId),
-        member = await this.core.membership(db, room, guest, false);
-      const prior = await this.core.receipt(db, operationId, hash);
+    return this.transactions.transaction(async (db) => {
+      const room = await this.access.room(db, roomId),
+        member = await this.access.membership(db, room, guest, false);
+      const prior = await this.receipts.receipt(db, operationId, hash);
       if (prior) return prior;
       requireState(
         !member.leftAt &&
@@ -296,7 +316,7 @@ export class RoomLifecycle {
         "MEMBERSHIP_REVOKED",
         403,
       );
-      await this.core.activeAccount(db, actor);
+      await this.identity.activeAccount(db, actor);
       const now = await freshTime(db);
       await this.rooms.lobby(db, room, now);
       requireState(room.presentationMode === "lobby", "LOBBY_NOT_OPEN");
@@ -305,22 +325,26 @@ export class RoomLifecycle {
           body.expectedReadyGeneration === room.lobbyGeneration,
         "STALE_MEMBER_VERSION",
       );
-      const existing = await this.core.members(db, roomId);
+      const existing = await this.access.members(db, roomId);
       requireState(
         !existing.some((m) => m.accountId === actor.account!.accountId),
         "ALREADY_JOINED",
       );
-      const updatedMember = single(await db
-        .update(s.roomMemberships)
-        .set({
-          accountId: actor.account!.accountId,
-          reconnectRevokedAt: now.toISOString(),
-          stateVersion: member.stateVersion + 1n,
-        })
-        .where(eq(s.roomMemberships.id, member.id))
-        .returning(), "LIFECYCLE_UPDATEDMEMBER_ROW");
+      const updatedMember = single(
+        await db
+          .update(s.roomMemberships)
+          .set({
+            accountId: actor.account!.accountId,
+            reconnectRevokedAt: now.toISOString(),
+            stateVersion: member.stateVersion + 1n,
+          })
+          .where(eq(s.roomMemberships.id, member.id))
+          .returning(),
+        "LIFECYCLE_UPDATEDMEMBER_ROW",
+      );
+      versionIncrement(member.stateVersion, updatedMember.stateVersion);
       const updated = await this.rooms.bump(db, room, now, true);
-      return this.core.saveReceipt(
+      return this.receipts.saveReceipt(
         db,
         updated,
         { ...actor, member },
@@ -345,12 +369,12 @@ export class RoomLifecycle {
       ...body,
       memberId: memberId ?? actor.member?.id ?? actor.account?.accountId,
     });
-    return this.core.transaction(async (db) => {
-      const room = await this.core.room(db, roomId);
-      if (action !== "leave") this.core.host(room, actor);
+    return this.transactions.transaction(async (db) => {
+      const room = await this.access.room(db, roomId);
+      if (action !== "leave") this.identity.host(room, actor);
       const member =
         action === "leave"
-          ? await this.core.membership(db, room, actor, false)
+          ? await this.access.membership(db, room, actor, false)
           : (
               await db
                 .select()
@@ -373,7 +397,7 @@ export class RoomLifecycle {
           "leave",
           hash,
         );
-      const prior = await this.core.receipt(db, operationId, hash);
+      const prior = await this.receipts.receipt(db, operationId, hash);
       if (prior) return prior;
       requireState(!room.closedAt, "ROOM_CLOSED", 410);
       requireState(
@@ -417,7 +441,7 @@ export class RoomLifecycle {
             ? !!member.removedAt
             : !!member.leftAt;
       if (noEffect)
-        return this.core.saveReceipt(
+        return this.receipts.saveReceipt(
           db,
           room,
           actor,
@@ -441,24 +465,34 @@ export class RoomLifecycle {
           );
         // A conditional claim release may already be clear; preserve its zero-row result.
         if (member.accountId)
-          await writtenAtMost(db
-            .update(s.accounts)
-            .set({ activeGameId: null, activeGameClaimedAt: null })
-            .where(
-              and(
-                eq(s.accounts.id, member.accountId),
-                eq(s.accounts.activeGameId, game.id),
-              ),
-            ).returning(), 1, "ACCOUNT_CLAIM_RELEASE_COUNT");
-        const changed = single(await db
-          .update(s.games)
-          .set({
-            stateVersion: game.stateVersion + 1n,
-            projectionVersion: game.projectionVersion + 1n,
-          })
-          .where(eq(s.games.id, game.id))
-          .returning(), "LIFECYCLE_CHANGED_ROW");
-        await this.core.hint(
+          await writtenAtMost(
+            db
+              .update(s.accounts)
+              .set({ activeGameId: null, activeGameClaimedAt: null })
+              .where(
+                and(
+                  eq(s.accounts.id, member.accountId),
+                  eq(s.accounts.activeGameId, game.id),
+                ),
+              )
+              .returning(),
+            1,
+            "ACCOUNT_CLAIM_RELEASE_COUNT",
+          );
+        const changed = single(
+          await db
+            .update(s.games)
+            .set({
+              stateVersion: game.stateVersion + 1n,
+              projectionVersion: game.projectionVersion + 1n,
+            })
+            .where(eq(s.games.id, game.id))
+            .returning(),
+          "LIFECYCLE_CHANGED_ROW",
+        );
+        versionIncrement(game.stateVersion, changed.stateVersion);
+        versionIncrement(game.projectionVersion, changed.projectionVersion);
+        await this.outbox.hint(
           db,
           roomId,
           0n,
@@ -475,11 +509,15 @@ export class RoomLifecycle {
           : action === "remove"
             ? { removedAt: now.toISOString() }
             : { leftAt: now.toISOString() };
-      const updatedMember = single(await db
-        .update(s.roomMemberships)
-        .set({ ...changes, stateVersion: member.stateVersion + 1n })
-        .where(eq(s.roomMemberships.id, member.id))
-        .returning(), "LIFECYCLE_UPDATEDMEMBER_ROW");
+      const updatedMember = single(
+        await db
+          .update(s.roomMemberships)
+          .set({ ...changes, stateVersion: member.stateVersion + 1n })
+          .where(eq(s.roomMemberships.id, member.id))
+          .returning(),
+        "LIFECYCLE_UPDATEDMEMBER_ROW",
+      );
+      versionIncrement(member.stateVersion, updatedMember.stateVersion);
       const updated = await this.rooms.bump(
         db,
         room,
@@ -488,7 +526,7 @@ export class RoomLifecycle {
         {},
         game?.status !== "active",
       );
-      return this.core.saveReceipt(
+      return this.receipts.saveReceipt(
         db,
         updated,
         action === "leave" ? { ...actor, member } : actor,
@@ -510,8 +548,8 @@ export class RoomLifecycle {
     name: string,
     hash: Buffer,
   ): Promise<Contract<"Receipt">> {
-    this.core.host(room, actor);
-    const prior = await this.core.receipt(db, operationId, hash);
+    this.identity.host(room, actor);
+    const prior = await this.receipts.receipt(db, operationId, hash);
     if (prior) return prior;
     requireState(!room.closedAt, "ROOM_CLOSED", 410);
     requireState(
@@ -533,7 +571,7 @@ export class RoomLifecycle {
           : "host_left",
       );
     const updated = await this.closeRows(db, room, now);
-    return this.core.saveReceipt(
+    return this.receipts.saveReceipt(
       db,
       updated,
       actor,
@@ -549,7 +587,8 @@ export class RoomLifecycle {
       .update(s.roomMemberships)
       .set({
         leftAt: now.toISOString(),
-        stateVersion: sql`${s.roomMemberships.stateVersion}+1`,
+        // Advance every live membership atomically within the closure transaction.
+        stateVersion: sql<bigint>`${s.roomMemberships.stateVersion}+1`,
       })
       .where(
         and(
@@ -571,11 +610,16 @@ export class RoomLifecycle {
     );
   }
   @scoped("lifecycle.close")
-  async close(actor: Actor, roomId: string, operationId: string, body: Contract<"RoomMutation">) {
-    return this.core.transaction(async (db) =>
+  async close(
+    actor: Actor,
+    roomId: string,
+    operationId: string,
+    body: Contract<"RoomMutation">,
+  ) {
+    return this.transactions.transaction(async (db) =>
       this.closeLocked(
         db,
-        await this.core.room(db, roomId),
+        await this.access.room(db, roomId),
         actor,
         operationId,
         body,
@@ -586,11 +630,11 @@ export class RoomLifecycle {
   }
   @scoped("lifecycle.expireRoom")
   async expireRoom(roomId: string) {
-    const initial = await this.core.room(this.core.database.db, roomId, false);
+    const initial = await this.access.room(this.database.db, roomId, false);
     if (initial.closedAt) return;
     if (initial.currentGameId) await this.games.expire(initial.currentGameId);
-    await this.core.transaction(async (db) => {
-      const room = await this.core.room(db, roomId);
+    await this.transactions.transaction(async (db) => {
+      const room = await this.access.room(db, roomId);
       if (room.closedAt) return;
       const game = room.currentGameId
           ? await this.games.game(db, room.currentGameId, false)
@@ -603,7 +647,9 @@ export class RoomLifecycle {
       );
       if (now.getTime() >= base + 86400000) {
         await this.closeRows(db, room, now);
-        this.core.afterCommit(db, () => log.info("rooms.expireRoom", { outcome: "expired" }));
+        this.transactions.afterCommit(db, () =>
+          log.info("rooms.expireRoom", { outcome: "expired" }),
+        );
       }
     });
   }

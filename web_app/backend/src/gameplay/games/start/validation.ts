@@ -1,5 +1,4 @@
-import { requireState } from "../../problem.js";
-
+import { requireState } from "../../platform/problem.js";
 import { revision } from "../../contract.js";
 import type { StartState } from "./types.js";
 export async function validateStart(state: StartState) {

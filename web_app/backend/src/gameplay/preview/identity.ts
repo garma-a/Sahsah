@@ -1,7 +1,7 @@
 import { SignJWT, jwtVerify } from "jose";
 import { z } from "zod";
-import type { PreviewOptions, VerifiedAccount } from "./ports.js";
-import { requireState } from "./problem.js";
+import type { PreviewOptions, VerifiedAccount } from "../platform/ports.js";
+import { requireState } from "../platform/problem.js";
 
 // Preview mode (ADR 0017) lets a browser that knows the shared passcode obtain
 // its own host account before login exists. It is never combined with real

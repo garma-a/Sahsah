@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { randomUUID } from "node:crypto";
 import { gameplayFixture, secret } from "./gameplay/fixture.mjs";
-import { proof } from "../dist/gameplay/proof.js";
+import { proof } from "../dist/gameplay/platform/proof.js";
 
 test(
   "binding preserves anonymous history; unopened replay restores its debit; overdue cleanup preserves effective time",

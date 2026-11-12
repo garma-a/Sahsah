@@ -1,21 +1,24 @@
-import { scoped, enrichContext, log, errorStack } from "./logging.js";
-import type { Contract } from "./contract.js";
-import { invariant } from "./invariant.js";
+import { DatabaseService } from "../../database/database.module.js";
+import { GameplayRuntime } from "../platform/runtime.js";
+import { scoped } from "../platform/logging.js";
+import type { Contract } from "../contract.js";
+import { invariant } from "../platform/invariant.js";
 import { Injectable } from "@nestjs/common";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { resolve } from "node:path";
 import type { RequestHandler } from "express";
-import * as s from "../database/schema/index.js";
-import { canonical } from "./proof.js";
-import { answerView, questionView, type Pin } from "./content.js";
-import { GameOperations } from "./games.js";
-import { ProjectionService } from "./projection.js";
-import { GameplayService, freshTime, type Actor } from "./service.js";
-import { requireState } from "./problem.js";
-import type { MediaObject, SignedMedia } from "./ports.js";
+import * as s from "../../database/schema/index.js";
+import { canonical } from "../platform/proof.js";
+import { answerView, questionView, type Pin } from "../games/content.js";
+import { GameOperations } from "../games/operations.js";
+import { ProjectionService } from "../games/projection.js";
+import { freshTime } from "../platform/clock.js";
+import type { Actor } from "../platform/types.js";
+import { requireState } from "../platform/problem.js";
+import type { MediaObject, SignedMedia } from "../platform/ports.js";
 
 export function r2Signer(
   env: NodeJS.ProcessEnv,
@@ -126,27 +129,33 @@ function refs(value: unknown): Contract<"MediaRef">[] {
   if (!value || typeof value !== "object") return [];
   if (Array.isArray(value)) return value.flatMap(refs);
   const obj = Object.fromEntries(Object.entries(value));
-  if (["image", "audio"].includes(String(obj.kind))) // Only typed question/answer presentations feed this recursive collector.
-  return [obj as Contract<"MediaRef">];
+  if (["image", "audio"].includes(String(obj.kind)))
+    // Only typed question/answer presentations feed this recursive collector.
+    return [obj as Contract<"MediaRef">];
   return Object.values(obj).flatMap(refs);
 }
 
 @Injectable()
 export class MediaService {
   constructor(
-    private core: GameplayService,
+    readonly runtime: GameplayRuntime,
+    readonly database: DatabaseService,
     private games: GameOperations,
     private projections: ProjectionService,
   ) {}
   @scoped("media.access")
-  async access(actor: Actor, gameId: string, body: Contract<"MediaRequest">): Promise<Contract<"MediaLinks">> {
+  async access(
+    actor: Actor,
+    gameId: string,
+    body: Contract<"MediaRequest">,
+  ): Promise<Contract<"MediaLinks">> {
     const requested = body.refs;
     requireState(
       new Set(requested.map(canonical)).size === requested.length,
       "DUPLICATE_MEDIA_REF",
       400,
     );
-    const result = await this.core.database.transaction(
+    const result = await this.database.transaction(
       async (db) => {
         const game = await this.games.game(db, gameId, false),
           now = await freshTime(db);
@@ -223,7 +232,7 @@ export class MediaService {
       },
       { consistentRead: true },
     );
-    const signer = this.core.options.signMedia;
+    const signer = this.runtime.options.signMedia;
     requireState(signer, "MEDIA_UNAVAILABLE", 503);
     const links = await Promise.all(
       result.objects.map(async ({ ref, asset }) => ({

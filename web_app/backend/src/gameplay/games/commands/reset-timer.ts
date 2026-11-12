@@ -1,16 +1,8 @@
 import { type Handler } from "../command-types.js";
-import { requireState } from "../../problem.js";
-import {
-  loadQuestion,
-  currentQuestion,
-  unrevealed,
-  answering,
-  running,
-  writeQuestion,
-  changed,
-} from "./question.js";
+import { requireState } from "../../platform/problem.js";
+import { loadQuestion, currentQuestion, unrevealed, answering, running, writeQuestion, changed } from "./question.js";
 export const reset_timer: Handler<"reset_timer"> = async (ctx) => {
-  const { body, game, now, db, operations, operationId } = ctx;
+  const { body, game, now } = ctx;
   const q = await loadQuestion(ctx, body);
   currentQuestion(game, q);
   unrevealed(q);

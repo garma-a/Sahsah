@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { randomUUID } from "node:crypto";
 import { gameplayFixture, secret } from "./gameplay/fixture.mjs";
-import { GameplayService } from "../dist/gameplay/service.js";
+import { GameplayService } from "../dist/gameplay/platform/runtime.js";
 import { createApplication } from "../dist/application.js";
 
 test(

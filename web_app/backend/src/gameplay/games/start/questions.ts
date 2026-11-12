@@ -1,7 +1,7 @@
 import * as s from "../../../database/schema/index.js";
-import { requireState } from "../../problem.js";
-import { written } from "../../invariant.js";
-import { points } from "../../content.js";
+import { requireState } from "../../platform/problem.js";
+import { written } from "../../platform/invariant.js";
+import { checkedQuestionColumns, points } from "../content.js";
 import { prepareQuestionMedia } from "./media.js";
 import type { StartState } from "./types.js";
 export async function copyQuestionSnapshots(state: StartState, gameId: string) {
@@ -36,13 +36,22 @@ export async function copyQuestionSnapshots(state: StartState, gameId: string) {
   }
   requireState(copied.length === 36, "CONTENT_NOT_READY");
   await written(
-    db.insert(s.gameQuestions).values(copied).returning(),
+    db
+      .insert(s.gameQuestions)
+      .values(copied)
+      .returning(checkedQuestionColumns),
     copied.length,
     "GAMEQUESTIONS_WRITE_COUNT",
   );
   if (pins.length)
     await written(
-      db.insert(s.gameQuestionMedia).values(pins).returning(),
+      db
+        .insert(s.gameQuestionMedia)
+        .values(pins)
+        .returning({
+          boardPosition: s.gameQuestionMedia.boardPosition,
+          questionPosition: s.gameQuestionMedia.questionPosition,
+        }),
       pins.length,
       "GAMEQUESTIONMEDIA_WRITE_COUNT",
     );

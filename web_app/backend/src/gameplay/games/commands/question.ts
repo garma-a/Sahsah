@@ -1,13 +1,9 @@
 import * as s from "../../../database/schema/index.js";
-import { remaining } from "../../content.js";
-import { single } from "../../invariant.js";
-import { requireState } from "../../problem.js";
-import type { Game, Question } from "../../service.js";
-import type {
-  ActionContext,
-  Command,
-  CommandEffect,
-} from "../command-types.js";
+import { checkedQuestionColumns, remaining } from "../content.js";
+import { single } from "../../platform/invariant.js";
+import { requireState } from "../../platform/problem.js";
+import type { Game, Question } from "../../platform/types.js";
+import type { ActionContext, Command, CommandEffect } from "../command-types.js";
 export type QuestionChanges = Partial<typeof s.gameQuestions.$inferInsert>;
 export async function loadQuestion(
   context: ActionContext,
@@ -78,7 +74,7 @@ export async function writeQuestion(
         .update(s.gameQuestions)
         .set(changes)
         .where(context.operations.slot(q))
-        .returning(),
+        .returning(checkedQuestionColumns),
       "GAMEQUESTIONS_WRITE_ROW",
     );
 }

@@ -1,6 +1,6 @@
 import { log } from "./logging.js";
 import { GameplayProblem, requireState } from "./problem.js";
-import type { Contract } from "./contract.js";
+import type { Contract } from "../contract.js";
 import type { PressureSample } from "./ports.js";
 export interface CapacityVector {
   rooms: number;
@@ -100,12 +100,11 @@ export class Admission {
       !this.occupancy ||
       !this.ceiling ||
       capacityKeys.some(
-        (key) =>
-          this.occupancy![key] >=
-          Math.floor(this.ceiling![key] * 0.85),
+        (key) => this.occupancy![key] >= Math.floor(this.ceiling![key] * 0.85),
       );
     const paused = this.closed || full;
-    if (paused && !this.loggedPaused) log.warn("platform.admission.availability", { code: "ADMISSION_PAUSED" });
+    if (paused && !this.loggedPaused)
+      log.warn("platform.admission.availability", { code: "ADMISSION_PAUSED" });
     this.loggedPaused = paused;
     return paused
       ? { admission: "paused", retryAfterSeconds: 15 }
@@ -126,7 +125,11 @@ export class Admission {
       return existing.promise as Promise<T>;
     }
     const kind = key.split(":")[0];
-    requireState(kind === "create" || kind === "join" || kind === "start", "INVALID_ALLOCATION", 500);
+    requireState(
+      kind === "create" || kind === "join" || kind === "start",
+      "INVALID_ALLOCATION",
+      500,
+    );
     const reserved = [...this.pending.values()].reduce(
       (counts, row) => ({
         rooms: counts.rooms + delta[row.kind].rooms,
@@ -155,8 +158,7 @@ export class Admission {
       .then(work)
       .then((value) => {
         if (this.occupancy)
-          for (const k of capacityKeys)
-            this.occupancy[k] += delta[kind][k];
+          for (const k of capacityKeys) this.occupancy[k] += delta[kind][k];
         this.revision++;
         return value;
       })

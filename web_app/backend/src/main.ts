@@ -1,6 +1,6 @@
 import { ConfigService } from "@nestjs/config";
 import { createApplication } from "./application.js";
-import { log, errorStack } from "./gameplay/logging.js";
+import { log, errorStack } from "./gameplay/platform/logging.js";
 
 async function bootstrap() {
   const app = await createApplication();

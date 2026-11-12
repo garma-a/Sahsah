@@ -10,12 +10,7 @@ import { reveal_answer } from "./commands/reveal-answer.js";
 import { resolve_question } from "./commands/resolve-question.js";
 import { adjust_score } from "./commands/adjust-score.js";
 import { end_game } from "./commands/end-game.js";
-import type {
-  ActionContext,
-  CommandBodies,
-  CommandName,
-  HandlerMap,
-} from "./command-types.js";
+import type { ActionContext, CommandBodies, CommandName, HandlerMap } from "./command-types.js";
 export const commands: HandlerMap = {
   open_question,
   return_to_board,

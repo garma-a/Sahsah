@@ -1,17 +1,15 @@
 import { eq } from "drizzle-orm";
-
 import * as s from "../../../database/schema/index.js";
-import { requireState } from "../../problem.js";
-
-import type { GameOperations } from "../../games.js";
-import type { Room, Tx } from "../../service.js";
+import { requireState } from "../../platform/problem.js";
+import type { GameOperations } from "../operations.js";
+import type { Room, Tx } from "../../platform/types.js";
 export async function loadStartRoster(
   operations: GameOperations,
   db: Tx,
   room: Room,
 ) {
   const roomId = room.id;
-  const roster = await operations.core.members(db, roomId);
+  const roster = await operations.access.members(db, roomId);
   requireState(
     roster.length > 0 &&
       roster.length <= 6 &&

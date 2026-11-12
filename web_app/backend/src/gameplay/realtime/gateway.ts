@@ -1,42 +1,54 @@
-import { log, withContext, errorStack } from "./logging.js";
+import { DatabaseService } from "../../database/database.module.js";
+import { GameplayOutbox } from "../platform/outbox.js";
+import { RoomAccess } from "../rooms/access.js";
+import { GameplayIdentity } from "../platform/identity.js";
+import { GameplayRuntime } from "../platform/runtime.js";
+import { log, withContext, errorStack } from "../platform/logging.js";
 import { type OnModuleDestroy } from "@nestjs/common";
-import {
-  WebSocketGateway,
-  type OnGatewayConnection,
-  type OnGatewayInit,
-} from "@nestjs/websockets";
+import { WebSocketGateway, type OnGatewayConnection, type OnGatewayInit } from "@nestjs/websockets";
 import { WsAdapter } from "@nestjs/platform-ws";
 import { WebSocket, type RawData, type WebSocketServer } from "ws";
 import { randomUUID } from "node:crypto";
 import { and, eq, isNull, sql } from "drizzle-orm";
-import * as s from "../database/schema/index.js";
-import { GameplayService, type Actor, type Member } from "./service.js";
-import { ProjectionService } from "./projection.js";
-import { GameOperations } from "./games.js";
-import { frame } from "./realtime-contract.js";
-import { canonical, equalProof, proof } from "./proof.js";
-import { questionView, answerView } from "./content.js";
-import { GameplayProblem, requireState } from "./problem.js";
-import { clientAddress } from "./http.js";
-import type { Contract } from "./contract.js";
-import type { RealtimeTypes } from "./contracts/realtime-types.js";
-import type { ServerFrame } from "./realtime-contract.js";
-import type { UnionFields } from "./content.js";
+import * as s from "../../database/schema/index.js";
+import type { Actor, Member } from "../platform/types.js";
+import { ProjectionService } from "../games/projection.js";
+import { GameOperations } from "../games/operations.js";
+import { frame } from "../realtime-contract.js";
+import { canonical, equalProof, proof } from "../platform/proof.js";
+import { GameplayProblem, requireState } from "../platform/problem.js";
+import { clientAddress } from "../platform/http.js";
+import type { Contract } from "../contract.js";
+import type { RealtimeTypes } from "../contracts/realtime-types.js";
+import type { ServerFrame } from "../realtime-contract.js";
+import type { UnionFields } from "../games/content.js";
 type Snapshot = Contract<"Snapshot">;
 type ServerPayload = UnionFields<ServerFrame["data"]>;
-
 import type { IncomingMessage } from "node:http";
 
 function viewerSnapshot(snapshot: Snapshot): Snapshot {
   const view = snapshot.view;
-  const { controls: _controls, feedback: _feedback, ...publicView } = { controls: undefined, feedback: undefined, ...view };
-  const result: UnionFields<Snapshot["view"]> = { ...publicView, audience: "viewer" };
+  const {
+    controls: _controls,
+    feedback: _feedback,
+    ...publicView
+  } = { controls: undefined, feedback: undefined, ...view };
+  const result: UnionFields<Snapshot["view"]> = {
+    ...publicView,
+    audience: "viewer",
+  };
   if ("question" in view) {
-    const { audio: _audio, ...question } = { audio: undefined, ...view.question };
+    const { audio: _audio, ...question } = {
+      audio: undefined,
+      ...view.question,
+    };
     result.question = question;
   }
   if ("answer" in view) {
-    const { forwardAudio: _forward, ...answer } = { forwardAudio: undefined, ...view.answer };
+    const { forwardAudio: _forward, ...answer } = {
+      forwardAudio: undefined,
+      ...view.answer,
+    };
     result.answer = answer;
   }
   // Removing host-only fields preserves the corresponding viewer contract branch.
@@ -156,24 +168,49 @@ export class GameplayRealtime
   private timer?: ReturnType<typeof setInterval>;
   private server?: WebSocketServer;
   constructor(
-    private core: GameplayService,
+    readonly runtime: GameplayRuntime,
+    readonly identity: GameplayIdentity,
+    readonly access: RoomAccess,
+    readonly outbox: GameplayOutbox,
+    readonly database: DatabaseService,
     private projections: ProjectionService,
     private games: GameOperations,
   ) {}
   afterInit(server: WebSocketServer) {
     this.server = server;
-    this.core.onCommitted = (roomId) => this.invalidate(roomId);
-    this.timer = setInterval(() => withContext("realtime.tick", () => this.tick(), { requestId: randomUUID() }), 1000);
+    this.outbox.onCommitted = (roomId) => this.invalidate(roomId);
+    this.timer = setInterval(
+      () =>
+        withContext("realtime.tick", () => this.tick(), {
+          requestId: randomUUID(),
+        }),
+      1000,
+    );
     this.timer.unref();
   }
   handleConnection(socket: WebSocket, request: IncomingMessage) {
     const connectionId = randomUUID();
     let connection: Connection | undefined;
-    const socketContext = () => ({ requestId: connectionId, roomId: connection?.roomId, gameId: connection?.gameId, accountId: connection?.actor?.account?.accountId });
-    withContext("realtime.handleConnection", () => log.info("realtime.handleConnection", { outcome: "open" }), socketContext());
-    socket.once("close", (closeCode) => withContext("realtime.close", () => log.info("realtime.close", { closeCode }), socketContext()));
+    const socketContext = () => ({
+      requestId: connectionId,
+      roomId: connection?.roomId,
+      gameId: connection?.gameId,
+      accountId: connection?.actor?.account?.accountId,
+    });
+    withContext(
+      "realtime.handleConnection",
+      () => log.info("realtime.handleConnection", { outcome: "open" }),
+      socketContext(),
+    );
+    socket.once("close", (closeCode) =>
+      withContext(
+        "realtime.close",
+        () => log.info("realtime.close", { closeCode }),
+        socketContext(),
+      ),
+    );
     if (
-      !this.core.options.enabled ||
+      !this.runtime.options.enabled ||
       [...this.connections].filter((c) => !c.actor).length >= 64 ||
       this.connections.size >= 1200
     ) {
@@ -224,7 +261,11 @@ export class GameplayRealtime
       }
       c.tokens--;
       c.queue.push(raw);
-      void withContext("realtime.consume", () => this.consume(c), socketContext());
+      void withContext(
+        "realtime.consume",
+        () => this.consume(c),
+        socketContext(),
+      );
     });
   }
   current(c: Connection) {
@@ -257,14 +298,16 @@ export class GameplayRealtime
             401,
           );
           if (refresh)
-            await this.core.scheduler.run("protected", () => this.authority(c));
-          const actor = await this.core.scheduler.run(
-            this.core.knownCredential(String(message.data.authorization))
+            await this.runtime.scheduler.run("protected", () =>
+              this.authority(c),
+            );
+          const actor = await this.runtime.scheduler.run(
+            this.identity.knownCredential(String(message.data.authorization))
               ? "protected"
               : "public",
-            () => this.core.identity(String(message.data.authorization)),
+            () => this.identity.identity(String(message.data.authorization)),
           );
-          await this.core.scheduler.run("protected", () =>
+          await this.runtime.scheduler.run("protected", () =>
             this.authenticate(
               c,
               refresh
@@ -276,7 +319,7 @@ export class GameplayRealtime
           );
         } else {
           requireState(c.actor, "AUTHENTICATE_FIRST", 401);
-          await this.core.scheduler.run("protected", async () => {
+          await this.runtime.scheduler.run("protected", async () => {
             await this.authority(c);
             if (!this.current(c)) return;
             if (message.event === "set_language") {
@@ -296,48 +339,43 @@ export class GameplayRealtime
         }
       }
     } catch (error) {
-      this.stop(
-        c,
-        "protocol_error",
-        error instanceof GameplayProblem ? error.code : "PROTOCOL_FAILURE",
-      );
+      const code =
+        error instanceof GameplayProblem ? error.code : "PROTOCOL_FAILURE";
+      if (error instanceof GameplayProblem)
+        log.warn("realtime.consume", { code });
+      else log.error("realtime.consume", { code, stack: errorStack(error) });
+      this.stop(c, "protocol_error", code);
     } finally {
       c.busy = false;
     }
   }
   private async authenticate(
     c: Connection,
-    data: Omit<RealtimeTypes["ClientAuthenticateData"], "roomId" | "language" | "protocolVersion"> & { roomId?: string; language?: Contract<"Language"> },
+    data: Omit<
+      RealtimeTypes["ClientAuthenticateData"],
+      "roomId" | "language" | "protocolVersion"
+    > & { roomId?: string; language?: Contract<"Language"> },
     refresh: boolean,
     actor: Actor,
   ) {
-    const room = await this.core.room(
-      this.core.database.db,
+    const room = await this.access.room(
+      this.database.db,
       String(data.roomId),
       false,
     );
     actor.controlSecret = data.controllerSecret;
     actor.generation = room.controllerGeneration;
-    const member = await this.core.membership(
-      this.core.database.db,
-      room,
-      actor,
-    );
+    const member = await this.access.membership(this.database.db, room, actor);
     if (actor.account?.accountId === room.ownerAccountId)
-      this.core.host(room, actor);
+      this.identity.host(room, actor);
     if (room.currentGameId && room.presentationMode === "game") {
       const game = await this.games.game(
-        this.core.database.db,
+        this.database.db,
         room.currentGameId,
         false,
       );
       if (game.status === "active")
-        await this.projections.authorize(
-          this.core.database.db,
-          game,
-          actor,
-          false,
-        );
+        await this.projections.authorize(this.database.db, game, actor, false);
     }
     requireState(this.current(c), "STREAM_REPLACED", 403);
     if (refresh)
@@ -383,13 +421,14 @@ export class GameplayRealtime
   private async fence(roomId: string) {
     // One SQL statement supplies a consistent source vector and all current
     // grants. Bigint/bytea decoding stays in Drizzle instead of lossy JSON casts.
-    const rows = await this.core.database.db
+    const rows = await this.database.db
       .select({
         room: s.rooms,
         game: s.games,
         member: s.roomMemberships,
         state: s.accounts.state,
-        now: sql<string>`clock_timestamp()`,
+        // Wall time shares the source-vector SQL statement; pg decodes timestamptz as Date.
+        now: sql<Date>`clock_timestamp()`,
       })
       .from(s.rooms)
       .leftJoin(s.games, eq(s.games.id, s.rooms.currentGameId))
@@ -450,7 +489,7 @@ export class GameplayRealtime
         401,
       );
     if (actor.account?.accountId === room.ownerAccountId) {
-      this.core.host(room, actor);
+      this.identity.host(room, actor);
       if (game?.status === "active") this.games.host(game, actor);
     }
   }
@@ -476,10 +515,13 @@ export class GameplayRealtime
       room.running = true;
       this.activeBuilds++;
       let failed = false;
-      void this.core.scheduler
+      void this.runtime.scheduler
         .run("protected", () => this.publish(roomId, room))
         .catch((error) => {
-          log.warn("realtime.pump", { code: "IN_PROCESS_PUSH_FAILED", stack: errorStack(error) });
+          log.warn("realtime.pump", {
+            code: "IN_PROCESS_PUSH_FAILED",
+            stack: errorStack(error),
+          });
           failed = true;
           if (this.rooms.has(roomId)) this.pendingRooms.add(roomId);
         })
@@ -496,7 +538,6 @@ export class GameplayRealtime
     }
   }
   private async publish(roomId: string, stream: RoomStream) {
-    log.debug("realtime.publish", { count: [...this.members.values()].filter((c) => c.roomId === roomId).length });
     try {
       for (
         let pass = 0;
@@ -508,9 +549,14 @@ export class GameplayRealtime
           (c) => c.roomId === roomId && this.current(c),
         );
         if (!recipients.length) break;
+        log.debug("realtime.publish", { count: recipients.length });
         const groups = new Map<
           string,
-          { actor: Actor; language: Contract<"Language">; recipients: Connection[] }
+          {
+            actor: Actor;
+            language: Contract<"Language">;
+            recipients: Connection[];
+          }
         >();
         const initial = await this.fence(roomId);
         for (const c of recipients) {
@@ -564,7 +610,7 @@ export class GameplayRealtime
               ),
             };
             stream.cache.set(group.language, cached);
-            this.core.metrics.projections++;
+            this.runtime.metrics.projections++;
           }
           built.push({
             value: host ? cached.value : viewerSnapshot(cached.value),
@@ -623,7 +669,7 @@ export class GameplayRealtime
               this.check(c.actor!, c.memberId!, latest);
               survivors++;
             } catch (revoked) {
-              this.core.forgetCredential(c.actor!);
+              this.identity.forgetCredential(c.actor!);
               this.revoke(c, revoked);
             }
           }
@@ -690,8 +736,12 @@ export class GameplayRealtime
     const snapshot = await this.projections.room(c.actor!, room.id, c.language),
       view = snapshot.view;
     const permitted = [
-      ("question" in view && "audio" in view.question ? view.question.audio : undefined),
-      ("answer" in view && "forwardAudio" in view.answer ? view.answer.forwardAudio : undefined),
+      "question" in view && "audio" in view.question
+        ? view.question.audio
+        : undefined,
+      "answer" in view && "forwardAudio" in view.answer
+        ? view.answer.forwardAudio
+        : undefined,
     ].filter(Boolean);
     requireState(
       permitted.some((r) => canonical(r) === canonical(data.media)),
@@ -699,7 +749,7 @@ export class GameplayRealtime
       403,
     );
     const media = data.media;
-    const metadata = await this.core.database.db
+    const metadata = await this.database.db
       .select({ duration: s.mediaAssets.durationMs })
       .from(s.gameQuestionMedia)
       .innerJoin(
@@ -714,10 +764,7 @@ export class GameplayRealtime
             s.gameQuestionMedia.questionPosition,
             Number(media.questionPosition),
           ),
-          eq(
-            s.gameQuestionMedia.mediaRole,
-            media.role,
-          ),
+          eq(s.gameQuestionMedia.mediaRole, media.role),
           eq(s.gameQuestionMedia.variantNumber, 0),
         ),
       );
@@ -740,7 +787,11 @@ export class GameplayRealtime
     stream.playbackSource = canonical(snapshot.source);
     this.invalidate(c.roomId!);
   }
-  private send(c: Connection, event: ServerFrame["event"], data: ServerPayload) {
+  private send(
+    c: Connection,
+    event: ServerFrame["event"],
+    data: ServerPayload,
+  ) {
     if (c.closed || c.socket.readyState !== WebSocket.OPEN) return;
     if (c.socket.bufferedAmount > 262144) {
       c.socket.terminate();
@@ -771,8 +822,20 @@ export class GameplayRealtime
   private revoke(c: Connection, e: unknown) {
     const code =
       e instanceof GameplayProblem ? e.code : "PROJECTION_UNAVAILABLE";
-    if (e instanceof GameplayProblem) log.warn("realtime.revoke", { code });
-    else log.error("realtime.revoke", { code, stack: errorStack(e) });
+    withContext(
+      "realtime.revoke",
+      () => {
+        if (e instanceof GameplayProblem)
+          log.warn("realtime.revoke", { code });
+        else log.error("realtime.revoke", { code, stack: errorStack(e) });
+      },
+      {
+        requestId: c.streamId,
+        roomId: c.roomId,
+        gameId: c.gameId,
+        accountId: c.actor?.account?.accountId,
+      },
+    );
     this.stop(
       c,
       code === "CONTROLLER_FENCED"

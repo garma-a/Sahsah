@@ -1,10 +1,8 @@
 import { inArray } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import * as s from "../../../database/schema/index.js";
-
-import { single } from "../../invariant.js";
-
-import type { Game } from "../../service.js";
+import { single } from "../../platform/invariant.js";
+import type { Game } from "../../platform/types.js";
 import type { StartState } from "./types.js";
 export async function finishStart(state: StartState, game: Game) {
   const {
@@ -51,14 +49,14 @@ export async function finishStart(state: StartState, game: Game) {
     { currentGameId: gameId, presentationMode: "game" },
     false,
   );
-  await operations.core.hint(
+  await operations.outbox.hint(
     db,
     roomId,
     updated.stateVersion,
     game.id,
     game.projectionVersion,
   );
-  return operations.core.saveReceipt(
+  return operations.receipts.saveReceipt(
     db,
     updated,
     actor,
