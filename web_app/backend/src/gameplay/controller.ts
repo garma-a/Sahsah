@@ -1,38 +1,29 @@
-import {
-  Body,
-  Controller,
-  Get,
-  HttpCode,
-  Param,
-  Patch,
-  Post,
-  Put,
-  Query,
-  Req,
-  SerializeOptions,
-  StandardSchemaSerializerInterceptor,
-  UseFilters,
-  UseInterceptors,
-} from "@nestjs/common";
+import { RoomCreation } from "./rooms/create.js";
+import { RoomReceipts } from "./platform/receipts.js";
+import { GameplayIdentity } from "./platform/identity.js";
+import { GameplayRuntime } from "./platform/runtime.js";
+import { Body, Controller, Get, HttpCode, Param, Patch, Post, Put, Query, Req, SerializeOptions, StandardSchemaSerializerInterceptor, UseFilters, UseInterceptors } from "@nestjs/common";
 import type { Request } from "express";
 import { id, position, schemas } from "./contract.js";
-import { GameplayProblemFilter } from "./problem.js";
-import { GameplayService } from "./service.js";
+import { GameplayProblemFilter } from "./platform/problem.js";
 import type { Contract } from "./contract.js";
-import { RoomOperations } from "./rooms.js";
-import { ProjectionService } from "./projection.js";
-import { GameOperations } from "./games.js";
-import { CatalogService } from "./catalog.js";
-import { RoomLifecycle } from "./lifecycle.js";
-import { MediaService } from "./media.js";
-import { GameplayHttpInterceptor } from "./http.js";
+import { RoomOperations } from "./rooms/operations.js";
+import { ProjectionService } from "./games/projection.js";
+import { GameOperations } from "./games/operations.js";
+import { CatalogService } from "./catalog/catalog.js";
+import { RoomLifecycle } from "./rooms/lifecycle.js";
+import { MediaService } from "./media/media.js";
+import { GameplayHttpInterceptor } from "./platform/http.js";
 
 @Controller("v1")
 @UseFilters(GameplayProblemFilter)
 @UseInterceptors(GameplayHttpInterceptor, StandardSchemaSerializerInterceptor)
 export class GameplayController {
   constructor(
-    private service: GameplayService,
+    readonly runtime: GameplayRuntime,
+    readonly identity: GameplayIdentity,
+    readonly receipts: RoomReceipts,
+    readonly creation: RoomCreation,
     private rooms: RoomOperations,
     private projections: ProjectionService,
     private games: GameOperations,
@@ -53,7 +44,7 @@ export class GameplayController {
     @Query() query: Record<string, unknown>,
   ) {
     return this.catalog.packs(
-      req.headers.authorization ? await this.service.actor(req) : undefined,
+      req.headers.authorization ? await this.identity.actor(req) : undefined,
       id(categoryId),
       query,
     );
@@ -61,8 +52,8 @@ export class GameplayController {
   @Get("gameplay/availability")
   @SerializeOptions({ schema: schemas.Availability })
   availability() {
-    this.service.enabled();
-    return this.service.admission.availability();
+    this.runtime.enabled();
+    return this.runtime.admission.availability();
   }
   @Post("rooms")
   @SerializeOptions({ schema: schemas.CreateRoomReceipt })
@@ -70,15 +61,15 @@ export class GameplayController {
     @Req() req: Request,
     @Body({ schema: schemas.CreateRoom }) body: Contract<"CreateRoom">,
   ) {
-    const actor = await this.service.actor(req),
-      operationId = this.service.operation(req);
+    const actor = await this.identity.actor(req),
+      operationId = this.receipts.operation(req);
     await this.lifecycle.prepareCreate(actor, operationId);
-    return this.service.create(actor, operationId, body);
+    return this.creation.create(actor, operationId, body);
   }
   @Get("rooms/:roomId/invitation")
   @SerializeOptions({ schema: schemas.Invitation })
   async invitation(@Req() req: Request, @Param("roomId") roomId: string) {
-    return this.rooms.invitation(await this.service.actor(req), id(roomId));
+    return this.rooms.invitation(await this.identity.actor(req), id(roomId));
   }
   @Get("room-invitations/:code")
   @SerializeOptions({ schema: schemas.InvitationPreview })
@@ -93,15 +84,17 @@ export class GameplayController {
     @Body({ schema: schemas.JoinRoom }) body: Contract<"JoinRoom">,
   ) {
     const actor =
-        body.identity === "account" ? await this.service.actor(req) : undefined,
-      operationId = this.service.operation(req);
+        body.identity === "account"
+          ? await this.identity.actor(req)
+          : undefined,
+      operationId = this.receipts.operation(req);
     await this.lifecycle.prepareJoin(code, operationId);
     return this.rooms.join(code, actor, operationId, body);
   }
   @Get("rooms/current")
   @SerializeOptions({ schema: schemas.CurrentRoomResponse })
   async current(@Req() req: Request) {
-    return this.lifecycle.current(await this.service.actor(req));
+    return this.lifecycle.current(await this.identity.actor(req));
   }
   @Get("rooms/:roomId")
   @SerializeOptions({ schema: schemas.Snapshot })
@@ -111,7 +104,7 @@ export class GameplayController {
     @Query("language") language?: string,
   ) {
     return this.projections.room(
-      await this.service.actor(req),
+      await this.identity.actor(req),
       id(roomId),
       language,
     );
@@ -125,9 +118,9 @@ export class GameplayController {
     @Body({ schema: schemas.RoomMutation }) body: Contract<"RoomMutation">,
   ) {
     return this.rooms.rotate(
-      await this.service.actor(req),
+      await this.identity.actor(req),
       id(roomId),
-      this.service.operation(req),
+      this.receipts.operation(req),
       body,
     );
   }
@@ -139,9 +132,9 @@ export class GameplayController {
     @Body({ schema: schemas.Ready }) body: Contract<"Ready">,
   ) {
     return this.rooms.memberChange(
-      await this.service.actor(req),
+      await this.identity.actor(req),
       id(roomId),
-      this.service.operation(req),
+      this.receipts.operation(req),
       body,
       true,
     );
@@ -154,9 +147,9 @@ export class GameplayController {
     @Body({ schema: schemas.MemberPatch }) body: Contract<"MemberPatch">,
   ) {
     return this.rooms.memberChange(
-      await this.service.actor(req),
+      await this.identity.actor(req),
       id(roomId),
-      this.service.operation(req),
+      this.receipts.operation(req),
       body,
       false,
     );
@@ -169,9 +162,9 @@ export class GameplayController {
     @Body({ schema: schemas.SaveSetup }) body: Contract<"SaveSetup">,
   ) {
     return this.rooms.saveSetup(
-      await this.service.actor(req),
+      await this.identity.actor(req),
       id(roomId),
-      this.service.operation(req),
+      this.receipts.operation(req),
       body,
     );
   }
@@ -183,9 +176,9 @@ export class GameplayController {
     @Body({ schema: schemas.StartGame }) body: Contract<"StartGame">,
   ) {
     return this.games.start(
-      await this.service.actor(req),
+      await this.identity.actor(req),
       id(roomId),
-      this.service.operation(req),
+      this.receipts.operation(req),
       body,
     );
   }
@@ -197,7 +190,7 @@ export class GameplayController {
     @Query("language") language?: string,
   ) {
     return this.projections.game(
-      await this.service.actor(req),
+      await this.identity.actor(req),
       id(gameId),
       language,
     );
@@ -210,7 +203,7 @@ export class GameplayController {
     @Query("language") language?: string,
   ) {
     return this.projections.game(
-      await this.service.actor(req),
+      await this.identity.actor(req),
       id(gameId),
       language,
       true,
@@ -225,9 +218,9 @@ export class GameplayController {
     @Body({ schema: schemas.GameCommand }) body: Contract<"GameCommand">,
   ) {
     return this.games.command(
-      await this.service.actor(req),
+      await this.identity.actor(req),
       id(gameId),
-      this.service.operation(req),
+      this.receipts.operation(req),
       body,
     );
   }
@@ -238,21 +231,22 @@ export class GameplayController {
     @Param("gameId") gameId: string,
     @Param("boardPosition") board: string,
     @Param("questionPosition") question: string,
-    @Body({ schema: schemas.FeedbackRequest }) body: Contract<"FeedbackRequest">,
+    @Body({ schema: schemas.FeedbackRequest })
+    body: Contract<"FeedbackRequest">,
   ) {
     return this.games.feedback(
-      await this.service.actor(req),
+      await this.identity.actor(req),
       id(gameId),
       position(board),
       position(question),
-      this.service.operation(req),
+      this.receipts.operation(req),
       body,
     );
   }
   @Get("rooms/:roomId/control")
   @SerializeOptions({ schema: schemas.ControlStatus })
   async control(@Req() req: Request, @Param("roomId") roomId: string) {
-    return this.lifecycle.status(await this.service.actor(req), id(roomId));
+    return this.lifecycle.status(await this.identity.actor(req), id(roomId));
   }
   @Post("rooms/:roomId/control")
   @HttpCode(200)
@@ -263,9 +257,9 @@ export class GameplayController {
     @Body({ schema: schemas.TakeControl }) body: Contract<"TakeControl">,
   ) {
     return this.lifecycle.takeover(
-      await this.service.actor(req),
+      await this.identity.actor(req),
       id(roomId),
-      this.service.operation(req),
+      this.receipts.operation(req),
       body,
     );
   }
@@ -278,9 +272,9 @@ export class GameplayController {
     @Body({ schema: schemas.RoomMutation }) body: Contract<"RoomMutation">,
   ) {
     return this.lifecycle.replay(
-      await this.service.actor(req),
+      await this.identity.actor(req),
       id(roomId),
-      this.service.operation(req),
+      this.receipts.operation(req),
       body,
     );
   }
@@ -293,9 +287,9 @@ export class GameplayController {
     @Body({ schema: schemas.RoomMutation }) body: Contract<"RoomMutation">,
   ) {
     return this.lifecycle.close(
-      await this.service.actor(req),
+      await this.identity.actor(req),
       id(roomId),
-      this.service.operation(req),
+      this.receipts.operation(req),
       body,
     );
   }
@@ -308,9 +302,9 @@ export class GameplayController {
     @Body({ schema: schemas.Departure }) body: Contract<"Departure">,
   ) {
     return this.lifecycle.memberAction(
-      await this.service.actor(req),
+      await this.identity.actor(req),
       id(roomId),
-      this.service.operation(req),
+      this.receipts.operation(req),
       body,
       "leave",
     );
@@ -325,9 +319,9 @@ export class GameplayController {
     @Body({ schema: schemas.RoomMutation }) body: Contract<"RoomMutation">,
   ) {
     return this.lifecycle.memberAction(
-      await this.service.actor(req),
+      await this.identity.actor(req),
       id(roomId),
-      this.service.operation(req),
+      this.receipts.operation(req),
       body,
       "remove",
       id(memberId),
@@ -343,9 +337,9 @@ export class GameplayController {
     @Body({ schema: schemas.RoomMutation }) body: Contract<"RoomMutation">,
   ) {
     return this.lifecycle.memberAction(
-      await this.service.actor(req),
+      await this.identity.actor(req),
       id(roomId),
-      this.service.operation(req),
+      this.receipts.operation(req),
       body,
       "unblock",
       id(memberId),
@@ -360,10 +354,10 @@ export class GameplayController {
     @Body({ schema: schemas.Binding }) body: Contract<"Binding">,
   ) {
     return this.lifecycle.bind(
-      await this.service.actor(req),
-      await this.service.identity(String(req.headers["x-guest-proof"] ?? "")),
+      await this.identity.actor(req),
+      await this.identity.identity(String(req.headers["x-guest-proof"] ?? "")),
       id(roomId),
-      this.service.operation(req),
+      this.receipts.operation(req),
       body,
     );
   }
@@ -375,6 +369,6 @@ export class GameplayController {
     @Param("gameId") gameId: string,
     @Body({ schema: schemas.MediaRequest }) body: Contract<"MediaRequest">,
   ) {
-    return this.media.access(await this.service.actor(req), id(gameId), body);
+    return this.media.access(await this.identity.actor(req), id(gameId), body);
   }
 }

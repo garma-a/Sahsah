@@ -4,7 +4,7 @@ import HealthModule from "./health/health.module.js";
 import DatabaseModule from "./database/database.module.js";
 import GameplayModule from "./gameplay/gameplay.module.js";
 import { LoggerModule } from "nestjs-pino";
-import { rootLogger } from "./gameplay/logging.js";
+import { rootLogger } from "./gameplay/platform/logging.js";
 
 @Module({
   imports: [ConfigModule.forRoot({ isGlobal: true }), LoggerModule.forRootAsync({

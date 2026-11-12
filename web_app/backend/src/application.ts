@@ -1,17 +1,18 @@
+import { GameplayRuntime } from "./gameplay/platform/runtime.js";
 import "reflect-metadata";
 import { StandardSchemaValidationPipe, ValidationPipe } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { NestFactory } from "@nestjs/core";
 import AppModule from "./app.module.js";
 import { mountAdminDashboard } from "./admin/admin-dashboard.js";
-import { GameplayService } from "./gameplay/service.js";
-import type { GameplayOptions } from "./gameplay/ports.js";
-import { localMedia, publicMediaBaseUrl, r2Signer } from "./gameplay/media.js";
-import { trustedProxyHops } from "./gameplay/http.js";
-import { GameplayWsAdapter } from "./gameplay/realtime.js";
+
+import type { GameplayOptions } from "./gameplay/platform/ports.js";
+import { localMedia, publicMediaBaseUrl, r2Signer } from "./gameplay/media/media.js";
+import { trustedProxyHops } from "./gameplay/platform/http.js";
+import { GameplayWsAdapter } from "./gameplay/realtime/gateway.js";
 import { json, type ErrorRequestHandler } from "express";
 import { PinoLogger } from "nestjs-pino";
-import { currentRequestId, requestLogging, SafeNestLogger, log } from "./gameplay/logging.js";
+import { currentRequestId, requestLogging, SafeNestLogger, log } from "./gameplay/platform/logging.js";
 
 export async function createApplication(
   options: { gameplay?: GameplayOptions } = {},
@@ -28,7 +29,7 @@ export async function createApplication(
   const gameplay =
       options.gameplay?.enabled ?? process.env.GAMEPLAY_ENABLED === "true",
     local = gameplay ? localMedia(process.env) : undefined;
-  app.get(GameplayService).configure({
+  app.get(GameplayRuntime).configure({
     ...options.gameplay,
     signMedia:
       options.gameplay?.signMedia ??
@@ -60,6 +61,7 @@ export async function createApplication(
       "X-Control-Secret",
       "X-Controller-Generation",
       "X-Guest-Proof",
+      "X-Request-Id",
     ],
     exposedHeaders: ["X-Request-ID", "Retry-After"],
   });
