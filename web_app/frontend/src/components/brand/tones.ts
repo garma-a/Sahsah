@@ -21,6 +21,11 @@ export const tones: Tone[] = [
   { border: "border-sun", ribbon: "bg-sun text-ink", tile: "bg-teal text-white", rule: "bg-maroon" },
 ];
 
+/** The two teams keep one colour everywhere: setup cards, lobby columns, tile winners and scores. */
+export function teamTone(number: number): { fill: string; edge: string } {
+  return number === 1 ? { fill: "bg-cyan text-ink", edge: "border-cyan" } : { fill: "bg-sun text-ink", edge: "border-sun" };
+}
+
 export function toneAt(index: number): Tone {
   return tones[((index % tones.length) + tones.length) % tones.length];
 }
