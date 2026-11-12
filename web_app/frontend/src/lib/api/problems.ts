@@ -26,7 +26,7 @@ const byCode: Record<string, string> = {
   // rooms and joining
   ROOM_ALREADY_OPEN: "عندك غرفة مفتوحة بالفعل.",
   ACCOUNT_ALREADY_PLAYING: "إنت داخل لعبة تانية دلوقتي.",
-  ROOM_FULL: "الغرفة اتملت. أقصى عدد ٦ لاعبين.",
+  ROOM_FULL: "الغرفة اتملت. بتاخد ٥ لاعبين غير المضيف.",
   ROOM_CLOSED: "الغرفة اتقفلت.",
   ROOM_EXPIRED: "الغرفة انتهت. اطلب من المضيف كود جديد.",
   INVITATION_EXPIRED: "الكود انتهى. اطلب من المضيف كود جديد.",

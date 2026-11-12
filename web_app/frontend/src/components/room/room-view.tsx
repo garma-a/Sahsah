@@ -10,13 +10,17 @@ import PlayerLobby from "@/components/room/player-lobby";
 import RoomShell from "@/components/room/room-shell";
 import Scoreboard from "@/components/room/scoreboard";
 import Button from "@/components/ui/button";
-import { ApiError, type Auth } from "@/lib/api/client";
+import ErrorBanner from "@/components/ui/error-banner";
+import StatusCard from "@/components/ui/status-card";
+import { type Auth } from "@/lib/api/client";
 import { closeRoom, executeCommand, getControlStatus, previewSession, takeControl } from "@/lib/api/endpoints";
-import type { BoardView, Category, LobbyView, QuestionView } from "@/lib/api/types";
-import { newSecret } from "@/lib/ids";
+import { isConflict, messageOf, requireField } from "@/lib/api/errors";
+import type { BoardView, Category, GameCommand, LobbyView, QuestionView } from "@/lib/api/types";
+import { newOperationId, newSecret } from "@/lib/ids";
 import { loadRoster, saveRoster } from "@/lib/roster";
 import { useRoomChannel, type RoomChannel } from "@/lib/realtime/use-room-channel";
 import { useCategories } from "@/lib/use-categories";
+import { useIntentKeys } from "@/lib/use-intent-keys";
 import { useIdentity, useIdentityApi } from "@/providers/game-store-provider";
 
 type CategoryIndex = ReadonlyMap<string, { category: Category; index: number }>;
@@ -40,7 +44,7 @@ export default function RoomView({ roomId }: { roomId: string }) {
   if (!hydrated) {
     return (
       <RoomShell covers={covers}>
-        <Centered>ثانية…</Centered>
+        <StatusCard title="ثانية…" busy />
       </RoomShell>
     );
   }
@@ -53,24 +57,6 @@ export default function RoomView({ roomId }: { roomId: string }) {
     return <LiveRoom key={roomId} roomId={roomId} auth={auth} role="guest" membershipId={seat.membershipId} covers={covers} categories={categories} />;
   }
   return <Claim roomId={roomId} covers={covers} signedIn={Boolean(host)} />;
-}
-
-function Centered({ children }: { children: React.ReactNode }) {
-  return (
-    <div role="status" className="paper-card m-auto rounded-3xl border-4 border-ink px-10 py-8 text-center font-heading text-4xl shadow-[0_8px_0_var(--color-ink)]">
-      {children}
-    </div>
-  );
-}
-
-function Message({ title, text, children }: { title: string; text: string; children?: React.ReactNode }) {
-  return (
-    <div className="paper-card m-auto flex max-w-lg flex-col items-center gap-3 rounded-[2rem] border-4 border-ink p-8 text-center shadow-[0_10px_0_var(--color-ink)]">
-      <h1 className="font-heading text-4xl">{title}</h1>
-      <p className="text-lg font-medium">{text}</p>
-      <div className="mt-2 flex flex-wrap justify-center gap-3">{children}</div>
-    </div>
-  );
 }
 
 /** A signed-in host opening a room this browser holds no control proof for: take control explicitly. */
@@ -86,19 +72,28 @@ function Claim({ roomId, covers, signedIn }: { roomId: string; covers: string[];
     setError(null);
     try {
       const account: Auth = { kind: "account", credential: host.credential };
-      const status = await getControlStatus(roomId, account);
-      const controlSecret = newSecret();
-      const receipt = await takeControl(roomId, account, {
-        expectedControllerGeneration: status.roomControllerGeneration,
-        proposedControlSecret: controlSecret,
-      });
-      identity.getState().setHostRoom(roomId, {
-        controlSecret,
-        generation: receipt.controllerGeneration ?? status.roomControllerGeneration,
-        membershipId: receipt.membershipId ?? "",
-      });
+      // The takeover (key, new secret and the generation it replaces) is saved before sending, so a lost
+      // response is retried with the same values instead of installing a second secret.
+      let pending = identity.getState().pendingTakeover;
+      if (pending?.roomId !== roomId) {
+        const status = await getControlStatus(roomId, account);
+        pending = { roomId, operationId: newOperationId(), controlSecret: newSecret(), expectedGeneration: status.roomControllerGeneration };
+        identity.getState().setPendingTakeover(pending);
+      }
+      try {
+        const receipt = await takeControl(roomId, account, pending.operationId, {
+          expectedControllerGeneration: pending.expectedGeneration,
+          proposedControlSecret: pending.controlSecret,
+        });
+        identity.getState().setHostRoom(roomId, { controlSecret: pending.controlSecret, generation: requireField(receipt.controllerGeneration) });
+        identity.getState().setPendingTakeover(null);
+      } catch (cause) {
+        // A conflict means the generation moved: the saved intent is stale, so the next try reads it again.
+        if (isConflict(cause)) identity.getState().setPendingTakeover(null);
+        throw cause;
+      }
     } catch (cause) {
-      setError(cause instanceof ApiError ? cause.message : "حصلت مشكلة. جرّب تاني.");
+      setError(messageOf(cause));
     } finally {
       setBusy(false);
     }
@@ -107,25 +102,21 @@ function Claim({ roomId, covers, signedIn }: { roomId: string; covers: string[];
   return (
     <RoomShell covers={covers}>
       {signedIn ? (
-        <Message title="الغرفة دي مفتوحة من جهاز تاني" text="لو دي غرفتك، كمّل منها هنا. الجهاز التاني هيفقد التحكم.">
+        <StatusCard title="الغرفة دي مفتوحة من جهاز تاني" text="لو دي غرفتك، كمّل منها هنا. الجهاز التاني هيفقد التحكم.">
           <Button onClick={claim} disabled={busy}>
             {busy ? "ثانية…" : "كمّل من هنا"}
           </Button>
           <Button asChild variant="outline">
             <Link href="/join">ادخل بكود</Link>
           </Button>
-          {error && (
-            <p role="alert" className="w-full rounded-xl border-[3px] border-[#b3261e] bg-white px-4 py-2 font-semibold text-[#8c1c15]">
-              {error}
-            </p>
-          )}
-        </Message>
+          {error && <ErrorBanner className="w-full">{error}</ErrorBanner>}
+        </StatusCard>
       ) : (
-        <Message title="إنت مش في الغرفة دي" text="ادخل الغرفة بالكود اللي مع المضيف.">
+        <StatusCard title="إنت مش في الغرفة دي" text="ادخل الغرفة بالكود اللي مع المضيف.">
           <Button asChild>
             <Link href="/join">ادخل بكود</Link>
           </Button>
-        </Message>
+        </StatusCard>
       )}
     </RoomShell>
   );
@@ -144,6 +135,7 @@ function LiveRoom({ roomId, auth, role, membershipId, covers, categories }: Live
   const router = useRouter();
   const identity = useIdentityApi();
   const isHost = role === "host";
+  const intents = useIntentKeys();
 
   // A host credential the API is about to retire is renewed in place, then the stream re-authenticates.
   const renew = useCallback(async () => {
@@ -157,11 +149,18 @@ function LiveRoom({ roomId, auth, role, membershipId, covers, categories }: Live
   const channel = useRoomChannel({ roomId, auth, renew: isHost ? renew : undefined });
   const { snapshot, status, error } = channel;
 
-  // Once the room is gone for this browser, forget its proofs.
+  // Once the room is gone, or this browser's proof is no longer accepted, forget it. A host whose control
+  // secret is out of date then falls through to the explicit takeover; a guest returns to joining.
+  const fenced = status === "failed" && (error?.code === "CONTROLLER_FENCED" || error?.code === "FRESH_CONTROL_SECRET_REQUIRED");
+  const gone = status === "closed" || status === "revoked" || (status === "failed" && !isHost && [401, 403, 404, 410].includes(error?.status ?? 0));
   useEffect(() => {
-    if (status === "closed" || status === "revoked") identity.getState().forgetRoom(roomId);
-    if (status === "failed" && error && [401, 403, 404, 410].includes(error.status) && !isHost) identity.getState().forgetRoom(roomId);
-  }, [status, error, isHost, roomId, identity]);
+    if (fenced) identity.getState().forgetRoom(roomId); // the view falls through to the takeover at once
+  }, [fenced, roomId, identity]);
+  useEffect(() => {
+    // The "room closed" message stays on screen; its proofs are dropped when the player leaves the page.
+    if (!gone) return;
+    return () => identity.getState().forgetRoom(roomId);
+  }, [gone, roomId, identity]);
 
   // Game views carry no player list, so remember the lobby's roster for the board.
   const lobby = snapshot?.view.phase === "lobby" ? snapshot.view : null;
@@ -185,12 +184,14 @@ function LiveRoom({ roomId, auth, role, membershipId, covers, categories }: Live
     }
     setClosing("busy");
     setCloseError(null);
+    const signature = `close:${snapshot.source.roomVersion}`;
     try {
-      await closeRoom(roomId, auth, snapshot.source.roomVersion);
+      await closeRoom(roomId, auth, intents.key(signature), snapshot.source.roomVersion);
+      intents.done(signature);
       identity.getState().forgetRoom(roomId);
       router.replace("/");
     } catch (cause) {
-      setCloseError(cause instanceof ApiError ? cause.message : "حصلت مشكلة. جرّب تاني.");
+      setCloseError(messageOf(cause));
       setClosing("idle");
     }
   }
@@ -203,44 +204,58 @@ function LiveRoom({ roomId, auth, role, membershipId, covers, categories }: Live
 
   const shell = (children: React.ReactNode, wide?: boolean, heading?: string) => (
     <RoomShell covers={covers} status={status} actions={actions} wide={wide} heading={heading}>
-      {closeError && (
-        <p role="alert" className="mb-3 rounded-xl border-[3px] border-[#b3261e] bg-white px-4 py-2 font-semibold text-[#8c1c15]">
-          {closeError}
-        </p>
-      )}
+      {closeError && <ErrorBanner className="mb-3">{closeError}</ErrorBanner>}
       {children}
     </RoomShell>
   );
 
   if (status === "replaced")
-    return shell(<Message title="الغرفة اتفتحت على جهاز تاني" text="بنوقف العرض هنا عشان مكانك مفتوح في مكان تاني."><Button onClick={() => window.location.reload()}>افتحها هنا تاني</Button></Message>);
+    return shell(
+      <StatusCard title="الغرفة اتفتحت على جهاز تاني" text="بنوقف العرض هنا عشان مكانك مفتوح في مكان تاني.">
+        <Button onClick={() => window.location.reload()}>افتحها هنا تاني</Button>
+      </StatusCard>,
+    );
   if (status === "control-lost")
-    return shell(<Message title="جهاز تاني خد التحكم" text="الغرفة بتتدار من جهاز تاني دلوقتي."><Button onClick={() => identity.getState().forgetRoom(roomId)}>خد التحكم تاني</Button></Message>);
+    return shell(
+      <StatusCard title="جهاز تاني خد التحكم" text="الغرفة بتتدار من جهاز تاني دلوقتي.">
+        <Button onClick={() => identity.getState().forgetRoom(roomId)}>خد التحكم تاني</Button>
+      </StatusCard>,
+    );
   if (status === "revoked")
-    return shell(<Message title="المضيف شالك من الغرفة" text="تقدر تدخل بكود جديد لو عايز."><Button asChild><Link href="/join">ادخل بكود</Link></Button></Message>);
+    return shell(
+      <StatusCard title="المضيف شالك من الغرفة" text="تقدر تدخل بكود جديد لو عايز.">
+        <Button asChild>
+          <Link href="/join">ادخل بكود</Link>
+        </Button>
+      </StatusCard>,
+    );
   if (status === "closed")
-    return shell(<Message title="الغرفة اتقفلت" text="المضيف أنهى الغرفة."><Button asChild><Link href="/">الرئيسية</Link></Button></Message>);
-  if (!snapshot) {
-    if (status === "failed")
-      return shell(
-        <Message title="مش قادرين نفتح الغرفة" text={error?.message ?? "حصلت مشكلة. جرّب تاني."}>
-          <Button onClick={() => window.location.reload()}>جرّب تاني</Button>
-          <Button asChild variant="outline">
-            <Link href="/">الرئيسية</Link>
-          </Button>
-        </Message>,
-      );
-    return shell(<Centered>بنفتح الغرفة…</Centered>);
-  }
+    return shell(
+      <StatusCard title="الغرفة اتقفلت" text="المضيف أنهى الغرفة.">
+        <Button asChild>
+          <Link href="/">الرئيسية</Link>
+        </Button>
+      </StatusCard>,
+    );
+  if (status === "failed")
+    return shell(
+      <StatusCard title="مش قادرين نفتح الغرفة" text={error?.message ?? messageOf(null)}>
+        <Button onClick={() => window.location.reload()}>جرّب تاني</Button>
+        <Button asChild variant="outline">
+          <Link href="/">الرئيسية</Link>
+        </Button>
+      </StatusCard>,
+    );
+  if (!snapshot) return shell(<StatusCard title="بنفتح الغرفة…" busy />);
 
   const { view, source } = snapshot;
   if (view.phase === "lobby") {
     return shell(
       isHost ? (
         <HostLobby roomId={roomId} view={view as LobbyView} roomVersion={source.roomVersion} auth={auth} categories={categories} connected={channel.connected} onRefresh={channel.refresh} />
-      ) : (
-        <PlayerLobby roomId={roomId} view={view as LobbyView} auth={auth} membershipId={membershipId ?? ""} connected={channel.connected} onRefresh={channel.refresh} />
-      ),
+      ) : membershipId ? (
+        <PlayerLobby roomId={roomId} view={view as LobbyView} auth={auth} membershipId={membershipId} connected={channel.connected} onRefresh={channel.refresh} />
+      ) : null,
       false,
       isHost ? "غرفة اللعب" : undefined,
     );
@@ -251,6 +266,7 @@ function LiveRoom({ roomId, auth, role, membershipId, covers, categories }: Live
 /** What the live game shows: the board, the holding panel for an opened tile, or the result. */
 function GameScreen({ channel, roomId, auth, isHost, categories }: { channel: RoomChannel; roomId: string; auth: Auth; isHost: boolean; categories: CategoryIndex }) {
   const { snapshot } = channel;
+  const intents = useIntentKeys();
   const [pending, setPending] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   // The last board survives while a question is open, so the holding panel can name the category.
@@ -263,21 +279,24 @@ function GameScreen({ channel, roomId, auth, isHost, categories }: { channel: Ro
   const gameVersion = snapshot && "gameVersion" in snapshot.source ? snapshot.source.gameVersion : null;
 
   const run = useCallback(
-    async (key: string, command: Parameters<typeof executeCommand>[2]) => {
+    async (pendingKey: string, command: GameCommand) => {
       if (!gameId) return;
-      setPending(key);
+      setPending(pendingKey);
       setProblem(null);
+      // The command names its game version, so the same click against the same state keeps the same key.
+      const signature = JSON.stringify(command);
       try {
-        await executeCommand(gameId, auth, command);
+        await executeCommand(gameId, auth, intents.key(signature), command);
+        intents.done(signature);
         channel.refresh();
       } catch (cause) {
-        setProblem(cause instanceof ApiError ? cause.message : "حصلت مشكلة. جرّب تاني.");
-        if (cause instanceof ApiError && cause.status === 409) channel.refresh();
+        setProblem(messageOf(cause));
+        if (isConflict(cause)) channel.refresh();
       } finally {
         setPending(null);
       }
     },
-    [gameId, auth, channel],
+    [gameId, auth, channel, intents],
   );
 
   if (!snapshot || !view || !gameVersion) return null;
@@ -287,11 +306,7 @@ function GameScreen({ channel, roomId, auth, isHost, categories }: { channel: Ro
   if (view.phase === "board") {
     return (
       <div className="flex flex-1 flex-col">
-        {problem && (
-          <p role="alert" className="mb-3 rounded-xl border-[3px] border-[#b3261e] bg-white px-4 py-2 font-semibold text-[#8c1c15]">
-            {problem}
-          </p>
-        )}
+        {problem && <ErrorBanner className="mb-3">{problem}</ErrorBanner>}
         <Board
           view={view}
           categories={categories}

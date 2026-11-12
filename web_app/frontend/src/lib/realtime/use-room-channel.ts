@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, LANGUAGE, REALTIME_URL, bearer, type Auth } from "@/lib/api/client";
 import { getRoom } from "@/lib/api/endpoints";
+import { asApiError } from "@/lib/api/errors";
 import type { Id, Snapshot } from "@/lib/api/types";
 import { isStale } from "./ordering";
 
@@ -30,6 +31,34 @@ type Frame = { event: string; data: Record<string, unknown> };
 
 const FIRST_DELAY_MS = 500;
 const MAX_DELAY_MS = 30000;
+
+/**
+ * What a `protocol_error` code means for the stream. The server sends it with the connection's own stream id,
+ * possibly before `authenticated`, and then closes. Terminal codes stop the reconnect loop; anything else
+ * (capacity, busy, timeout) is transient and reconnects as usual.
+ */
+function terminalStatus(code: string): { status: ChannelStatus; httpStatus: number } | null {
+  switch (code) {
+    case "ROOM_CLOSED":
+    case "ROOM_EXPIRED":
+    case "GAME_EXPIRED":
+      return { status: "closed", httpStatus: 410 };
+    case "MEMBERSHIP_REVOKED":
+    case "PARTICIPATION_ENDED":
+      return { status: "revoked", httpStatus: 403 };
+    case "CONTROLLER_FENCED":
+    case "FRESH_CONTROL_SECRET_REQUIRED":
+      return { status: "control-lost", httpStatus: 403 };
+    case "UNAUTHENTICATED":
+    case "INVALID_PROOF":
+    case "CREDENTIAL_EXPIRED":
+      return { status: "failed", httpStatus: 401 };
+    case "NOT_FOUND":
+      return { status: "failed", httpStatus: 404 };
+    default:
+      return null;
+  }
+}
 
 /**
  * The room's live view. It renders only what the server projects: an HTTP snapshot for first paint, then
@@ -81,7 +110,7 @@ export function useRoomChannel(input: {
         if (controller.signal.aborted) return;
         // A failed refresh keeps the last good state; only a room that never loaded is a hard failure.
         if (!snapshotRef.current) {
-          setError(cause instanceof ApiError ? cause : new ApiError(0, "NETWORK"));
+          setError(asApiError(cause));
           setStatus("failed");
         }
       });
@@ -97,14 +126,16 @@ export function useRoomChannel(input: {
     let stopped = false;
     let streamId: string | null = null;
     let lastSequence = BigInt(-1);
+    let connectedBefore = false;
 
     const clearTimer = () => {
       if (timer) clearTimeout(timer);
       timer = undefined;
     };
 
-    const stop = (next: ChannelStatus) => {
+    const stop = (next: ChannelStatus, failure?: ApiError) => {
       stopped = true;
+      if (failure) setError(failure);
       clearTimer();
       setStatus(next);
       socket?.close(1000);
@@ -129,11 +160,21 @@ export function useRoomChannel(input: {
 
     function handle(frame: Frame) {
       const data = frame.data;
+      if (frame.event === "protocol_error") {
+        // Read before the stream filter: a rejected authentication arrives with no authenticated stream yet.
+        const code = String(data.code ?? "");
+        const terminal = terminalStatus(code);
+        if (terminal) stop(terminal.status, terminal.status === "failed" ? new ApiError(terminal.httpStatus, code) : undefined);
+        return;
+      }
       if (frame.event === "authenticated") {
         streamId = String(data.streamId);
         lastSequence = BigInt(String(data.sequence));
         attempt = 0;
         setStatus("live");
+        // Changes made while the socket was down are not replayed: take the current state over HTTP as well.
+        if (connectedBefore) setReloads((n) => n + 1);
+        connectedBefore = true;
         return;
       }
       if (String(data.streamId) !== streamId) return; // frame from a replaced stream
@@ -152,13 +193,20 @@ export function useRoomChannel(input: {
           socket?.send(JSON.stringify({ event: "resync", data: {} }));
           setReloads((n) => n + 1);
           break;
-        case "credential_expiring":
-          void renewRef.current?.().then((authorization) => {
-            const secret = authRef.current?.kind === "host" ? authRef.current.controlSecret : undefined;
-            if (authorization && socket?.readyState === WebSocket.OPEN)
-              socket.send(JSON.stringify({ event: "reauthenticate", data: { authorization, ...(secret ? { controllerSecret: secret } : {}) } }));
-          });
+        case "credential_expiring": {
+          const renewal = renewRef.current?.() ?? Promise.resolve(null);
+          renewal
+            .then((authorization) => {
+              if (!authorization) throw new ApiError(401, "CREDENTIAL_EXPIRED");
+              const secret = authRef.current?.kind === "host" ? authRef.current.controlSecret : undefined;
+              if (socket?.readyState === WebSocket.OPEN)
+                socket.send(JSON.stringify({ event: "reauthenticate", data: { authorization, ...(secret ? { controllerSecret: secret } : {}) } }));
+            })
+            .catch((cause: unknown) => {
+              stop("failed", asApiError(cause, "CREDENTIAL_EXPIRED"));
+            });
           break;
+        }
         case "stream_replaced":
           stop("replaced");
           break;
@@ -170,9 +218,6 @@ export function useRoomChannel(input: {
           break;
         case "room_closed":
           stop("closed");
-          break;
-        case "protocol_error":
-          // The server closes the stream; the normal reconnect path starts a fresh one.
           break;
       }
     }
@@ -193,6 +238,7 @@ export function useRoomChannel(input: {
         );
       };
       ws.onmessage = (message) => {
+        if (socket !== ws) return; // a replaced or closed socket no longer speaks for the room
         try {
           handle(JSON.parse(String(message.data)) as Frame);
         } catch {

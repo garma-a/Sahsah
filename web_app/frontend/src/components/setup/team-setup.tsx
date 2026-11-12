@@ -8,9 +8,12 @@ import Logo from "@/components/brand/logo";
 import { toneAt } from "@/components/brand/tones";
 import SessionForm from "@/components/setup/session-form";
 import Button from "@/components/ui/button";
+import ErrorBanner from "@/components/ui/error-banner";
 import Input from "@/components/ui/input";
+import StatusCard from "@/components/ui/status-card";
 import { ApiError } from "@/lib/api/client";
 import { createRoom, firstFreshPack } from "@/lib/api/endpoints";
+import { messageOf, requireField } from "@/lib/api/errors";
 import { isIdentityRejected } from "@/lib/api/problems";
 import type { Selection } from "@/lib/api/types";
 import { formatDigits } from "@/lib/format";
@@ -75,7 +78,7 @@ export default function TeamSetup() {
         observedRevision: packs[i]!.contentRevision,
       }));
       // Save the intent (key and secret) before sending, so a refresh retries exactly the same creation.
-      const signature = JSON.stringify([names, selections.map((s) => s.packId)]);
+      const signature = JSON.stringify([names, selections.map((s) => [s.packId, s.observedRevision])]);
       let pending = draft.getState().pendingCreate;
       if (!pending || pending.signature !== signature) {
         pending = { operationId: newOperationId(), controlSecret: newSecret(), signature };
@@ -90,8 +93,7 @@ export default function TeamSetup() {
       });
       identity.getState().setHostRoom(receipt.roomId, {
         controlSecret: pending.controlSecret,
-        generation: receipt.controllerGeneration ?? "1",
-        membershipId: receipt.membershipId ?? "",
+        generation: requireField(receipt.controllerGeneration),
       });
       draft.getState().clear();
       router.replace(`/room/${receipt.roomId}`);
@@ -101,7 +103,7 @@ export default function TeamSetup() {
         else if (cause.code === "ROOM_ALREADY_OPEN" && cause.body?.existingRoomId)
           setProblem({ kind: "open-room", roomId: cause.body.existingRoomId });
         else setProblem({ kind: "message", text: cause.message });
-      } else setProblem({ kind: "message", text: "حصلت مشكلة. جرّب تاني." });
+      } else setProblem({ kind: "message", text: messageOf(cause) });
     } finally {
       setBusy(false);
     }
@@ -117,11 +119,11 @@ export default function TeamSetup() {
   if (selected.length !== BOARD_SIZE) {
     return (
       <Shell>
-        <Notice title={`لسه محتاج ${formatDigits(BOARD_SIZE)} فئات`} text={`إنت مختار ${formatDigits(selected.length)}. ارجع واختار الباقي.`}>
+        <StatusCard title={`لسه محتاج ${formatDigits(BOARD_SIZE)} فئات`} text={`إنت مختار ${formatDigits(selected.length)}. ارجع واختار الباقي.`}>
           <Button asChild>
             <Link href="/">اختار الفئات</Link>
           </Button>
-        </Notice>
+        </StatusCard>
       </Shell>
     );
   }
@@ -143,7 +145,7 @@ export default function TeamSetup() {
       <form onSubmit={submit} className="space-y-10" noValidate>
         <div>
           <h1 className="font-heading text-5xl leading-tight sm:text-6xl">سمّوا الفريقين</h1>
-          <p className="mt-2 text-lg font-medium text-charcoal/80">أهلًا {host.displayName}. الغرفة بتتفتح بعد الخطوة دي.</p>
+          <p className="mt-2 text-lg font-medium text-ink">أهلًا {host.displayName}. الغرفة بتتفتح بعد الخطوة دي.</p>
         </div>
 
         <div className="grid gap-6 sm:grid-cols-2">
@@ -235,21 +237,7 @@ function ProblemNotice({
       </div>
     );
   }
-  return (
-    <p role="alert" className="rounded-2xl border-[3px] border-[#b3261e] bg-white px-5 py-4 text-lg font-semibold text-[#8c1c15]">
-      {problem.text}
-    </p>
-  );
-}
-
-function Notice({ title, text, children }: { title: string; text: string; children: React.ReactNode }) {
-  return (
-    <div className="mx-auto max-w-md rounded-[2rem] border-4 border-ink bg-white p-8 text-center shadow-[0_8px_0_var(--color-ink)]">
-      <h1 className="font-heading text-4xl">{title}</h1>
-      <p className="mt-2 mb-6 text-lg font-medium">{text}</p>
-      {children}
-    </div>
-  );
+  return <ErrorBanner>{problem.text}</ErrorBanner>;
 }
 
 function Shell({ children }: { children: React.ReactNode }) {

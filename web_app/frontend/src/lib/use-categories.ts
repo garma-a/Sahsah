@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { listCategories } from "@/lib/api/endpoints";
+import { asApiError } from "@/lib/api/errors";
 import { ApiError } from "@/lib/api/client";
 import type { Category } from "@/lib/api/types";
 
@@ -21,7 +22,7 @@ export function useCategories(): { state: CategoriesState; retry: () => void } {
       .then((categories) => setState({ status: "ready", categories }))
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
-        setState({ status: "error", error: error instanceof ApiError ? error : new ApiError(0, "NETWORK") });
+        setState({ status: "error", error: asApiError(error) });
       });
     return () => controller.abort();
   }, [attempt]);

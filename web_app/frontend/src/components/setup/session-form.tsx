@@ -2,9 +2,10 @@
 
 import { useId, useState, type FormEvent } from "react";
 import Button from "@/components/ui/button";
+import ErrorBanner from "@/components/ui/error-banner";
 import Input from "@/components/ui/input";
-import { ApiError } from "@/lib/api/client";
 import { previewSession } from "@/lib/api/endpoints";
+import { messageOf } from "@/lib/api/errors";
 import { useIdentityApi } from "@/providers/game-store-provider";
 
 type SessionFormProps = { onDone: () => void; onCancel?: () => void; defaultName?: string };
@@ -37,7 +38,7 @@ export default function SessionForm({ onDone, onCancel, defaultName = "" }: Sess
       });
       onDone();
     } catch (cause) {
-      setError(cause instanceof ApiError ? cause.message : "حصلت مشكلة. جرّب تاني.");
+      setError(messageOf(cause));
     } finally {
       setBusy(false);
     }
@@ -62,7 +63,7 @@ export default function SessionForm({ onDone, onCancel, defaultName = "" }: Sess
           maxLength={200}
           className="text-start"
         />
-        <p className="text-sm font-medium text-charcoal/80">بتكتبه مرة واحدة بس على الجهاز ده.</p>
+        <p className="text-sm font-medium text-ink">بتكتبه مرة واحدة بس على الجهاز ده.</p>
       </div>
       <div className="space-y-2">
         <label htmlFor={ids.name} className="block font-heading text-2xl">
@@ -78,11 +79,7 @@ export default function SessionForm({ onDone, onCancel, defaultName = "" }: Sess
           placeholder="اسمك اللي هيظهر للاعبين"
         />
       </div>
-      {error && (
-        <p id={ids.error} role="alert" className="rounded-xl border-[3px] border-[#b3261e] bg-white px-4 py-3 text-base font-semibold text-[#8c1c15]">
-          {error}
-        </p>
-      )}
+      {error && <ErrorBanner id={ids.error}>{error}</ErrorBanner>}
       <div className="flex flex-wrap items-center gap-3 pt-1">
         <Button type="submit" size="lg" disabled={busy}>
           {busy ? "ثانية…" : "يلا"}

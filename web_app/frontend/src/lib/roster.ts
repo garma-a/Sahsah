@@ -17,6 +17,15 @@ export function saveRoster(roomId: Id, members: Member[]): void {
   }
 }
 
+/** Dropped with the room's other proofs, so nothing about a finished room lingers in this browser. */
+export function clearRoster(roomId: Id): void {
+  try {
+    localStorage.removeItem(key(roomId));
+  } catch {
+    // Nothing to clean when storage is blocked.
+  }
+}
+
 export function loadRoster(roomId: Id): RosterEntry[] {
   try {
     const raw = localStorage.getItem(key(roomId));

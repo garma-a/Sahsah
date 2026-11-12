@@ -8,8 +8,10 @@ import JoinShell from "@/components/join/join-shell";
 import { teamTone } from "@/components/brand/tones";
 import Button from "@/components/ui/button";
 import Input from "@/components/ui/input";
+import ErrorBanner from "@/components/ui/error-banner";
 import { ApiError } from "@/lib/api/client";
 import { joinRoom, previewInvitation } from "@/lib/api/endpoints";
+import { asApiError, messageOf, requireField } from "@/lib/api/errors";
 import type { InvitationPreview, TeamNumber } from "@/lib/api/types";
 import { formatDigits } from "@/lib/format";
 import { newOperationId, newSecret } from "@/lib/ids";
@@ -24,6 +26,8 @@ export default function JoinView({ code }: { code: string }) {
   const identity = useIdentityApi();
   const hydrated = useIdentity((s) => s.hydrated);
   const savedName = useIdentity((s) => s.guestName);
+  const pendingJoin = useIdentity((s) => s.pendingJoin);
+  const guestSeats = useIdentity((s) => s.guestSeats);
   const ids = { name: useId(), error: useId() };
   const [preview, setPreview] = useState<Preview>({ status: "loading" });
   const [name, setName] = useState<string | null>(null);
@@ -37,17 +41,26 @@ export default function JoinView({ code }: { code: string }) {
       .then((result) => setPreview({ status: "ready", preview: result }))
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
-        setPreview({ status: "error", error: error instanceof ApiError ? error : new ApiError(0, "NETWORK") });
+        setPreview({ status: "error", error: asApiError(error) });
       });
     return () => controller.abort();
   }, [code]);
 
-  const shownName = name ?? savedName;
+  // A seat already held for this code goes straight to its room instead of joining twice.
+  const heldRoomId = Object.entries(guestSeats).find(([, seat]) => seat.code === code)?.[0];
+  useEffect(() => {
+    if (hydrated && heldRoomId) router.replace(`/room/${heldRoomId}`);
+  }, [hydrated, heldRoomId, router]);
+
+  // A join that was sent but never answered is retried with its own name and team, so the key and secret match.
+  const retry = pendingJoin?.code === code ? pendingJoin : null;
+  const shownName = name ?? retry?.displayName ?? savedName;
+  const shownTeam = team ?? retry?.teamNumber ?? null;
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     const displayName = shownName.trim();
-    if (!displayName || team === null) {
+    if (!displayName || shownTeam === null) {
       setProblem(!displayName ? "اكتب اسمك الأول." : "اختار فريقك.");
       return;
     }
@@ -55,27 +68,26 @@ export default function JoinView({ code }: { code: string }) {
     setProblem(null);
     // Key and secret are saved before sending: if the answer is lost, the retry recovers the same seat.
     let pending = identity.getState().pendingJoin;
-    if (!pending || pending.code !== code || pending.displayName !== displayName || pending.teamNumber !== team) {
-      pending = { code, operationId: newOperationId(), secret: newSecret(), displayName, teamNumber: team };
+    if (!pending || pending.code !== code || pending.displayName !== displayName || pending.teamNumber !== shownTeam) {
+      pending = { code, operationId: newOperationId(), secret: newSecret(), displayName, teamNumber: shownTeam };
       identity.getState().setPendingJoin(pending);
     }
     try {
       const receipt = await joinRoom(code, pending.operationId, {
         displayName,
-        teamNumber: team,
+        teamNumber: shownTeam,
         reconnectSecret: pending.secret,
       });
-      if (!receipt.membershipId) throw new ApiError(500, "INTERNAL_ERROR");
-      identity.getState().setGuestSeat(receipt.roomId, { membershipId: receipt.membershipId, secret: pending.secret, displayName });
+      identity.getState().setGuestSeat(receipt.roomId, { code, membershipId: requireField(receipt.membershipId), secret: pending.secret, displayName });
       identity.getState().setPendingJoin(null);
       router.replace(`/room/${receipt.roomId}`);
     } catch (cause) {
-      setProblem(cause instanceof ApiError ? cause.message : "حصلت مشكلة. جرّب تاني.");
+      setProblem(messageOf(cause));
       setBusy(false);
     }
   }
 
-  if (preview.status === "loading" || !hydrated) {
+  if (preview.status === "loading" || !hydrated || heldRoomId) {
     return (
       <JoinShell>
         <p role="status" className="py-10 text-center font-heading text-3xl">
@@ -101,7 +113,7 @@ export default function JoinView({ code }: { code: string }) {
 
   const { preview: room } = preview;
   if (!room.joinable) {
-    const text = room.admission === "paused" ? "السيرفر زحمة دلوقتي. جرّب تاني كمان شوية." : room.availableSeats === 0 ? "الغرفة اتملت. أقصى عدد ٦ لاعبين." : "الغرفة دي مش بتستقبل لاعبين دلوقتي.";
+    const text = room.admission === "paused" ? "السيرفر زحمة دلوقتي. جرّب تاني كمان شوية." : room.availableSeats === 0 ? "الغرفة اتملت. بتاخد ٥ لاعبين غير المضيف." : "الغرفة دي مش بتستقبل لاعبين دلوقتي.";
     return (
       <JoinShell>
         <div role="alert" className="space-y-4 text-center">
@@ -125,7 +137,7 @@ export default function JoinView({ code }: { code: string }) {
       <form onSubmit={submit} noValidate className="space-y-6" aria-describedby={problem ? ids.error : undefined}>
         <div className="text-center">
           <h1 className="font-heading text-4xl leading-tight">يلا ندخل اللعبة</h1>
-          <p className="mt-1 text-base font-medium text-charcoal/80">
+          <p className="mt-1 text-base font-medium text-ink">
             في {formatDigits(room.availableSeats)} أماكن فاضية.
           </p>
         </div>
@@ -149,7 +161,7 @@ export default function JoinView({ code }: { code: string }) {
           <legend className="mb-1 font-heading text-2xl">اختار فريقك</legend>
           <div className="grid grid-cols-2 gap-3">
             {teams.map((option) => {
-              const selected = team === option.number;
+              const selected = shownTeam === option.number;
               return (
                 <button
                   key={option.number}
@@ -179,9 +191,7 @@ export default function JoinView({ code }: { code: string }) {
         </fieldset>
 
         {problem && (
-          <p id={ids.error} role="alert" className="rounded-xl border-[3px] border-[#b3261e] bg-white px-4 py-3 font-semibold text-[#8c1c15]">
-            {problem}
-          </p>
+          <ErrorBanner id={ids.error}>{problem}</ErrorBanner>
         )}
 
         <Button type="submit" size="xl" className="w-full" disabled={busy}>

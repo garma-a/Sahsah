@@ -89,22 +89,22 @@ export function joinRoom(
   });
 }
 
+// Every mutating call below takes its Idempotency-Key from the caller, which creates and keeps one key per
+// intent (see use-intent-keys.ts), so a retry after a lost response recovers the same outcome.
+
 export function setReadiness(
   roomId: Id,
   auth: Auth,
+  operationId: string,
   input: { expectedMembershipVersion: string; expectedReadyGeneration: number; ready: boolean },
 ): Promise<Receipt> {
-  return request(`/rooms/${roomId}/memberships/me/readiness`, {
-    method: "PUT",
-    auth,
-    operationId: crypto.randomUUID(),
-    body: input,
-  });
+  return request(`/rooms/${roomId}/memberships/me/readiness`, { method: "PUT", auth, operationId, body: input });
 }
 
 export function updateOwnMembership(
   roomId: Id,
   auth: Auth,
+  operationId: string,
   input: {
     expectedMembershipVersion: string;
     expectedReadyGeneration: number;
@@ -112,12 +112,7 @@ export function updateOwnMembership(
     displayName?: string;
   },
 ): Promise<Receipt> {
-  return request(`/rooms/${roomId}/memberships/me`, {
-    method: "PATCH",
-    auth,
-    operationId: crypto.randomUUID(),
-    body: input,
-  });
+  return request(`/rooms/${roomId}/memberships/me`, { method: "PATCH", auth, operationId, body: input });
 }
 
 export function startGame(
@@ -129,22 +124,12 @@ export function startGame(
   return request(`/rooms/${roomId}/games`, { method: "POST", auth, operationId, body: input });
 }
 
-export function executeCommand(gameId: Id, auth: Auth, command: GameCommand): Promise<Receipt> {
-  return request(`/games/${gameId}/commands`, {
-    method: "POST",
-    auth,
-    operationId: crypto.randomUUID(),
-    body: command,
-  });
+export function executeCommand(gameId: Id, auth: Auth, operationId: string, command: GameCommand): Promise<Receipt> {
+  return request(`/games/${gameId}/commands`, { method: "POST", auth, operationId, body: command });
 }
 
-export function closeRoom(roomId: Id, auth: Auth, expectedRoomVersion: string): Promise<Receipt> {
-  return request(`/rooms/${roomId}/closure`, {
-    method: "POST",
-    auth,
-    operationId: crypto.randomUUID(),
-    body: { expectedRoomVersion },
-  });
+export function closeRoom(roomId: Id, auth: Auth, operationId: string, expectedRoomVersion: string): Promise<Receipt> {
+  return request(`/rooms/${roomId}/closure`, { method: "POST", auth, operationId, body: { expectedRoomVersion } });
 }
 
 export function getControlStatus(roomId: Id, auth: Auth): Promise<ControlStatus> {
@@ -154,12 +139,8 @@ export function getControlStatus(roomId: Id, auth: Auth): Promise<ControlStatus>
 export function takeControl(
   roomId: Id,
   auth: Auth,
+  operationId: string,
   input: { expectedControllerGeneration: string; proposedControlSecret: string },
 ): Promise<Receipt> {
-  return request(`/rooms/${roomId}/control`, {
-    method: "POST",
-    auth,
-    operationId: crypto.randomUUID(),
-    body: input,
-  });
+  return request(`/rooms/${roomId}/control`, { method: "POST", auth, operationId, body: input });
 }

@@ -2,6 +2,7 @@
 
 import { teamTone } from "@/components/brand/tones";
 import Button from "@/components/ui/button";
+import ErrorBanner from "@/components/ui/error-banner";
 import type { QuestionView, ResultView } from "@/lib/api/types";
 import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -39,11 +40,7 @@ export function QuestionHolding({
       <p className="max-w-md text-lg font-medium text-charcoal/85">
         {isHost ? "شاشة السؤال لسه بتتجهّز. ارجع للوحة واختار سؤال تاني." : "المضيف فاتح سؤال دلوقتي. استنى ويرجع للوحة."}
       </p>
-      {error && (
-        <p role="alert" className="rounded-xl border-[3px] border-[#b3261e] bg-white px-4 py-2 font-semibold text-[#8c1c15]">
-          {error}
-        </p>
-      )}
+      {error && <ErrorBanner>{error}</ErrorBanner>}
       {isHost && (
         <Button size="lg" onClick={onReturn} disabled={busy}>
           {busy ? "ثانية…" : "ارجع للوحة"}

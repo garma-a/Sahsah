@@ -2,15 +2,17 @@
 
 import { Check, Clock, Copy } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Cover from "@/components/brand/cover";
 import { teamTone, toneAt } from "@/components/brand/tones";
 import Button from "@/components/ui/button";
-import { ApiError, type Auth } from "@/lib/api/client";
+import ErrorBanner from "@/components/ui/error-banner";
+import { type Auth } from "@/lib/api/client";
 import { getInvitation, startGame } from "@/lib/api/endpoints";
+import { isConflict, messageOf } from "@/lib/api/errors";
 import type { Category, Invitation, LobbyView } from "@/lib/api/types";
 import { formatDigits } from "@/lib/format";
-import { newOperationId } from "@/lib/ids";
+import { useIntentKeys } from "@/lib/use-intent-keys";
 import { cn } from "@/lib/utils";
 
 type HostLobbyProps = {
@@ -29,7 +31,7 @@ export default function HostLobby({ roomId, view, roomVersion, auth, categories,
   const [copied, setCopied] = useState(false);
   const [starting, setStarting] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
-  const startKey = useRef<{ key: string; operationId: string } | null>(null);
+  const intents = useIntentKeys();
 
   const credential = auth.kind === "host" ? auth.credential : null;
   const controlSecret = auth.kind === "host" ? auth.controlSecret : null;
@@ -42,7 +44,7 @@ export default function HostLobby({ roomId, view, roomVersion, auth, categories,
         if (!controller.signal.aborted) setInvitation(next);
       })
       .catch((cause: unknown) => {
-        if (!controller.signal.aborted) setInvitationError(cause instanceof ApiError ? cause.message : "تعذّر تحميل الكود.");
+        if (!controller.signal.aborted) setInvitationError(messageOf(cause, "تعذّر تحميل الكود."));
       });
     return () => controller.abort();
   }, [roomId, credential, controlSecret, generation, view.readyGeneration]);
@@ -55,17 +57,17 @@ export default function HostLobby({ roomId, view, roomVersion, auth, categories,
     setStarting(true);
     setProblem(null);
     // The same intent keeps the same key, so a lost response retries the same start instead of a second one.
-    const key = `${roomVersion}:${view.readyGeneration}`;
-    if (startKey.current?.key !== key) startKey.current = { key, operationId: newOperationId() };
+    const signature = `start:${roomVersion}:${view.readyGeneration}`;
     try {
-      await startGame(roomId, auth, startKey.current.operationId, {
+      await startGame(roomId, auth, intents.key(signature), {
         expectedRoomVersion: roomVersion,
         expectedReadyGeneration: view.readyGeneration,
       });
+      intents.done(signature);
       onRefresh();
     } catch (cause) {
-      setProblem(cause instanceof ApiError ? cause.message : "حصلت مشكلة. جرّب تاني.");
-      if (cause instanceof ApiError && cause.status === 409) onRefresh();
+      setProblem(messageOf(cause));
+      if (isConflict(cause)) onRefresh();
     } finally {
       setStarting(false);
     }
@@ -86,7 +88,7 @@ export default function HostLobby({ roomId, view, roomVersion, auth, categories,
   const joinHost = invitation ? new URL(invitation.joinUrl).host : "";
 
   return (
-    <div className="grid flex-1 gap-4 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] lg:gap-6">
+    <div className="grid flex-1 content-start gap-4 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] lg:items-start lg:gap-6">
       {/* Invitation: code and QR, readable from across the room. */}
       <section aria-labelledby="invite-title" className="paper-card flex flex-col items-center justify-center rounded-[1.6rem] border-4 border-ink p-5 text-center shadow-[0_10px_0_var(--color-ink)]">
         <h2 id="invite-title" className="font-heading text-3xl leading-tight sm:text-4xl">
@@ -100,8 +102,9 @@ export default function HostLobby({ roomId, view, roomVersion, auth, categories,
             <p className="mt-4 text-base font-semibold" dir="ltr">
               {joinHost}/join
             </p>
-            <p aria-label={`كود الغرفة ${code.split("").join(" ")}`} className="tabular mt-1 select-all font-heading text-6xl tracking-[0.12em] sm:text-7xl">
-              {formatDigits(code)}
+            <p id="room-code" className="tabular mt-1 select-all font-heading text-6xl tracking-[0.12em] sm:text-7xl">
+              <span className="sr-only">كود الغرفة {formatDigits(code).split("").join(" ")}</span>
+              <span aria-hidden>{formatDigits(code)}</span>
             </p>
             <Button variant="outline" size="sm" className="mt-4" onClick={copyLink}>
               {copied ? <Check className="size-5" aria-hidden /> : <Copy className="size-5" aria-hidden />}
@@ -129,7 +132,7 @@ export default function HostLobby({ roomId, view, roomVersion, auth, categories,
                   <h3 className={cn("truncate rounded-xl border-[3px] border-ink px-4 py-1.5 font-heading text-3xl", teamTone(team.number).fill)}>{team.name}</h3>
                   <ul aria-label={`لاعبين ${team.name}`} className="mt-3 space-y-2">
                     {members.length === 0 && (
-                      <li className="rounded-xl border-[3px] border-dashed border-ink/35 px-4 py-3 text-base font-medium text-charcoal/70">
+                      <li className="rounded-xl border-[3px] border-dashed border-ink/35 px-4 py-3 text-base font-medium text-ink">
                         مستنيين أول لاعب
                       </li>
                     )}
@@ -172,7 +175,7 @@ export default function HostLobby({ roomId, view, roomVersion, auth, categories,
           </ol>
         </section>
 
-        <div className="mt-auto flex flex-wrap items-center gap-4 rounded-[1.6rem] border-4 border-ink bg-cyan p-4 shadow-[0_8px_0_var(--color-ink)]">
+        <div className="flex flex-wrap items-center gap-4 rounded-[1.6rem] border-4 border-ink bg-cyan p-4 shadow-[0_8px_0_var(--color-ink)]">
           <p role="status" className="min-w-0 flex-1 font-heading text-2xl leading-snug">
             {players.length === 0
               ? "لسه محدش دخل. استنى اللاعبين أو ابدأ."
@@ -184,9 +187,7 @@ export default function HostLobby({ roomId, view, roomVersion, auth, categories,
             {starting ? "ثانية…" : "ابدأ اللعبة"}
           </Button>
           {problem && (
-            <p role="alert" className="w-full rounded-xl border-[3px] border-[#b3261e] bg-white px-4 py-2 font-semibold text-[#8c1c15]">
-              {problem}
-            </p>
+            <ErrorBanner className="w-full">{problem}</ErrorBanner>
           )}
         </div>
       </div>

@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { useStore } from "zustand";
 import { createDraftStore, type DraftStore } from "@/stores/draft-store";
-import { createIdentityStore, type IdentityStore } from "@/stores/identity-store";
+import { IDENTITY_STORAGE_KEY, createIdentityStore, type IdentityStore } from "@/stores/identity-store";
 
 type Stores = { identity: ReturnType<typeof createIdentityStore>; draft: ReturnType<typeof createDraftStore> };
 const StoresContext = createContext<Stores | null>(null);
@@ -15,6 +15,12 @@ export default function GameStoreProvider({ children }: { children: ReactNode })
   useEffect(() => {
     void Promise.resolve(stores.identity.persist.rehydrate()).then(() => stores.identity.setState({ hydrated: true }));
     void Promise.resolve(stores.draft.persist.rehydrate()).then(() => stores.draft.setState({ hydrated: true }));
+    // Another tab changed the identity (a new seat, a takeover): take it, so two tabs never overwrite each other.
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === IDENTITY_STORAGE_KEY) void stores.identity.persist.rehydrate();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
   }, [stores]);
   return <StoresContext.Provider value={stores}>{children}</StoresContext.Provider>;
 }

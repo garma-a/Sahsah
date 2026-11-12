@@ -1,12 +1,18 @@
 import { createJSONStorage, persist } from "zustand/middleware";
 import { createStore } from "zustand/vanilla";
 import type { Id, PreviewSession, TeamNumber } from "@/lib/api/types";
+import { clearRoster } from "@/lib/roster";
+
+/** localStorage key of the persisted identity; other tabs watch it (see the provider). */
+export const IDENTITY_STORAGE_KEY = "sahsah.identity.v1";
 
 export type HostIdentity = Pick<PreviewSession, "credential" | "expiresAt" | "accountId" | "displayName">;
 /** What this browser needs to keep running a room it created. */
-export type HostRoom = { controlSecret: string; generation: string; membershipId: Id };
-/** A guest's private seat proof. It lives only in this browser. */
-export type GuestSeat = { membershipId: Id; secret: string; displayName: string };
+export type HostRoom = { controlSecret: string; generation: string };
+/** A takeover saved before sending: key, new secret and the generation it replaces, so a retry is identical. */
+export type PendingTakeover = { roomId: Id; operationId: string; controlSecret: string; expectedGeneration: string };
+/** A guest's private seat proof, with the invitation code it was joined by. It lives only in this browser. */
+export type GuestSeat = { code: string; membershipId: Id; secret: string; displayName: string };
 /** A join saved before sending, so a lost response retries the same seat. */
 export type PendingJoin = {
   code: string;
@@ -23,8 +29,10 @@ type IdentityState = {
   guestSeats: Record<Id, GuestSeat>;
   guestName: string;
   pendingJoin: PendingJoin | null;
+  pendingTakeover: PendingTakeover | null;
 };
 type IdentityActions = {
+  setPendingTakeover: (pending: PendingTakeover | null) => void;
   setHost: (host: HostIdentity | null) => void;
   setHostRoom: (roomId: Id, room: HostRoom) => void;
   forgetRoom: (roomId: Id) => void;
@@ -50,25 +58,30 @@ export const createIdentityStore = () =>
         guestSeats: {},
         guestName: "",
         pendingJoin: null,
+        pendingTakeover: null,
+        setPendingTakeover: (pendingTakeover) => set({ pendingTakeover }),
         setHost: (host) => set({ host }),
         setHostRoom: (roomId, room) => set((s) => ({ hostRooms: { ...s.hostRooms, [roomId]: room } })),
-        forgetRoom: (roomId) =>
-          set((s) => ({ hostRooms: without(s.hostRooms, roomId), guestSeats: without(s.guestSeats, roomId) })),
+        forgetRoom: (roomId) => {
+          clearRoster(roomId);
+          set((s) => ({ hostRooms: without(s.hostRooms, roomId), guestSeats: without(s.guestSeats, roomId) }));
+        },
         setGuestSeat: (roomId, seat) =>
           set((s) => ({ guestSeats: { ...s.guestSeats, [roomId]: seat }, guestName: seat.displayName })),
         setGuestName: (guestName) => set({ guestName }),
         setPendingJoin: (pendingJoin) => set({ pendingJoin }),
       }),
       {
-        name: "sahsah.identity.v1",
+        name: IDENTITY_STORAGE_KEY,
         skipHydration: true,
         storage: createJSONStorage(() => localStorage),
-        partialize: ({ host, hostRooms, guestSeats, guestName, pendingJoin }) => ({
+        partialize: ({ host, hostRooms, guestSeats, guestName, pendingJoin, pendingTakeover }) => ({
           host,
           hostRooms,
           guestSeats,
           guestName,
           pendingJoin,
+          pendingTakeover,
         }),
       },
     ),

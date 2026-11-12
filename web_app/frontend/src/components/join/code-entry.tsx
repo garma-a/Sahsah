@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useId, useState, type FormEvent } from "react";
 import JoinShell from "@/components/join/join-shell";
 import Button from "@/components/ui/button";
+import ErrorBanner from "@/components/ui/error-banner";
 import Input from "@/components/ui/input";
 import { toLatinDigits } from "@/lib/format";
 
@@ -47,11 +48,7 @@ export default function CodeEntry() {
             className="h-16 text-center font-heading text-4xl tracking-[0.3em]"
             placeholder="٠٠٠٠٠٠"
           />
-          {error && (
-            <p id={`${id}-error`} role="alert" className="font-semibold text-[#8c1c15]">
-              {error}
-            </p>
-          )}
+          {error && <ErrorBanner id={`${id}-error`}>{error}</ErrorBanner>}
         </div>
         <Button type="submit" size="lg" className="w-full">
           كمّل
