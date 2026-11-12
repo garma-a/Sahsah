@@ -4,7 +4,6 @@ import type {
   ControlStatus,
   CurrentRoom,
   GameCommand,
-  GameResult,
   Id,
   Invitation,
   InvitationPreview,
@@ -136,9 +135,6 @@ export function mediaAccess(gameId: Id, auth: Auth, refs: MediaRef[], signal?: A
   return request(`/games/${gameId}/media-access`, { method: "POST", auth, body: { refs }, signal });
 }
 
-export function getGameResult(gameId: Id, auth: Auth): Promise<GameResult> {
-  return request(`/games/${gameId}/result`, { auth });
-}
 
 /** Host: move the room from the finished game's result back to the lobby to play again. */
 export function returnToLobby(roomId: Id, auth: Auth, operationId: string, expectedRoomVersion: string): Promise<Receipt> {

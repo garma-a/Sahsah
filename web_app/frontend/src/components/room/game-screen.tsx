@@ -2,16 +2,17 @@
 
 import { useCallback, useState } from "react";
 import { toneAt } from "@/components/brand/tones";
+import HostTools from "@/components/game/host-tools";
 import type { QuestionAction } from "@/components/game/host-bar";
 import QuestionScreen from "@/components/game/question-screen";
+import ResultScreen from "@/components/game/result-screen";
 import Board from "@/components/room/board";
-import { ResultHolding } from "@/components/room/holding-panel";
 import Scoreboard from "@/components/room/scoreboard";
 import ErrorBanner from "@/components/ui/error-banner";
 import type { Auth } from "@/lib/api/client";
-import { executeCommand } from "@/lib/api/endpoints";
+import { executeCommand, returnToLobby } from "@/lib/api/endpoints";
 import { isConflict, messageOf } from "@/lib/api/errors";
-import type { BoardView, Category, GameCommand, QuestionView, TeamNumber } from "@/lib/api/types";
+import type { AudioRef, BoardView, Category, GameCommand, QuestionView, TeamNumber } from "@/lib/api/types";
 import type { RoomChannel } from "@/lib/realtime/use-room-channel";
 import { loadRoster } from "@/lib/roster";
 import { useIntentKeys } from "@/lib/use-intent-keys";
@@ -41,16 +42,54 @@ export default function GameScreen({ channel, roomId, auth, isHost, categories }
 
   const gameId = snapshot && "gameId" in snapshot.source ? snapshot.source.gameId : null;
   const gameVersion = snapshot && "gameVersion" in snapshot.source ? snapshot.source.gameVersion : null;
+  const roomVersion = snapshot?.source.roomVersion ?? null;
 
-  const run = useCallback(
-    async (pendingKey: string, command: GameCommand) => {
-      if (!gameId) return;
-      setPending(pendingKey);
-      setProblem(null);
+  /** Sends one command with its saved key; resolves to an error message, or null when it was accepted. */
+  const send = useCallback(
+    async (command: GameCommand): Promise<string | null> => {
+      if (!gameId) return null;
       // The command names its game version, so the same click against the same state keeps the same key.
       const signature = JSON.stringify(command);
       try {
         await executeCommand(gameId, auth, intents.key(signature), command);
+        intents.done(signature);
+        channel.refresh();
+        return null;
+      } catch (cause) {
+        if (isConflict(cause)) channel.refresh();
+        return messageOf(cause);
+      }
+    },
+    [gameId, auth, channel, intents],
+  );
+
+  const run = useCallback(
+    async (pendingKey: string, command: GameCommand) => {
+      setPending(pendingKey);
+      setProblem(await send(command).finally(() => setPending(null)));
+    },
+    [send],
+  );
+
+  const reportPlayback = useCallback(
+    (media: AudioRef, playing: boolean, positionMs: number) => {
+      if (!gameId || !gameVersion || auth.kind !== "host") return;
+      channel.sendPlayback({ gameId, gameVersion, controllerGeneration: auth.generation, media, playing, positionMs });
+    },
+    [gameId, gameVersion, auth, channel],
+  );
+
+  if (!snapshot || !view || !gameVersion || !gameId || !roomVersion) return null;
+
+  const hostView = isHost && view.audience === "host";
+
+  if (view.phase === "result") {
+    const playAgain = async () => {
+      const signature = `lobby:${roomVersion}`;
+      setPending("lobby");
+      setProblem(null);
+      try {
+        await returnToLobby(roomId, auth, intents.key(signature), roomVersion);
         intents.done(signature);
         channel.refresh();
       } catch (cause) {
@@ -59,15 +98,23 @@ export default function GameScreen({ channel, roomId, auth, isHost, categories }
       } finally {
         setPending(null);
       }
-    },
-    [gameId, auth, channel, intents],
+    };
+    return <ResultScreen view={view} roster={roster} isHost={hostView} busy={pending !== null} error={problem} onPlayAgain={playAgain} />;
+  }
+
+  const scoreboard = (teams: BoardView["teams"]) => (
+    <>
+      <Scoreboard teams={teams} members={roster} connected={channel.connected} />
+      {hostView && (
+        <HostTools
+          teams={teams}
+          busy={pending !== null}
+          onAdjust={(teamNumber, targetTotal) => send({ name: "adjust_score", expectedGameVersion: gameVersion, teamNumber, targetTotal })}
+          onEnd={() => run("end_game", { name: "end_game", expectedGameVersion: gameVersion })}
+        />
+      )}
+    </>
   );
-
-  if (!snapshot || !view || !gameVersion || !gameId) return null;
-
-  if (view.phase === "result") return <ResultHolding view={view} />;
-
-  const scoreboard = (teams: BoardView["teams"]) => <Scoreboard teams={teams} members={roster} connected={channel.connected} />;
 
   if (view.phase === "board") {
     return (
@@ -76,7 +123,7 @@ export default function GameScreen({ channel, roomId, auth, isHost, categories }
         <Board
           view={view}
           categories={categories}
-          canOpen={isHost && view.audience === "host"}
+          canOpen={hostView}
           pending={pending}
           onOpen={(boardPosition, questionPosition) =>
             run(`${boardPosition}:${questionPosition}`, { name: "open_question", expectedGameVersion: gameVersion, boardPosition, questionPosition })
@@ -102,6 +149,8 @@ export default function GameScreen({ channel, roomId, auth, isHost, categories }
         gameId={gameId}
         auth={auth}
         clockOffsetMs={channel.clockOffsetMs}
+        playback={channel.playback}
+        onPlayback={reportPlayback}
         pending={pending}
         problem={problem}
         onAct={(name: QuestionAction) => run(name, { name, ...pointer })}
