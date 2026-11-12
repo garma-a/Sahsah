@@ -12,12 +12,12 @@ type PosterProps = {
   selected: boolean;
   /** Six are already chosen: unselected posters rest until one is removed. */
   full: boolean;
-  priority?: boolean;
+  eager?: boolean;
   onToggle: (category: Category) => void;
 };
 
 /** A category poster on the shelf: a printed card with a coloured border, a name ribbon and the "؟" badge. */
-export default function Poster({ category, toneIndex, selected, full, priority, onToggle }: PosterProps) {
+export default function Poster({ category, toneIndex, selected, full, eager, onToggle }: PosterProps) {
   const tone = toneAt(toneIndex);
   const unavailable = category.publishedPackCount < 1;
   const resting = !selected && (full || unavailable);
@@ -44,7 +44,7 @@ export default function Poster({ category, toneIndex, selected, full, priority, 
           selected && "shadow-[7px_7px_0_var(--color-ink)]",
         )}
       >
-        <Cover src={category.coverUrl} name={category.name} priority={priority} />
+        <Cover src={category.coverUrl} name={category.name} eager={eager} />
         {selected && <span aria-hidden className="pointer-events-none absolute inset-0 border-[3px] border-ink/80" />}
         {unavailable && (
           <span aria-hidden className="absolute inset-0 grid place-items-center bg-ink/55">

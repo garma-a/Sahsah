@@ -39,7 +39,7 @@ function Fan({ categories }: { categories: Category[] }) {
             style={{ left: slot.left, top: slot.top, zIndex: i, ["--r" as string]: `${slot.turn}deg`, ...delay(250 + i * 90) }}
           >
             {category ? (
-              <Cover src={category.coverUrl} name={category.name} priority sizes="(min-width: 1024px) 12vw, 28vw" />
+              <Cover src={category.coverUrl} name={category.name} eager sizes="(min-width: 1024px) 12vw, 28vw" />
             ) : (
               <span className="block aspect-[4/5] bg-charcoal/70" />
             )}
@@ -63,7 +63,7 @@ export default function Hero({ categories, onPlay }: HeroProps) {
       <div aria-hidden className="grain-dark pointer-events-none absolute inset-0 -z-10 hidden opacity-30 lg:block" />
 
       <div className="mx-auto flex max-w-[1400px] items-center justify-between gap-4 px-5 pt-4 sm:px-8 lg:px-12 lg:pt-8">
-        <Logo variant="retro" priority className="w-14 lg:hidden" />
+        <Logo variant="retro" eager className="w-14 lg:hidden" />
         <div aria-hidden className="hidden items-center gap-3 lg:flex">
           <span className="h-11 w-32 rounded-full bg-sun" />
           <span className="h-11 w-24 rounded-full bg-green" />
@@ -77,7 +77,7 @@ export default function Hero({ categories, onPlay }: HeroProps) {
         </Link>
       </div>
 
-      <div className="mx-auto grid max-w-[1400px] items-center gap-x-6 gap-y-6 px-5 pb-12 pt-6 sm:grid-cols-[1fr_1fr] sm:px-8 lg:grid-cols-[1fr_minmax(0,24rem)_1fr] lg:gap-x-10 lg:px-12 lg:pb-44 lg:pt-4">
+      <div className="mx-auto grid max-w-[1400px] items-center gap-x-6 gap-y-6 px-5 pb-12 pt-6 sm:grid-cols-[1fr_1fr] sm:px-8 lg:grid-cols-[1fr_minmax(0,31rem)_1fr] lg:gap-x-4 lg:px-8 lg:pb-36 lg:pt-0">
         <div className="space-y-4 sm:order-2 lg:order-1 lg:space-y-0 lg:ps-6">
           <h1 className="flex flex-col items-start gap-3 font-heading lg:gap-1">
             <span
@@ -105,8 +105,8 @@ export default function Hero({ categories, onPlay }: HeroProps) {
           </Button>
         </div>
 
-        <div className="hidden justify-self-center lg:order-2 lg:block">
-          <Logo variant="retro" priority className="w-full max-w-[22rem] -rotate-2 drop-shadow-[0_18px_30px_rgb(0_0_0/0.35)]" />
+        <div className="hidden w-full lg:order-2 lg:block">
+          <Logo variant="retro" eager className="mx-auto w-full max-w-[28rem] -rotate-2 drop-shadow-[0_18px_30px_rgb(0_0_0/0.35)]" />
         </div>
 
         <div className="sm:order-1 lg:order-3">

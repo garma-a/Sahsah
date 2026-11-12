@@ -30,7 +30,7 @@ export default function SessionDialog({ open, onClose, onDone }: SessionDialogPr
           <h2 id="session-title" className="mb-1 text-center font-heading text-4xl">
             قبل ما نبدأ
           </h2>
-          <p className="mb-6 text-center text-base font-medium text-charcoal/80">
+          <p className="mb-6 text-center text-base font-medium text-ink">
             بنسألك مرة واحدة بس على الجهاز ده.
           </p>
           <SessionForm onDone={onDone} onCancel={onClose} />

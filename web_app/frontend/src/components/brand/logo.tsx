@@ -9,9 +9,9 @@ const sources = {
   mono: { src: "/brand/logo-mono.svg", width: 2060, height: 2180 },
 } as const;
 
-type LogoProps = { variant?: keyof typeof sources; className?: string; priority?: boolean; title?: string };
+type LogoProps = { variant?: keyof typeof sources; className?: string; eager?: boolean; title?: string };
 
-export default function Logo({ variant = "retro", className, priority = false, title = "صحصح" }: LogoProps) {
+export default function Logo({ variant = "retro", className, eager = false, title = "صحصح" }: LogoProps) {
   const { src, width, height } = sources[variant];
   if (variant === "mono") {
     return (
@@ -33,5 +33,5 @@ export default function Logo({ variant = "retro", className, priority = false, t
       />
     );
   }
-  return <Image src={src} width={width} height={height} alt={title} priority={priority} unoptimized className={cn("h-auto", className)} />;
+  return <Image src={src} width={width} height={height} alt={title} loading={eager ? "eager" : undefined} fetchPriority={eager ? "high" : undefined} unoptimized className={cn("h-auto", className)} />;
 }

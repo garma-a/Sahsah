@@ -24,6 +24,8 @@
   /* Derived: the chunky button face. White on it passes AA (4.6:1); the raw orange-red does not. */
   --color-press: #d63a19;
   --color-press-deep: #a52a10;
+  /* Derived: the pink for ribbons and tiles (white on it passes AA, 5.3:1). */
+  --color-pink-press: #d1066c;
   /* Derived neutrals for the dark hero and the board wall. */
   --color-ink: #1d2321;
   --color-paper-shade: #ecdcb8;

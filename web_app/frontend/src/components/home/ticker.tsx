@@ -25,6 +25,7 @@ function Track({ hidden }: { hidden?: boolean }) {
 export default function Ticker() {
   return (
     <div
+      role="region"
       aria-label="إعلانات صحصح"
       className="relative z-20 overflow-hidden border-b-[3px] border-cyan bg-press py-2.5 text-[0.95rem] font-medium text-white"
     >

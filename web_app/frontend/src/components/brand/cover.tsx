@@ -10,7 +10,7 @@ type CoverProps = {
   name: string;
   className?: string;
   sizes?: string;
-  priority?: boolean;
+  eager?: boolean;
 };
 
 /**
@@ -18,7 +18,7 @@ type CoverProps = {
  * frame is always 4:5 with object-fit: cover: shelves and board columns stay aligned and nothing shifts
  * while an image loads. Missing or broken artwork falls back to a printed placeholder with the name.
  */
-export default function Cover({ src, name, className, sizes = "(min-width: 1024px) 220px, 33vw", priority }: CoverProps) {
+export default function Cover({ src, name, className, sizes = "(min-width: 1024px) 220px, 33vw", eager }: CoverProps) {
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const failed = !src || failedSrc === src;
   return (
@@ -35,7 +35,7 @@ export default function Cover({ src, name, className, sizes = "(min-width: 1024p
           fill
           sizes={sizes}
           unoptimized
-          priority={priority}
+          loading={eager ? "eager" : undefined} fetchPriority={eager ? "high" : undefined}
           draggable={false}
           onError={() => setFailedSrc(src)}
           className="object-cover"

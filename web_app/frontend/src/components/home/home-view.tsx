@@ -64,7 +64,8 @@ export default function HomeView() {
   }, [notice]);
 
   const scrollToShelves = useCallback(() => {
-    shelvesRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    shelvesRef.current?.scrollIntoView({ behavior: calm ? "auto" : "smooth", block: "start" });
     shelvesRef.current?.focus({ preventScroll: true });
   }, []);
 
