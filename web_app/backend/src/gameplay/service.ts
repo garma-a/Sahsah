@@ -1,3 +1,7 @@
+import { writtenAtMost, written } from "./invariant.js";
+import { scoped, enrichContext, log, errorStack, context, withContext } from "./logging.js";
+import type { Contract } from "./contract.js";
+import { single, invariant } from "./invariant.js";
 import {
   Injectable,
   type OnModuleDestroy,
@@ -20,7 +24,7 @@ import {
   databaseConstraint,
 } from "./problem.js";
 import { setTimeout as retryDelay } from "node:timers/promises";
-import type { Data, GameplayOptions, VerifiedAccount } from "./ports.js";
+import type { GameplayOptions, VerifiedAccount } from "./ports.js";
 import { GameplayScheduler } from "./scheduler.js";
 import { GameplayMetrics } from "./metrics.js";
 import {
@@ -45,8 +49,8 @@ export interface Actor {
 }
 
 export async function freshTime(db: Tx): Promise<Date> {
-  const result = await db.execute(sql`SELECT clock_timestamp() AS now`);
-  return new Date((result.rows[0] as { now: Date }).now);
+  const result = await db.execute<{ now: Date }>(sql`SELECT clock_timestamp() AS now`);
+  return new Date(single(result.rows, "CLOCK_SINGLE_ROW").now);
 }
 export const iso = (value: string | Date) => new Date(value).toISOString();
 export const plusDay = (now: Date) =>
@@ -152,11 +156,11 @@ export class GameplayService implements OnModuleInit, OnModuleDestroy {
   async reconcileOccupancy() {
     const revision = this.admission.revision;
     const result = await this.database.db
-      .execute(sql`SELECT (SELECT count(*)::int FROM rooms WHERE closed_at IS NULL) AS rooms,
+      .execute<{ rooms: number; members: number; games: number }>(sql`SELECT (SELECT count(*)::int FROM rooms WHERE closed_at IS NULL) AS rooms,
       (SELECT count(*)::int FROM room_memberships m JOIN rooms r ON r.id=m.room_id WHERE r.closed_at IS NULL AND m.left_at IS NULL AND m.removed_at IS NULL) AS members,
       (SELECT count(*)::int FROM games WHERE status='active') AS games`);
     this.admission.reconcile(
-      result.rows[0] as { rooms: number; members: number; games: number },
+      single(result.rows, "OCCUPANCY_SINGLE_ROW"),
       revision,
     );
   }
@@ -200,10 +204,19 @@ export class GameplayService implements OnModuleInit, OnModuleDestroy {
     }
   }
   operation(req: Request) {
-    return id(req.headers["idempotency-key"]);
+    const operationId = id(req.headers["idempotency-key"]);
+    enrichContext({ operationId });
+    return operationId;
   }
   /** Live streams subscribe here; called once per changed room after commit. */
   onCommitted?: (roomId: string) => void;
+  private committedLogs = new WeakMap<Tx, (() => void)[]>();
+  afterCommit(db: Tx, work: () => void) {
+    const captured = { ...context() };
+    const logs = this.committedLogs.get(db) ?? [];
+    logs.push(() => withContext(captured.scope, work, captured));
+    this.committedLogs.set(db, logs);
+  }
   private hinted = new WeakMap<Tx, Map<string, string>>();
   private pushed = new Set<string>();
   /** True once for a hint this process already delivered after its commit. */
@@ -222,6 +235,7 @@ export class GameplayService implements OnModuleInit, OnModuleDestroy {
         });
         // Push without waiting for the outbox poll. The durable hint remains
         // the safety net for a crash between commit and this line.
+        if (committing) for (const writeLog of this.committedLogs.get(committing) ?? []) writeLog();
         const hints = committing && this.hinted.get(committing);
         if (hints && this.onCommitted) {
           for (const key of hints.keys()) {
@@ -229,8 +243,13 @@ export class GameplayService implements OnModuleInit, OnModuleDestroy {
               this.pushed.delete(this.pushed.values().next().value!);
             this.pushed.add(key);
           }
-          for (const roomId of new Set(hints.values()))
-            this.onCommitted(roomId);
+          for (const roomId of new Set(hints.values())) {
+            try { this.onCommitted(roomId); }
+            catch (error) {
+              log.warn("platform.transaction.push", { code: "IN_PROCESS_PUSH_FAILED", stack: errorStack(error) });
+              throw error;
+            }
+          }
         }
         return result;
       } catch (error) {
@@ -244,10 +263,12 @@ export class GameplayService implements OnModuleInit, OnModuleDestroy {
               constraint ?? "",
             ));
         if (!retry || attempt >= 2) throw error;
+        log.warn("platform.transaction.retry", { code, attempt: attempt + 1 });
         await retryDelay(10 * (attempt + 1));
       }
     }
   }
+  @scoped("service.identity")
   async identity(authorization?: string): Promise<Actor> {
     this.enabled();
     requireState(
@@ -296,10 +317,12 @@ export class GameplayService implements OnModuleInit, OnModuleDestroy {
       throw new GameplayProblem(401, "UNAUTHENTICATED");
     }
     const verified = { ...account, accountId: row.id };
+    enrichContext({ accountId: row.id });
     if (!cached?.account)
       this.rememberCredential(fingerprint, `account:${row.id}`, verified);
     return { account: verified, proofFingerprint: fingerprint };
   }
+  @scoped("service.actor")
   async actor(req: Request): Promise<Actor> {
     const known = this.actors.get(req);
     if (known) return known;
@@ -333,10 +356,14 @@ export class GameplayService implements OnModuleInit, OnModuleDestroy {
         403,
       );
   }
+  @scoped("service.room")
   async room(db: Tx, roomId: string, lock = true): Promise<Room> {
     const query = db.select().from(s.rooms).where(eq(s.rooms.id, roomId));
+    const waiting = performance.now();
     const room = (await (lock ? query.for("update") : query))[0];
+    if (lock) log.debug("rooms.room.lock", { waitMs: performance.now() - waiting });
     requireState(room, "NOT_FOUND", 404);
+    enrichContext({ roomId: room.id });
     return room;
   }
   async members(db: Tx, roomId: string) {
@@ -409,7 +436,7 @@ export class GameplayService implements OnModuleInit, OnModuleDestroy {
     db: Tx,
     operationId: string,
     hash: Buffer,
-  ): Promise<Data | undefined> {
+  ): Promise<Contract<"Receipt"> | undefined> {
     const row = (
       await db
         .select()
@@ -418,7 +445,8 @@ export class GameplayService implements OnModuleInit, OnModuleDestroy {
     )[0];
     if (!row) return;
     requireState(equalProof(row.requestDigest, hash), "OPERATION_CONFLICT");
-    return row.resultData;
+    // Receipts are persisted from the typed receipt writer; recovery must not revalidate.
+    return row.resultData as Contract<"Receipt">;
   }
   async saveReceipt(
     db: Tx,
@@ -428,16 +456,16 @@ export class GameplayService implements OnModuleInit, OnModuleDestroy {
     operationName: string,
     hash: Buffer,
     now: Date,
-    outcome: Data,
-  ): Promise<Data> {
-    const result = {
+    outcome: Partial<Contract<"Receipt">>,
+  ): Promise<Contract<"Receipt">> {
+    const result: Contract<"Receipt"> = {
       operationId,
       roomId: room.id,
       acceptedAt: now.toISOString(),
       effect: "changed",
       ...outcome,
     };
-    await db.insert(s.roomActions).values({
+    single(await db.insert(s.roomActions).values({
       operationId,
       roomId: room.id,
       actorAccountId: actor.account?.accountId,
@@ -447,8 +475,8 @@ export class GameplayService implements OnModuleInit, OnModuleDestroy {
       requestDigest: hash,
       acceptedAt: now.toISOString(),
       expiresAt: new Date(now.getTime() + 7 * 86400000).toISOString(),
-      resultData: result as JsonObject,
-    });
+      resultData: result,
+    }).returning(), "ROOMACTIONS_WRITE_ROW");
     return result;
   }
   async hint(
@@ -462,7 +490,7 @@ export class GameplayService implements OnModuleInit, OnModuleDestroy {
       deduplicationKey = `${gameId ? "game" : "room"}:${resource}:${gameProjection ?? version}`;
     const hints = this.hinted.get(db) ?? new Map<string, string>();
     this.hinted.set(db, hints.set(deduplicationKey, roomId));
-    await db
+    await writtenAtMost(db
       .insert(s.outboxEvents)
       .values({
         id: randomUUID(),
@@ -474,9 +502,10 @@ export class GameplayService implements OnModuleInit, OnModuleDestroy {
         availableAt: sql`clock_timestamp()`,
         createdAt: sql`clock_timestamp()`,
       })
-      .onConflictDoNothing();
+      .onConflictDoNothing().returning(), 1, "OUTBOXEVENTS_WRITE_COUNT");
   }
-  async create(actor: Actor, operationId: string, body: Data): Promise<Data> {
+  @scoped("service.create")
+  async create(actor: Actor, operationId: string, body: Contract<"CreateRoom">): Promise<Contract<"Receipt">> {
     requireState(actor.account, "UNAUTHENTICATED", 401);
     const hash = digest("createRoom", actor.account.accountId, body);
     const original = (
@@ -542,7 +571,7 @@ export class GameplayService implements OnModuleInit, OnModuleDestroy {
           const now = await freshTime(db),
             roomId = randomUUID(),
             memberId = randomUUID();
-          const [room] = await db
+          const room = single(await db
             .insert(s.rooms)
             .values({
               id: roomId,
@@ -564,18 +593,19 @@ export class GameplayService implements OnModuleInit, OnModuleDestroy {
               invitationIssuedAt: now.toISOString(),
               invitationExpiresAt: plusDay(now),
             })
-            .returning();
-          await db.insert(s.roomMemberships).values({
+            .returning(), "SERVICE_ROOM_ROW");
+          single(await db.insert(s.roomMemberships).values({
             id: memberId,
             roomId,
             accountId: actor.account!.accountId,
             displayName: account!.displayName!,
-            lobbyTeamNumber: body.hostTeamNumber as number | null,
+            lobbyTeamNumber: body.hostTeamNumber,
             joinedAt: now.toISOString(),
-          });
-          const selections = body.selections as Data[];
+          }).returning(), "ROOMMEMBERSHIPS_WRITE_ROW");
+          enrichContext({ roomId, accountId: actor.account!.accountId });
+          const selections = body.selections;
           if (selections.length)
-            await db.insert(s.roomPackSelections).values(
+            await written(db.insert(s.roomPackSelections).values(
               selections.map((item) => ({
                 roomId,
                 boardPosition: Number(item.boardPosition),
@@ -583,8 +613,9 @@ export class GameplayService implements OnModuleInit, OnModuleDestroy {
                 packId: String(item.packId),
                 observedRevision: BigInt(String(item.observedRevision)),
               })),
-            );
+            ).returning(), selections.length, "ROOMPACKSELECTIONS_WRITE_COUNT");
           await this.hint(db, room.id, room.stateVersion);
+          this.afterCommit(db, () => log.info("rooms.create", { outcome: "created" }));
           return this.saveReceipt(
             db,
             room,

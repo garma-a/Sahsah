@@ -10,12 +10,15 @@ import { localMedia, publicMediaBaseUrl, r2Signer } from "./gameplay/media.js";
 import { trustedProxyHops } from "./gameplay/http.js";
 import { GameplayWsAdapter } from "./gameplay/realtime.js";
 import { json, type ErrorRequestHandler } from "express";
-import { randomUUID } from "node:crypto";
+import { PinoLogger } from "nestjs-pino";
+import { currentRequestId, requestLogging, SafeNestLogger, log } from "./gameplay/logging.js";
 
 export async function createApplication(
   options: { gameplay?: GameplayOptions } = {},
 ) {
-  const app = await NestFactory.create(AppModule, { abortOnError: false });
+  const app = await NestFactory.create(AppModule, { abortOnError: false, logger: false });
+  app.useLogger(new SafeNestLogger(await app.resolve(PinoLogger)));
+  app.use(requestLogging());
   const config = app.get(ConfigService);
   const express = app.getHttpAdapter().getInstance();
   express.disable("x-powered-by");
@@ -75,7 +78,8 @@ export async function createApplication(
     const bodyError: ErrorRequestHandler = (error, _req, res, next) => {
       if (!error) return next();
       const status = error.status === 413 ? 413 : 400;
-      const requestId = randomUUID();
+      const requestId = currentRequestId();
+      log.warn("platform.http.body", { code: status === 413 ? "BODY_TOO_LARGE" : "INVALID_INPUT", status });
       res.setHeader("X-Request-ID", requestId);
       res
         .status(status)

@@ -11,14 +11,19 @@ type Connection = Pick<Client | PoolClient, "query">;
 type Journal = { entries: { tag: string; when: number; idx: number }[] };
 
 function localMigrations(folder: string) {
+  // Drizzle reads the same journal; the checks below verify its ordered entry shape.
   const journal = JSON.parse(readFileSync(`${folder}/meta/_journal.json`, "utf8")) as Journal;
   const files = readMigrationFiles({ migrationsFolder: folder });
   if (!files.length || journal.entries.length !== files.length || files.some((file, i) =>
     !Number.isSafeInteger(file.folderMillis) || file.folderMillis !== journal.entries[i]?.when ||
-    journal.entries[i]?.idx !== i || (i > 0 && file.folderMillis <= files[i - 1].folderMillis))) {
+    journal.entries[i]?.idx !== i || (i > 0 && file.folderMillis <= (files[i - 1]?.folderMillis ?? Infinity)))) {
     throw new Error("Invalid migration journal: require a nonempty, strictly ordered history.");
   }
-  return files.map((file, i) => ({ ...file, tag: journal.entries[i].tag }));
+  return files.map((file, i) => {
+    const entry = journal.entries[i];
+    if (!entry) throw new Error("Invalid migration journal: missing entry.");
+    return { ...file, tag: entry.tag };
+  });
 }
 
 export async function migrationStatus(client: Connection, folder = migrationsFolder) {
@@ -26,7 +31,7 @@ export async function migrationStatus(client: Connection, folder = migrationsFol
   const exists = await client.query<{ present: boolean }>(
     "SELECT to_regclass('drizzle.__drizzle_migrations') IS NOT NULL AS present",
   );
-  const applied = exists.rows[0].present
+  const applied = exists.rows[0]?.present
     ? (await client.query<{ hash: string; created_at: string }>(
       "SELECT hash, created_at::text FROM drizzle.__drizzle_migrations ORDER BY created_at, id",
     )).rows : [];

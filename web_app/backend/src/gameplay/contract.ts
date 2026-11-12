@@ -2,7 +2,9 @@ import { readFileSync } from "node:fs";
 import { Ajv, type ValidateFunction } from "ajv";
 import addFormats = require("ajv-formats");
 import { z } from "zod";
-import type { Data } from "./ports.js";
+import type { WireTypes } from "./contracts/wire-types.js";
+import { makeSchemas } from "./contracts/schema-registry.js";
+export type Contract<N extends keyof typeof schemas> = z.output<(typeof schemas)[N]>;
 import { GameplayProblem } from "./problem.js";
 
 export const openapi = JSON.parse(
@@ -11,8 +13,8 @@ export const openapi = JSON.parse(
 function convert(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(convert);
   if (!value || typeof value !== "object") return value;
-  const source = value as Data;
-  const result: Data = {};
+  const source = Object.fromEntries(Object.entries(value));
+  const result: Record<string, unknown> = {};
   for (const [key, item] of Object.entries(source)) {
     if (["nullable", "discriminator", "writeOnly"].includes(key)) continue;
     result[key] =
@@ -39,14 +41,15 @@ export function validator(name: string): ValidateFunction {
   }
   return validate;
 }
-export function inputSchema(name: string) {
+export function inputSchema<T>(name: string): z.ZodType<T> {
   // Zod's Standard Schema interface integrates with Nest; AJV validates the
   // reviewed contract so input/output definitions cannot drift into permissive DTOs.
   return z
-    .custom<Data>((value) => validator(name)(normalize(value)), {
+    .custom<T>((value) => validator(name)(normalize(value)), {
       error: "Invalid request",
     })
-    .transform((value) => normalize(value) as Data)
+    // Normalization trims strings and preserves the AJV-validated object shape.
+    .transform((value) => normalize(value) as T)
     .meta({ id: name });
 }
 function normalize(value: unknown): unknown {
@@ -63,21 +66,17 @@ function normalize(value: unknown): unknown {
     );
   return value;
 }
-export function input(name: string, value: unknown): Data {
+export function input<N extends keyof WireTypes>(name: N, value: unknown): WireTypes[N] {
   if (!validator(name)(value)) throw new GameplayProblem(400, "INVALID_INPUT");
-  return value as Data;
+  // AJV validated this exact contract; its cached validator erases the generic.
+  return value as WireTypes[N];
 }
-export function output(name: string, value: unknown): Data {
-  if (!validator(name)(value))
-    throw new GameplayProblem(500, "RESPONSE_CONTRACT_ERROR");
-  return value as Data;
+export function output<N extends keyof WireTypes>(name: N, value: unknown): WireTypes[N] {
+  if (!validator(name)(value)) throw new GameplayProblem(500, "RESPONSE_CONTRACT_ERROR");
+  // AJV validated this exact contract; its cached validator erases the generic.
+  return value as WireTypes[N];
 }
-export const schemas = Object.fromEntries(
-  Object.keys(openapi.components.schemas).map((name) => [
-    name,
-    inputSchema(name),
-  ]),
-);
+export const schemas = makeSchemas(inputSchema);
 export const uuid = z.uuid();
 export function id(value: unknown): string {
   const parsed = uuid.safeParse(value);

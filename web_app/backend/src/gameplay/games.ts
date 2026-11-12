@@ -1,3 +1,6 @@
+import { writtenAtMost, written } from "./invariant.js";
+import { scoped, enrichContext, log, errorStack } from "./logging.js";
+import { single, invariant, versionIncrement } from "./invariant.js";
 import { Injectable } from "@nestjs/common";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
@@ -8,7 +11,7 @@ import { points, remaining, settings, suggested } from "./content.js";
 import { revision } from "./contract.js";
 import { digest, equalProof, proof } from "./proof.js";
 import { requireState } from "./problem.js";
-import type { Data } from "./ports.js";
+import type { Contract } from "./contract.js";
 import { RoomOperations } from "./rooms.js";
 import {
   GameplayService,
@@ -30,8 +33,11 @@ export class GameOperations {
   ) {}
   async game(db: Tx, gameId: string, lock = true): Promise<Game> {
     const query = db.select().from(s.games).where(eq(s.games.id, gameId));
+    const waiting = performance.now();
     const game = (await (lock ? query.for("update") : query))[0];
+    if (lock) log.debug("games.game.lock", { waitMs: performance.now() - waiting });
     requireState(game, "NOT_FOUND", 404);
+    enrichContext({ gameId: game.id, roomId: game.roomId });
     return game;
   }
   host(game: Game, actor: Actor, control = true) {
@@ -76,7 +82,7 @@ export class GameOperations {
       ...players.flatMap((p) => (p.accountId ? [p.accountId] : [])),
     ]);
   }
-  fields(game: Game): Data {
+  fields(game: Game): Pick<Contract<"GameCommandReceipt">, "gameId" | "gameVersion" | "gameProjectionVersion"> {
     return {
       gameId: game.id,
       gameVersion: String(game.stateVersion),
@@ -97,7 +103,8 @@ export class GameOperations {
     )[0];
     if (!row) return;
     requireState(equalProof(row.requestDigest, hash), "OPERATION_CONFLICT");
-    return row.resultData;
+    // Durable game receipts come from the typed writer; replay does not revalidate.
+    return row.resultData as Contract<"Receipt">;
   }
   async receipt(
     db: Tx,
@@ -108,10 +115,10 @@ export class GameOperations {
     hash: Buffer,
     expected: bigint,
     now: Date,
-    outcome: Data = {},
+    outcome: Partial<Contract<"Receipt">> = {},
     score: Partial<typeof s.gameActions.$inferInsert> = {},
-  ): Promise<Data> {
-    const result = {
+  ): Promise<Contract<"Receipt">> {
+    const result: Contract<"Receipt"> = {
       operationId,
       roomId: game.roomId,
       acceptedAt: now.toISOString(),
@@ -122,7 +129,7 @@ export class GameOperations {
       ...this.fields(game),
       ...outcome,
     };
-    await db.insert(s.gameActions).values({
+    single(await db.insert(s.gameActions).values({
       gameId: game.id,
       commandId: operationId,
       hostAccountId: actor.account!.accountId,
@@ -131,12 +138,13 @@ export class GameOperations {
       controllerGeneration: game.controllerGeneration,
       expectedVersion: expected,
       resultVersion: game.stateVersion,
-      resultData: result as JsonObject,
+      resultData: result,
       acceptedAt: now.toISOString(),
       ...score,
-    });
+    }).returning(), "GAMEACTIONS_WRITE_ROW");
     return result;
   }
+  @scoped("games.finish")
   async finish(
     db: Tx,
     game: Game,
@@ -167,7 +175,7 @@ export class GameOperations {
       );
     for (const q of running) {
       const ms = remaining(q, ended);
-      await db
+      single(await db
         .update(s.gameQuestions)
         .set({
           timerState: ms ? "paused" : "elapsed",
@@ -175,9 +183,9 @@ export class GameOperations {
           timerDeadlineAt: null,
           resumeTimerOnReopen: false,
         })
-        .where(this.slot(q));
+        .where(this.slot(q)).returning(), "GAMEQUESTIONS_WRITE_ROW");
     }
-    const [updated] = await db
+    const updated = single(await db
       .update(s.games)
       .set({
         status: reason === "idle_timeout" ? "expired" : "finished",
@@ -192,7 +200,7 @@ export class GameOperations {
         activeQuestionPosition: null,
       })
       .where(eq(s.games.id, game.id))
-      .returning();
+      .returning(), "GAMES_UPDATED_ROW");
     await db
       .update(s.accounts)
       .set({ activeGameId: null, activeGameClaimedAt: null })
@@ -210,7 +218,7 @@ export class GameOperations {
           )
       )[0];
       requireState(debit, "GAME_DEBIT_MISSING", 500);
-      await db
+      await writtenAtMost(db
         .insert(s.tokenLedgerEntries)
         .values({
           id: randomUUID(),
@@ -224,7 +232,7 @@ export class GameOperations {
           restorationReason: "unopened_game",
           createdAt: now.toISOString(),
         })
-        .onConflictDoNothing();
+        .onConflictDoNothing().returning(), 1, "TOKENLEDGERENTRIES_WRITE_COUNT");
     }
     await this.core.hint(
       db,
@@ -235,8 +243,12 @@ export class GameOperations {
     );
     // A room-only maintenance pass derives its lobby deadline from endedAt;
     // never acquire room after game, even through a membership trigger.
+    versionIncrement(game.stateVersion, updated.stateVersion);
+    versionIncrement(game.projectionVersion, updated.projectionVersion);
+    this.core.afterCommit(db, () => log.info("games.finish", { outcome: updated.status }));
     return updated;
   }
+  @scoped("games.expire")
   async expire(gameId: string) {
     return this.core.transaction(async (db) => {
       const game = await this.game(db, gameId),
@@ -267,12 +279,13 @@ export class GameOperations {
     ].sort())
       await this.expire(id);
   }
+  @scoped("games.start")
   async start(
     actor: Actor,
     roomId: string,
     operationId: string,
-    body: Data,
-  ): Promise<Data> {
+    body: Contract<"StartGame">,
+  ): Promise<Contract<"Receipt">> {
     const hash = digest("startGame", roomId, body);
     const original = (
       await this.core.database.db
@@ -461,12 +474,12 @@ export class GameOperations {
         const sequence = await db.execute(
           sql`SELECT coalesce(max(sequence_number),0)+1 AS n FROM games WHERE room_id=${roomId}`,
         );
-        const [game] = await db
+        const game = single(await db
           .insert(s.games)
           .values({
             id: gameId,
             roomId,
-            sequenceNumber: Number(sequence.rows[0].n),
+            sequenceNumber: Number(single(sequence.rows, "GAME_SEQUENCE_ROW").n),
             startRequestId: operationId,
             startRequestDigest: hash,
             hostAccountId: room.ownerAccountId,
@@ -483,7 +496,9 @@ export class GameOperations {
             controllerGeneration: room.controllerGeneration,
             controllerAcquiredAt: now.toISOString(),
           })
-          .returning();
+          .returning(), "GAMES_GAME_ROW");
+        enrichContext({ gameId, roomId, operationId });
+        this.core.afterCommit(db, () => log.info("games.start", { outcome: "created" }));
         const ordered = [...roster].sort((a, b) =>
           a.accountId === room.ownerAccountId
             ? -1
@@ -493,7 +508,7 @@ export class GameOperations {
                 ? -1
                 : 1,
         );
-        await db.insert(s.gamePlayers).values(
+        await written(db.insert(s.gamePlayers).values(
           ordered.map((m, i) => ({
             gameId,
             roomId,
@@ -504,8 +519,8 @@ export class GameOperations {
             displayName: m.displayName,
             joinedAt: now.toISOString(),
           })),
-        );
-        await db.insert(s.gamePacks).values(
+        ).returning(), ordered.length, "GAMEPLAYERS_WRITE_COUNT");
+        await written(db.insert(s.gamePacks).values(
           selections.map((choice) => {
             const pack = packs.find((p) => p.id === choice.packId)!,
               category = categories.find((c) => c.id === choice.categoryId)!;
@@ -522,7 +537,7 @@ export class GameOperations {
               repeatAcceptedBySeat: choice.repeatAcceptedAt ? 1 : null,
             };
           }),
-        );
+        ).returning(), selections.length, "GAMEPACKS_WRITE_COUNT");
         const copied: (typeof s.gameQuestions.$inferInsert)[] = [],
           pins: (typeof s.gameQuestionMedia.$inferInsert)[] = [];
         for (const q of questions) {
@@ -660,8 +675,8 @@ export class GameOperations {
           });
         }
         requireState(copied.length === 36, "CONTENT_NOT_READY");
-        await db.insert(s.gameQuestions).values(copied);
-        if (pins.length) await db.insert(s.gameQuestionMedia).values(pins);
+        await written(db.insert(s.gameQuestions).values(copied).returning(), copied.length, "GAMEQUESTIONS_WRITE_COUNT");
+        if (pins.length) await written(db.insert(s.gameQuestionMedia).values(pins).returning(), pins.length, "GAMEQUESTIONMEDIA_WRITE_COUNT");
         await db
           .update(s.accounts)
           .set({ activeGameId: gameId, activeGameClaimedAt: now.toISOString() })
@@ -671,7 +686,7 @@ export class GameOperations {
               accounts.map((a) => a.id),
             ),
           );
-        await db.insert(s.tokenLedgerEntries).values({
+        single(await db.insert(s.tokenLedgerEntries).values({
           id: randomUUID(),
           accountId: room.ownerAccountId,
           entryKind: "game_debit",
@@ -679,7 +694,7 @@ export class GameOperations {
           idempotencyKey: `start:${operationId}`,
           gameId,
           createdAt: now.toISOString(),
-        });
+        }).returning(), "TOKENLEDGERENTRIES_WRITE_ROW");
         const updated = await this.rooms.bump(
           db,
           room,
@@ -734,7 +749,7 @@ export class GameOperations {
       (a) => a.state === "active" && a.activeGameId === game.id,
     );
     if (eligible.length)
-      await db
+      await writtenAtMost(db
         .insert(s.accountQuestionExposures)
         .values(
           eligible.map((a) => ({
@@ -744,7 +759,7 @@ export class GameOperations {
             firstExposedAt: now.toISOString(),
           })),
         )
-        .onConflictDoNothing();
+        .onConflictDoNothing().returning(), eligible.length, "ACCOUNTQUESTIONEXPOSURES_WRITE_COUNT");
   }
   async completion(db: Tx, game: Game, q: Question, now: Date) {
     const all = await db
@@ -771,7 +786,7 @@ export class GameOperations {
       (a) => a.state === "active" && a.activeGameId === game.id,
     );
     if (eligible.length)
-      await db
+      await writtenAtMost(db
         .insert(s.accountPackCompletions)
         .values(
           eligible.map((a) => ({
@@ -781,21 +796,26 @@ export class GameOperations {
             completedAt: now.toISOString(),
           })),
         )
-        .onConflictDoNothing();
+        .onConflictDoNothing().returning(), eligible.length, "ACCOUNTPACKCOMPLETIONS_WRITE_COUNT");
   }
+  @scoped("games.command")
   async command(
     actor: Actor,
     gameId: string,
     operationId: string,
-    body: Data,
-  ): Promise<Data> {
+    body: Contract<"GameCommand">,
+  ): Promise<Contract<"Receipt">> {
+    enrichContext({ gameId, operationId, accountId: actor.account?.accountId });
+    let versionBefore = body.expectedGameVersion;
+    let recovered = false;
     const hash = digest("gameCommand", gameId, body);
     return this.core
       .transaction(async (db) => {
         let game = await this.game(db, gameId);
+        versionBefore = String(game.stateVersion);
         this.host(game, actor);
         const prior = await this.recover(db, gameId, operationId, hash);
-        if (prior) return prior;
+        if (prior) { recovered = true; return prior; }
         const lockedAccounts = await this.lockRoster(db, game);
         requireState(
           lockedAccounts.find((a) => a.id === game.hostAccountId)?.state ===
@@ -819,7 +839,7 @@ export class GameOperations {
           409,
           { currentGameVersion: String(game.stateVersion) },
         );
-        const name = String(body.name);
+        const name = body.name;
         if (name === "end_game") {
           game = await this.finish(db, game, now, "host_ended");
           return this.receipt(
@@ -834,7 +854,7 @@ export class GameOperations {
           );
         }
         let score: Partial<typeof s.gameActions.$inferInsert> = {},
-          changes: Partial<typeof s.games.$inferInsert> = {};
+          changes: Partial<Game> = {};
         if (name === "adjust_score") {
           const team = Number(body.teamNumber),
             before = team === 1 ? game.teamOneScore : game.teamTwoScore,
@@ -922,7 +942,7 @@ export class GameOperations {
               };
             } else if (name === "resolve_question") {
               requireState(q.revealedAt, "ANSWER_NOT_REVEALED");
-              const winner = body.winningTeamNumber as number | null;
+              const winner = body.winningTeamNumber;
               requireState(
                 winner !== null ||
                   body.awardedPoints === undefined ||
@@ -1020,7 +1040,7 @@ export class GameOperations {
             }
           }
           if (Object.keys(qc).length)
-            await db.update(s.gameQuestions).set(qc).where(this.slot(q));
+            single(await db.update(s.gameQuestions).set(qc).where(this.slot(q)).returning(), "GAMEQUESTIONS_WRITE_ROW");
           if (name === "resolve_question")
             await this.completion(db, game, q, now);
         }
@@ -1029,17 +1049,17 @@ export class GameOperations {
           const count = await db.execute(
             sql`SELECT count(*)::int AS n FROM game_questions WHERE game_id=${gameId} AND resolved_at IS NOT NULL`,
           );
-          complete = count.rows[0].n === 36;
+          complete = single(count.rows, "GAME_RESOLVED_COUNT_ROW").n === 36;
         }
         if (complete)
           game = await this.finish(
             db,
-            { ...game, ...changes } as Game,
+            { ...game, ...changes },
             now,
             "completed",
           );
         else {
-          const [updated] = await db
+          const updated = single(await db
             .update(s.games)
             .set({
               ...changes,
@@ -1049,7 +1069,9 @@ export class GameOperations {
               idleExpiresAt: plusDay(now),
             })
             .where(eq(s.games.id, game.id))
-            .returning();
+            .returning(), "GAMES_UPDATED_ROW");
+          versionIncrement(game.stateVersion, updated.stateVersion);
+          versionIncrement(game.projectionVersion, updated.projectionVersion);
           game = updated;
         }
         await this.core.hint(
@@ -1073,17 +1095,22 @@ export class GameOperations {
         );
       })
       .then((result) => {
-        requireState(!result.expired, "GAME_EXPIRED", 410);
+        requireState(!("expired" in result), "GAME_EXPIRED", 410);
+        log.info(`games.commands.${body.name}`, { name: body.name, versionBefore, versionAfter: result.gameVersion, outcome: recovered ? "replayed" : result.effect });
         return result;
+      }).catch((error: unknown) => {
+        log.info(`games.commands.${body.name}`, { name: body.name, versionBefore, outcome: error instanceof Error && "code" in error ? String(error.code) : "failed" });
+        throw error;
       });
   }
+  @scoped("games.feedback")
   async feedback(
     actor: Actor,
     gameId: string,
     boardPosition: number,
     questionPosition: number,
     operationId: string,
-    body: Data,
+    body: Contract<"FeedbackRequest">,
   ) {
     const hash = digest("feedback", gameId, {
       ...body,
@@ -1126,21 +1153,23 @@ export class GameOperations {
           now,
           { feedbackVersion: String(q.feedbackVersion), effect: "none" },
         );
-      await db
+      single(await db
         .update(s.gameQuestions)
         .set({
-          feedbackVote: body.vote as "like" | "dislike",
+          feedbackVote: body.vote,
           feedbackVersion: q.feedbackVersion + 1n,
           feedbackByAccountId: game.hostAccountId,
           feedbackCreatedAt: q.feedbackCreatedAt ?? now.toISOString(),
           feedbackUpdatedAt: now.toISOString(),
         })
-        .where(this.slot(q));
-      const [updated] = await db
+        .where(this.slot(q)).returning(), "GAMEQUESTIONS_WRITE_ROW");
+      const updated = single(await db
         .update(s.games)
         .set({ projectionVersion: game.projectionVersion + 1n })
         .where(eq(s.games.id, gameId))
-        .returning();
+        .returning(), "GAMES_UPDATED_ROW");
+      versionIncrement(game.projectionVersion, updated.projectionVersion);
+      invariant(updated.stateVersion === game.stateVersion, "FEEDBACK_GAME_VERSION_STABLE");
       await this.core.hint(
         db,
         game.roomId,

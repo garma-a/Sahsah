@@ -1,3 +1,6 @@
+import { scoped, enrichContext, log, errorStack } from "./logging.js";
+import type { Contract } from "./contract.js";
+import { invariant } from "./invariant.js";
 import { Injectable } from "@nestjs/common";
 import { and, eq, sql } from "drizzle-orm";
 import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
@@ -12,7 +15,7 @@ import { GameOperations } from "./games.js";
 import { ProjectionService } from "./projection.js";
 import { GameplayService, freshTime, type Actor } from "./service.js";
 import { requireState } from "./problem.js";
-import type { Data, MediaObject, SignedMedia } from "./ports.js";
+import type { MediaObject, SignedMedia } from "./ports.js";
 
 export function r2Signer(
   env: NodeJS.ProcessEnv,
@@ -119,11 +122,12 @@ export function publicMediaBaseUrl(env: NodeJS.ProcessEnv) {
   );
   return url.href.replace(/\/+$/, "");
 }
-function refs(value: unknown): Data[] {
+function refs(value: unknown): Contract<"MediaRef">[] {
   if (!value || typeof value !== "object") return [];
   if (Array.isArray(value)) return value.flatMap(refs);
-  const obj = value as Data;
-  if (["image", "audio"].includes(String(obj.kind))) return [obj];
+  const obj = Object.fromEntries(Object.entries(value));
+  if (["image", "audio"].includes(String(obj.kind))) // Only typed question/answer presentations feed this recursive collector.
+  return [obj as Contract<"MediaRef">];
   return Object.values(obj).flatMap(refs);
 }
 
@@ -134,8 +138,9 @@ export class MediaService {
     private games: GameOperations,
     private projections: ProjectionService,
   ) {}
-  async access(actor: Actor, gameId: string, body: Data): Promise<Data> {
-    const requested = body.refs as Data[];
+  @scoped("media.access")
+  async access(actor: Actor, gameId: string, body: Contract<"MediaRequest">): Promise<Contract<"MediaLinks">> {
+    const requested = body.refs;
     requireState(
       new Set(requested.map(canonical)).size === requested.length,
       "DUPLICATE_MEDIA_REF",
@@ -169,6 +174,7 @@ export class MediaService {
               }),
             )
         )[0];
+        invariant(q, "MEDIA_CURRENT_QUESTION");
         const media = await db
           .select({ pin: s.gameQuestionMedia, asset: s.mediaAssets })
           .from(s.gameQuestionMedia)
@@ -227,7 +233,7 @@ export class MediaService {
           namespace: asset.storageNamespace,
           key: asset.storageKey,
         })),
-        contentType: asset.contentType,
+        contentType: asset.contentType!,
         byteSize: String(asset.byteSize),
         ...(asset.durationMs !== null ? { durationMs: asset.durationMs } : {}),
         ...(asset.widthPx !== null ? { width: asset.widthPx } : {}),

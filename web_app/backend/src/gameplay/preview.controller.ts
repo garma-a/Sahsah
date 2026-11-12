@@ -1,3 +1,5 @@
+import { writtenAtMost } from "./invariant.js";
+import { single, invariant } from "./invariant.js";
 import {
   Body,
   Controller,
@@ -75,13 +77,14 @@ export class PreviewController {
           )
           .returning({ id: s.accounts.id });
         requireState(renewed.length, "UNAUTHENTICATED", 401);
+        invariant(renewed.length === 1, "PREVIEW_RENEW_SINGLE_ACCOUNT");
         return held.accountId;
       }
       const id = randomUUID(),
         audit = randomUUID();
       // Ledger credits require an active granting staff account; "disabled" is
       // not a password hash, so this account can never sign in to AdminJS.
-      await db
+      await writtenAtMost(db
         .insert(s.staffAccounts)
         .values({
           id: staffId,
@@ -89,15 +92,15 @@ export class PreviewController {
           normalizedEmail: "preview@sahsah.invalid",
           passwordHash: "disabled",
         })
-        .onConflictDoNothing();
+        .onConflictDoNothing().returning(), 1, "STAFFACCOUNTS_WRITE_COUNT");
       // +2000… is outside every Egyptian numbering range, so it cannot be a real phone.
-      await db.insert(s.accounts).values({
+      single(await db.insert(s.accounts).values({
         id,
         displayName,
         phoneE164: `+2000${String(randomInt(1e10)).padStart(10, "0")}`,
         phoneVerifiedAt: sql`clock_timestamp()`,
-      });
-      await db.insert(s.staffAuditEvents).values({
+      }).returning(), "ACCOUNTS_WRITE_ROW");
+      single(await db.insert(s.staffAuditEvents).values({
         id: audit,
         staffAccountId: staffId,
         actionCode: "token_grant",
@@ -105,8 +108,8 @@ export class PreviewController {
         targetKey: id,
         requestKey: randomUUID(),
         reason: "Preview host grant (ADR 0017)",
-      });
-      await db.insert(s.tokenLedgerEntries).values({
+      }).returning(), "STAFFAUDITEVENTS_WRITE_ROW");
+      single(await db.insert(s.tokenLedgerEntries).values({
         id: randomUUID(),
         accountId: id,
         entryKind: "credit",
@@ -114,7 +117,7 @@ export class PreviewController {
         idempotencyKey: `preview:${id}`,
         staffAuditEventId: audit,
         reasonText: "Preview host grant",
-      });
+      }).returning(), "TOKENLEDGERENTRIES_WRITE_ROW");
       return id;
     });
     return {

@@ -4,15 +4,15 @@ import {
   type ExceptionFilter,
   HttpException,
 } from "@nestjs/common";
-import { randomUUID } from "node:crypto";
+import { context, currentRequestId, log, errorStack } from "./logging.js";
 import type { Response } from "express";
-import type { Data } from "./ports.js";
+import type { JsonObject } from "../database/schema/types.js";
 
 export class GameplayProblem extends Error {
   constructor(
     public status: number,
     public code: string,
-    public details: Data = {},
+    public details: JsonObject = {},
   ) {
     super(code);
   }
@@ -21,19 +21,19 @@ export function requireState(
   condition: unknown,
   code = "INVALID_TRANSITION",
   status = 409,
-  details: Data = {},
+  details: JsonObject = {},
 ): asserts condition {
   if (!condition) throw new GameplayProblem(status, code, details);
 }
 export function databaseCode(error: unknown): string | undefined {
   if (!error || typeof error !== "object") return;
-  const e = error as { code?: string; cause?: unknown };
-  return e.code ?? databaseCode(e.cause);
+  const e = error;
+  return ("code" in e && typeof e.code === "string" ? e.code : undefined) ?? databaseCode("cause" in e ? e.cause : undefined);
 }
 export function databaseConstraint(error: unknown): string | undefined {
   if (!error || typeof error !== "object") return;
-  const value = error as { constraint?: string; cause?: unknown };
-  return value.constraint ?? databaseConstraint(value.cause);
+  const value = error;
+  return ("constraint" in value && typeof value.constraint === "string" ? value.constraint : undefined) ?? databaseConstraint("cause" in value ? value.cause : undefined);
 }
 @Catch()
 export class GameplayProblemFilter implements ExceptionFilter {
@@ -61,7 +61,12 @@ export class GameplayProblemFilter implements ExceptionFilter {
           : "INTERNAL_ERROR");
     if (status === 429 || status === 503)
       response.setHeader("Retry-After", "15");
-    const requestId = randomUUID();
+    // Logged once here, at the HTTP boundary. Capacity refusals are routine;
+    // invariant failures were already logged with context where they failed.
+    if (status < 500 || status === 503) log.warn(context().scope, { code: applicationCode, status });
+    else if (applicationCode !== "INTERNAL_INVARIANT")
+      log.error(context().scope, { code: applicationCode, status, stack: errorStack(error) });
+    const requestId = currentRequestId();
     response.setHeader("X-Request-Id", requestId);
     response.setHeader("Cache-Control", "private, no-store");
     response

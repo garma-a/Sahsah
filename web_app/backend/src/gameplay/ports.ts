@@ -33,4 +33,3 @@ export interface GameplayOptions {
   /** Origin and path prefix of public category artwork, without a trailing slash. */
   publicMediaBaseUrl?: string;
 }
-export type Data = Record<string, unknown>;
