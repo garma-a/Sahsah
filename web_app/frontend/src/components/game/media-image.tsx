@@ -18,8 +18,11 @@ type MediaImageProps = {
  * A question or answer picture in a paper frame. The link is short-lived and signed, so an image that
  * fails to load asks for a fresh link instead of showing a broken picture.
  */
-export default function MediaImage({ url, alt, failed, onRetry, className }: MediaImageProps) {
+export default function MediaImage({ url: latest, alt, failed, onRetry, className }: MediaImageProps) {
   const [brokenUrl, setBrokenUrl] = useState<string | null>(null);
+  // A hint stage swaps the picture: keep showing the previous one until the next link arrives.
+  const [url, setUrl] = useState(latest);
+  if (latest && latest !== url) setUrl(latest);
   const broken = failed || (url !== undefined && brokenUrl === url);
   return (
     <figure className={cn("relative rounded-2xl border-4 border-ink bg-white p-2 shadow-[0_8px_0_var(--color-ink)]", className)}>

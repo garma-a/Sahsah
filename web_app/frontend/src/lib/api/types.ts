@@ -100,6 +100,9 @@ export type AudioRef = {
 };
 export type MediaRef = ImageRef | AudioRef;
 
+/** The host clip's play state as presence mirrors it: no reference or URL, only how far along it is. */
+export type Playback = { playing: boolean; positionMs: number; durationMs: number; updatedAt: string };
+
 export type Timer =
   | { state: "ready"; remainingMs: number }
   | { state: "running"; remainingMs: number; deadlineAt: string }

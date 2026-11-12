@@ -18,7 +18,7 @@ export function clock(remainingMs: number): string {
  * The answering timer: a ring that empties and the time in the display face, big enough to read from across
  * the room. It goes red in the last ten seconds and turns into a "time's up" block at zero.
  */
-export default function TimerDial({ state, remainingMs }: { state: Timer["state"]; remainingMs: number }) {
+export default function TimerDial({ state, remainingMs, note }: { state: Timer["state"]; remainingMs: number; note?: string }) {
   const over = state === "elapsed" || (state === "running" && remainingMs <= 0);
   const paused = state === "paused";
   const low = !over && !paused && state === "running" && remainingMs <= LOW_MS;
@@ -59,11 +59,13 @@ export default function TimerDial({ state, remainingMs }: { state: Timer["state"
         )}
       </div>
       {/* Reserved height: the state label appears without pushing the question down. */}
-      <div className="grid h-12 place-items-center">
+      <div className="grid min-h-12 place-items-center">
         {over ? (
           <p className="animate-pop rounded-lg border-[3px] border-ink bg-press px-4 py-0.5 font-heading text-3xl leading-tight text-white">الوقت خلص</p>
         ) : paused ? (
           <p className="rounded-lg border-[3px] border-ink bg-amber px-4 py-0.5 font-heading text-2xl leading-tight text-ink">الوقت واقف</p>
+        ) : note && state === "ready" ? (
+          <p className="max-w-52 rounded-lg border-[3px] border-ink bg-sun px-3 py-0.5 text-center font-heading text-lg leading-tight">{note}</p>
         ) : null}
       </div>
       {/* Announced once when the state changes, never every second. */}

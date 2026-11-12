@@ -255,6 +255,15 @@
     transform: rotate(-14deg) scale(1);
   }
 }
+@keyframes eq {
+  0%,
+  100% {
+    transform: scaleY(0.3);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
 @keyframes beat {
   50% {
     transform: scale(1.06);

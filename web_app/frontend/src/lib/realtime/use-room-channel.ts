@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, LANGUAGE, REALTIME_URL, bearer, type Auth } from "@/lib/api/client";
 import { getRoom } from "@/lib/api/endpoints";
 import { asApiError } from "@/lib/api/errors";
-import type { Id, Snapshot } from "@/lib/api/types";
+import type { AudioRef, Id, Playback, Snapshot } from "@/lib/api/types";
 import { isStale } from "./ordering";
 
 export type ChannelStatus =
@@ -25,9 +25,15 @@ export type RoomChannel = {
   connected: ReadonlySet<Id>;
   /** Server clock minus this device clock (ms), taken from the newest state: deadlines are the server's. */
   clockOffsetMs: number;
+  /** The host clip's transient play state, mirrored to viewers (presence; never a game change). */
+  playback: Playback | null;
+  /** Host only: report an actual play, pause, seek or end of the current clip. */
+  sendPlayback: (input: PlaybackReport) => void;
   /** Reload the current projection over HTTP, e.g. after a command or a conflict. */
   refresh: () => void;
 };
+
+export type PlaybackReport = { gameId: Id; gameVersion: string; controllerGeneration: string; media: AudioRef; playing: boolean; positionMs: number };
 
 type Frame = { event: string; data: Record<string, unknown> };
 
@@ -79,6 +85,9 @@ export function useRoomChannel(input: {
   const [error, setError] = useState<ApiError | null>(null);
   const [connected, setConnected] = useState<ReadonlySet<Id>>(new Set());
   const [reloads, setReloads] = useState(0);
+  const [playback, setPlayback] = useState<Playback | null>(null);
+  const sendRef = useRef<(frame: object) => void>(() => {});
+  const playbackSequence = useRef(0);
   const [clockOffsetMs, setClockOffsetMs] = useState(0);
 
   const snapshotRef = useRef<Snapshot | null>(null);
@@ -193,6 +202,7 @@ export function useRoomChannel(input: {
           break;
         case "presence":
           setConnected(new Set((data.members as { membershipId: string; connected: boolean }[]).filter((m) => m.connected).map((m) => m.membershipId)));
+          setPlayback((data.playback as Playback | undefined) ?? null);
           break;
         case "resync_required":
           socket?.send(JSON.stringify({ event: "resync", data: {} }));
@@ -234,6 +244,9 @@ export function useRoomChannel(input: {
       streamId = null;
       const ws = new WebSocket(REALTIME_URL);
       socket = ws;
+      sendRef.current = (frame) => {
+        if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(frame));
+      };
       ws.onopen = () => {
         ws.send(
           JSON.stringify({
@@ -254,6 +267,7 @@ export function useRoomChannel(input: {
         if (socket === ws) {
           socket = null;
           setConnected(new Set());
+          setPlayback(null);
           scheduleReconnect();
         }
       };
@@ -284,5 +298,10 @@ export function useRoomChannel(input: {
     };
   }, [roomId, hasAuth, accept]);
 
-  return { snapshot, status, error, connected, clockOffsetMs, refresh };
+  const sendPlayback = useCallback((input: PlaybackReport) => {
+    playbackSequence.current += 1;
+    sendRef.current({ event: "playback_status", data: { ...input, playbackSequence: String(playbackSequence.current) } });
+  }, []);
+
+  return { snapshot, status, error, connected, clockOffsetMs, playback, sendPlayback, refresh };
 }
