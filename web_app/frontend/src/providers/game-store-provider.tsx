@@ -1,18 +1,46 @@
 "use client";
 
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { useStore } from "zustand";
-import { createGameStore, type GameStore } from "@/stores/game-store";
+import { createDraftStore, type DraftStore } from "@/stores/draft-store";
+import { IDENTITY_STORAGE_KEY, createIdentityStore, type IdentityStore } from "@/stores/identity-store";
 
-const GameStoreContext = createContext<ReturnType<typeof createGameStore> | null>(null);
+type Stores = { identity: ReturnType<typeof createIdentityStore>; draft: ReturnType<typeof createDraftStore> };
+const StoresContext = createContext<Stores | null>(null);
 
+// One pair of stores per provider keeps server requests and browser sessions independent.
+// Both persist to the browser, so they are rehydrated after mount and flagged `hydrated`.
 export default function GameStoreProvider({ children }: { children: ReactNode }) {
-  const [store] = useState(createGameStore);
-  return <GameStoreContext.Provider value={store}>{children}</GameStoreContext.Provider>;
+  const [stores] = useState<Stores>(() => ({ identity: createIdentityStore(), draft: createDraftStore() }));
+  useEffect(() => {
+    void Promise.resolve(stores.identity.persist.rehydrate()).then(() => stores.identity.setState({ hydrated: true }));
+    void Promise.resolve(stores.draft.persist.rehydrate()).then(() => stores.draft.setState({ hydrated: true }));
+    // Another tab changed the identity (a new seat, a takeover): take it, so two tabs never overwrite each other.
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === IDENTITY_STORAGE_KEY) void stores.identity.persist.rehydrate();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [stores]);
+  return <StoresContext.Provider value={stores}>{children}</StoresContext.Provider>;
 }
 
-export function useGameStore<T>(selector: (state: GameStore) => T): T {
-  const store = useContext(GameStoreContext);
-  if (!store) throw new Error("useGameStore requires GameStoreProvider");
-  return useStore(store, selector);
+function useStores(): Stores {
+  const stores = useContext(StoresContext);
+  if (!stores) throw new Error("Stores require GameStoreProvider");
+  return stores;
+}
+
+export function useIdentity<T>(selector: (state: IdentityStore) => T): T {
+  return useStore(useStores().identity, selector);
+}
+export function useDraft<T>(selector: (state: DraftStore) => T): T {
+  return useStore(useStores().draft, selector);
+}
+/** Imperative access for event handlers that must read the latest state, not a render snapshot. */
+export function useIdentityApi() {
+  return useStores().identity;
+}
+export function useDraftApi() {
+  return useStores().draft;
 }
