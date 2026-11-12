@@ -3,9 +3,16 @@
   "private": true,
   "version": "0.1.0",
   "packageManager": "pnpm@10.34.3",
-  "engines": { "node": ">=24.15.0 <25" },
+  "engines": {
+    "node": ">=24.15.0 <25"
+  },
   "pnpm": {
-    "onlyBuiltDependencies": ["@swc/core", "esbuild", "sharp", "unrs-resolver"]
+    "onlyBuiltDependencies": [
+      "@swc/core",
+      "esbuild",
+      "sharp",
+      "unrs-resolver"
+    ]
   },
   "scripts": {
     "dev": "next dev --port 3000",
@@ -18,7 +25,9 @@
     "@radix-ui/react-slot": "1.5.0",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
+    "lucide-react": "1.54.0",
     "next": "16.4.2",
+    "qrcode.react": "4.2.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "tailwind-merge": "3.7.0",
