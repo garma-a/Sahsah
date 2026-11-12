@@ -9,7 +9,7 @@ export interface RealtimeTypes {
   Secret: (string);
   Basis: (string);
   Language: ("ar" | "franco");
-  Team: ({ "number": (number); "name": (string); "score": (RealtimeTypes["Score"]) });
+  Team: ({ "number": (number); "name": (string); "score": (RealtimeTypes["Score"]); "players": (((RealtimeTypes["TeamPlayer"]))[]) });
   Teams: (((RealtimeTypes["Team"]))[]);
   Selection: ({ "boardPosition": (number); "categoryId": (RealtimeTypes["Id"]); "packId": (RealtimeTypes["Id"]); "observedRevision": (RealtimeTypes["Revision"]); "repeatConsentBasis"?: (RealtimeTypes["Basis"]) });
   Selections: (((RealtimeTypes["Selection"]))[]);
@@ -72,7 +72,7 @@ export interface RealtimeTypes {
   ViewerQuestionView: ({ "phase": ("question"); "audience": ("viewer"); "roomId": (RealtimeTypes["Id"]); "gameId": (RealtimeTypes["Id"]); "boardPosition": (number); "questionPosition": (number); "basePoints": (200 | 400 | 600); "suggestedPoints": (number); "teams": (RealtimeTypes["Teams"]); "timer": (RealtimeTypes["Timer"]); "idleExpiresAt": (RealtimeTypes["Time"]); "question": (RealtimeTypes["ViewerQuestion"]) });
   ViewerAnswerView: ((((RealtimeTypes["ViewerStandardAnswerView"])) | ((RealtimeTypes["ViewerImageBlurAnswerView"])) | ((RealtimeTypes["ViewerImageZoomAnswerView"])) | ((RealtimeTypes["ViewerAudioGuessAnswerView"])) | ((RealtimeTypes["ViewerAudioReverseAnswerView"])) | ((RealtimeTypes["ViewerImagePersonAnswerView"])) | ((RealtimeTypes["ViewerImageColorAnswerView"])) | ((RealtimeTypes["ViewerImageRiddleAnswerView"])) | ((RealtimeTypes["ViewerAudioVoiceAnswerView"])) | ((RealtimeTypes["ViewerImageMemoryAnswerView"]))));
   CategoryResult: ({ "boardPosition": (number); "categoryId": (RealtimeTypes["Id"]); "name": (string); "resolvedCount": (number); "teamOneAwardPoints": (number); "teamTwoAwardPoints": (number); "winningTeamNumber": (1 | 2 | null) });
-  ResultTeam: ({ "number": (number); "name": (string); "score": (RealtimeTypes["Score"]); "questionAwardTotal": (number); "manualAdjustmentTotal": (RealtimeTypes["SignedInteger"]) });
+  ResultTeam: ({ "number": (number); "name": (string); "score": (RealtimeTypes["Score"]); "questionAwardTotal": (number); "manualAdjustmentTotal": (RealtimeTypes["SignedInteger"]); "players": (((RealtimeTypes["TeamPlayer"]))[]) });
   Result: ({ "gameId": (RealtimeTypes["Id"]); "roomId": (RealtimeTypes["Id"]); "status": ("finished" | "expired" | "failed"); "endReason": ("completed" | "host_ended" | "host_left" | "idle_timeout" | "platform_failure"); "endedAt": (RealtimeTypes["Time"]); "resolvedQuestionCount": (number); "winningTeamNumber": (1 | 2 | null); "teams": (((RealtimeTypes["ResultTeam"]))[]); "categories": (((RealtimeTypes["CategoryResult"]))[]) });
   ResultView: ({ "phase": ("result"); "audience": ("host" | "viewer"); "result": (RealtimeTypes["Result"]) });
   Empty: ({  });
@@ -125,4 +125,5 @@ export interface RealtimeTypes {
   GameView: ((((RealtimeTypes["BoardView"])) | ((RealtimeTypes["HostQuestionView"])) | ((RealtimeTypes["ViewerQuestionView"])) | ((RealtimeTypes["HostAnswerView"])) | ((RealtimeTypes["ViewerAnswerView"])) | ((RealtimeTypes["ResultView"]))));
   ServerLobbyStateData: ({ "protocolVersion": (1); "streamId": (RealtimeTypes["Id"]); "sequence": (RealtimeTypes["Revision"]); "serverTime": (RealtimeTypes["Time"]); "language": (RealtimeTypes["Language"]); "source": (RealtimeTypes["LobbySource"]); "view": (RealtimeTypes["LobbyView"]) });
   ServerGameStateData: ({ "protocolVersion": (1); "streamId": (RealtimeTypes["Id"]); "sequence": (RealtimeTypes["Revision"]); "serverTime": (RealtimeTypes["Time"]); "language": (RealtimeTypes["Language"]); "source": (RealtimeTypes["GameSource"]); "view": (RealtimeTypes["GameView"]) });
+  TeamPlayer: ({ "membershipId": (RealtimeTypes["Id"]); "displayName": (string) });
 }

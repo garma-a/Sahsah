@@ -161,5 +161,6 @@ export function makeSchemas(factory: <T>(name: string) => ZodType<T>) {
     InitialSelection: factory<WireTypes["InitialSelection"]>("InitialSelection"),
     InitialSelections: factory<WireTypes["InitialSelections"]>("InitialSelections"),
     CategorySection: factory<WireTypes["CategorySection"]>("CategorySection"),
+    TeamPlayer: factory<WireTypes["TeamPlayer"]>("TeamPlayer"),
   };
 }
