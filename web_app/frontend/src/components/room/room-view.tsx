@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import GameScreen from "@/components/room/game-screen";
 import HostLobby from "@/components/room/host-lobby";
-
 import PlayerLobby from "@/components/room/player-lobby";
 import RoomShell from "@/components/room/room-shell";
 import Button from "@/components/ui/button";
@@ -161,7 +160,7 @@ function LiveRoom({ roomId, auth, role, membershipId, covers, categories }: Live
     return () => identity.getState().forgetRoom(roomId);
   }, [gone, roomId, identity]);
 
-  // Game views carry no player list, so remember the lobby's roster for the board.
+  // Keep the lobby roster: the fallback for team players when an older API sends none in game views.
   const lobby = snapshot?.view.phase === "lobby" ? snapshot.view : null;
   useEffect(() => {
     if (lobby) saveRoster(roomId, lobby.members);

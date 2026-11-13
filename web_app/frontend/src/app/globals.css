@@ -245,16 +245,6 @@
     transform: perspective(900px) rotateX(0) scale(1);
   }
 }
-@keyframes stamp {
-  0% {
-    opacity: 0;
-    transform: rotate(-14deg) scale(1.8);
-  }
-  100% {
-    opacity: 1;
-    transform: rotate(-14deg) scale(1);
-  }
-}
 @keyframes eq {
   0%,
   100% {

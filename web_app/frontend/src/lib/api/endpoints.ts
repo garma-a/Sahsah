@@ -135,7 +135,6 @@ export function mediaAccess(gameId: Id, auth: Auth, refs: MediaRef[], signal?: A
   return request(`/games/${gameId}/media-access`, { method: "POST", auth, body: { refs }, signal });
 }
 
-
 /** Host: move the room from the finished game's result back to the lobby to play again. */
 export function returnToLobby(roomId: Id, auth: Auth, operationId: string, expectedRoomVersion: string): Promise<Receipt> {
   return request(`/rooms/${roomId}/lobby`, { method: "POST", auth, operationId, body: { expectedRoomVersion } });

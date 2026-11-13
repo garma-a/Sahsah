@@ -6,7 +6,7 @@ import Button from "@/components/ui/button";
 import ErrorBanner from "@/components/ui/error-banner";
 import type { CategoryResult, ResultTeam, ResultView } from "@/lib/api/types";
 import { formatDigits, formatNumber } from "@/lib/format";
-import type { RosterEntry } from "@/lib/roster";
+import { teamPlayers, type RosterEntry } from "@/lib/roster";
 import { cn } from "@/lib/utils";
 
 type ResultScreenProps = {
@@ -39,7 +39,7 @@ export default function ResultScreen({ view, roster, isHost, busy, error, onPlay
       <div className="paper-card rounded-[2rem] border-4 border-ink p-4 shadow-[0_12px_0_var(--color-ink)] sm:p-6 lg:px-10 lg:py-8">
         <header className="flex flex-col items-center gap-3 text-center">
           <p className="rounded-full border-[3px] border-ink bg-cream px-4 py-0.5 text-base font-bold">{endNote[result.endReason] ?? "اللعبة خلصت"}</p>
-          <h1 id="result-title" className="sr-only">
+          <h1 id="result-title" tabIndex={-1} className="sr-only focus:outline-none">
             نتيجة اللعبة
           </h1>
           <div
@@ -94,7 +94,7 @@ export default function ResultScreen({ view, roster, isHost, busy, error, onPlay
 
 function TeamCard({ team, won, roster }: { team: ResultTeam; won: boolean; roster: RosterEntry[] }) {
   const tone = teamTone(team.number);
-  const players = team.players ? team.players.map((p) => p.displayName) : roster.filter((m) => m.teamNumber === team.number).map((m) => m.displayName);
+  const players = teamPlayers(team, roster);
   const adjustment = Number(team.manualAdjustmentTotal);
   return (
     <li className={cn("rounded-[1.4rem] border-4 border-ink bg-cream p-4 shadow-[0_6px_0_var(--color-ink)]", won && "ring-4 ring-sun ring-offset-2 ring-offset-cream")}>
@@ -113,9 +113,9 @@ function TeamCard({ team, won, roster }: { team: ResultTeam; won: boolean; roste
       )}
       <ul aria-label={`لاعبين ${team.name}`} className="mt-2 flex flex-wrap gap-1.5">
         {players.length === 0 && <li className="text-sm font-semibold">مفيش لاعبين</li>}
-        {players.map((name, i) => (
-          <li key={`${name}-${i}`} className="max-w-full truncate rounded-full border-2 border-ink bg-white px-3 py-0.5 text-sm font-bold">
-            {name}
+        {players.map((player) => (
+          <li key={player.id} className="max-w-full truncate rounded-full border-2 border-ink bg-white px-3 py-0.5 text-sm font-bold">
+            {player.displayName}
           </li>
         ))}
       </ul>

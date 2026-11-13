@@ -33,28 +33,24 @@ type HostBarProps = {
   /** The command in flight, if any. */
   pending: string | null;
   onAct: (name: QuestionAction) => void;
-  /** Extra controls for a format, such as playing the clip. They sit first in the bar. */
-  children?: React.ReactNode;
-  className?: string;
 };
 
 /**
  * The host's controls, together in one dark bar apart from what the audience reads. Only the commands the
  * server lists in `controls` for this exact moment are shown, so a button never offers an illegal step.
  */
-export default function HostBar({ controls, pending, onAct, children, className }: HostBarProps) {
+export default function HostBar({ controls, pending, onAct }: HostBarProps) {
   const available = actions.filter((action) => controls.includes(action.name));
   return (
     <div
       role="group"
       aria-label="تحكم المضيف"
-      className={cn("flex flex-wrap items-center gap-3 rounded-[1.4rem] border-4 border-ink bg-ink p-3 text-cream shadow-[0_8px_0_var(--color-night)] sm:px-4", className)}
+      className="flex flex-wrap items-center gap-3 rounded-[1.4rem] border-4 border-ink bg-ink p-3 text-cream shadow-[0_8px_0_var(--color-night)] sm:px-4"
     >
       <p className="me-auto flex items-center gap-2 font-heading text-lg leading-none text-cream/75">
         <MonitorUp aria-hidden className="size-5" strokeWidth={2.5} />
         تحكم المضيف
       </p>
-      {children}
       {available.map((action) => {
         const Icon = action.icon;
         const primary = action.name === "reveal_answer";
