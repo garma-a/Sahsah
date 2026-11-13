@@ -12,7 +12,6 @@ import type { Auth } from "@/lib/api/client";
 import type { AudioRef, ImageRef, MediaRef, Playback, QuestionContent, QuestionView, TeamNumber } from "@/lib/api/types";
 import { formatNumber } from "@/lib/format";
 import { mediaKey, useMediaLinks } from "@/lib/use-media-links";
-import { useRemainingMs } from "@/lib/use-remaining-ms";
 import { cn } from "@/lib/utils";
 
 type QuestionScreenProps = {
@@ -25,6 +24,8 @@ type QuestionScreenProps = {
   gameId: string;
   auth: Auth;
   clockOffsetMs: number;
+  /** The live connection is up (the host clip pauses when it is not). */
+  live: boolean;
   /** The host clip's mirrored play state, for viewers. */
   playback: Playback | null;
   /** Host only: an actual play, pause, seek or end of a clip. */
@@ -49,8 +50,8 @@ function clockWaits(question: QuestionContent): boolean {
   return question.format === "IMAGE_MEMORY" && (question.memoryPhase === "ready" || question.memoryPhase === "viewing_first");
 }
 
-function soundCaption(question: QuestionContent, answering: boolean): string {
-  if (question.format === "AUDIO_REVERSE") return answering ? "المقطع معكوس" : "المقطع الأصلي";
+function soundCaption(question: QuestionContent, forwardClip: boolean): string {
+  if (question.format === "AUDIO_REVERSE") return forwardClip ? "المقطع الأصلي" : "المقطع معكوس";
   if (question.format === "AUDIO_VOICE") return "مين صاحب الصوت؟";
   return "اسمع المقطع";
 }
@@ -68,6 +69,7 @@ export default function QuestionScreen({
   gameId,
   auth,
   clockOffsetMs,
+  live,
   playback,
   onPlayback,
   pending,
@@ -77,7 +79,6 @@ export default function QuestionScreen({
 }: QuestionScreenProps) {
   const answering = view.phase === "question";
   const hostView = isHost && view.audience === "host";
-  const remainingMs = useRemainingMs(view.timer, clockOffsetMs);
   const { question, answer } = view;
   const promptImage = imageOf(question);
   const answerImage = answer?.image;
@@ -87,11 +88,14 @@ export default function QuestionScreen({
     ? (answer?.forwardAudio ?? ("audio" in question ? question.audio : undefined))
     : undefined;
   const hasSound = "durationMs" in question;
+  // Only the host, and only after the reveal, has the forward (original) clip of a reversed question.
+  const forwardClip = answer?.forwardAudio !== undefined && audio === answer.forwardAudio;
 
   // Pictures and the host's clip come over short-lived signed links, asked for only while this view carries them.
-  const refs: MediaRef[] = [promptImage, answerImage, audio].filter((ref): ref is MediaRef => ref !== undefined);
-  const media = useMediaLinks(gameId, auth, refs);
+  // After the reveal only the picture on screen is needed (the answer image, else the question image).
   const shown = answerImage ?? promptImage;
+  const refs: MediaRef[] = [shown, audio].filter((ref): ref is MediaRef => ref !== undefined);
+  const media = useMediaLinks(gameId, auth, refs);
   const controls = view.controls ?? [];
   const stages = "stageSuggestions" in question ? question : undefined;
   const hint = question.format === "AUDIO_VOICE" ? question.hint : undefined;
@@ -119,7 +123,7 @@ export default function QuestionScreen({
             </p>
           </div>
           {answering && (
-            <TimerDial state={view.timer.state} remainingMs={remainingMs} note={clockWaits(question) ? "الوقت بيبدأ لما الصورة تختفي" : undefined} />
+            <TimerDial timer={view.timer} clockOffsetMs={clockOffsetMs} note={clockWaits(question) ? "الوقت بيبدأ لما الصورة تختفي" : undefined} />
           )}
         </header>
 
@@ -127,8 +131,9 @@ export default function QuestionScreen({
           <div className="flex w-full min-w-0 flex-1 flex-col items-center gap-6 text-center">
             <h1
               id="question-title"
+              tabIndex={-1}
               className={cn(
-                "text-balance font-heading",
+                "text-balance break-words font-heading focus:outline-none",
                 answering
                   ? short
                     ? "text-5xl leading-[1.4] sm:text-6xl lg:text-8xl lg:leading-[1.3]"
@@ -165,18 +170,19 @@ export default function QuestionScreen({
           {hasSound &&
             (audio ? (
               <HostSound
-                key={mediaKey(audio)}
+                key={`${view.phase}:${mediaKey(audio)}`}
                 url={media.urls.get(mediaKey(audio))}
                 failed={media.failed}
                 onRetry={media.retry}
+                live={live}
                 durationMs={(question as { durationMs: number }).durationMs}
-                caption={soundCaption(question, answering)}
+                caption={soundCaption(question, forwardClip)}
                 onReport={(playing, positionMs) => onPlayback(audio, playing, positionMs)}
               />
             ) : (
               <ViewerSound
                 durationMs={(question as { durationMs: number }).durationMs}
-                caption={soundCaption(question, answering)}
+                caption={soundCaption(question, forwardClip)}
                 playback={playback}
                 clockOffsetMs={clockOffsetMs}
               />
