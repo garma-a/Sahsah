@@ -21,6 +21,7 @@ export type MediaLinks = {
 const RENEW_EARLY_MS = 60000;
 const MIN_WAIT_MS = 5000;
 const RETRIES = 2;
+const RENEW_RETRY_MS = 10000;
 
 /**
  * Short-lived signed links for the media of the current view. They are requested when the view needs them,
@@ -46,6 +47,8 @@ export function useMediaLinks(gameId: Id | null, auth: Auth, refs: MediaRef[]): 
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
     let failures = 0;
+    // When the links in hand stop working, on this device's clock. Zero until the first batch arrives.
+    let validUntil = 0;
 
     const fetchLinks = () => {
       mediaAccess(gameId, authRef.current, wanted, controller.signal)
@@ -54,17 +57,22 @@ export function useMediaLinks(gameId: Id | null, auth: Auth, refs: MediaRef[]): 
           setFailed(false);
           setUrls(new Map(links.map((link: MediaLink) => [mediaKey(link.ref), link.url])));
           const soonest = Math.min(...links.map((link) => Date.parse(link.expiresAt)));
-          const wait = Number.isFinite(soonest) ? soonest - Date.parse(serverTime) - RENEW_EARLY_MS : 120000;
-          timer = setTimeout(fetchLinks, Math.max(MIN_WAIT_MS, wait));
+          const left = Number.isFinite(soonest) ? soonest - Date.parse(serverTime) : 2 * RENEW_EARLY_MS;
+          validUntil = Date.now() + left;
+          timer = setTimeout(fetchLinks, Math.max(MIN_WAIT_MS, left - RENEW_EARLY_MS));
         })
         .catch(() => {
           if (controller.signal.aborted) return;
           failures += 1;
-          if (failures > RETRIES) {
+          if (failures <= RETRIES) {
+            timer = setTimeout(fetchLinks, 1000 * failures);
+          } else if (Date.now() < validUntil) {
+            // A renewal failed but the links in hand still work: keep them and try again, do not call it a failure.
+            failures = 0;
+            timer = setTimeout(fetchLinks, RENEW_RETRY_MS);
+          } else {
             setFailed(true);
-            return;
           }
-          timer = setTimeout(fetchLinks, 1000 * failures);
         });
     };
     fetchLinks();

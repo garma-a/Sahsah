@@ -48,6 +48,8 @@ type HostSoundProps = {
   onRetry: () => void;
   durationMs: number;
   caption: string;
+  /** The live connection is up; the clip is paused while it is not. */
+  live: boolean;
   /** An actual play, pause, seek or end, for the viewers' visual. Never audio, never the link. */
   onReport: (playing: boolean, positionMs: number) => void;
 };
@@ -57,7 +59,7 @@ type HostSoundProps = {
  * repeated without limit. Starting, pausing, seeking and ending are reported once each so viewers can mirror
  * the clip as a picture; the bytes and the link never leave this device.
  */
-export function HostSound({ url, failed, onRetry, durationMs, caption, onReport }: HostSoundProps) {
+export function HostSound({ url, failed, onRetry, durationMs, caption, live, onReport }: HostSoundProps) {
   const audio = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
   const [ended, setEnded] = useState(false);
@@ -67,7 +69,26 @@ export function HostSound({ url, failed, onRetry, durationMs, caption, onReport 
   useEffect(() => {
     report.current = onReport;
   });
-  // Leaving the question (or the reveal) unmounts this card: the sound stops with it.
+
+  // The element keeps its current link while it has progress: a renewed link swapped in mid-clip would reload
+  // it from the start. The newest link is taken once the clip is idle (never started, or ended) or if the old
+  // one stops working, and then the position and the playing state are restored.
+  const [src, setSrc] = useState(url);
+  const latest = useRef(url);
+  const resume = useRef<{ timeMs: number; play: boolean } | null>(null);
+  const isPlaying = useRef(false);
+  useEffect(() => {
+    latest.current = url;
+    const element = audio.current;
+    const idle = !element || element.ended || element.error !== null || (element.paused && element.currentTime === 0);
+    if (url && idle) setSrc(url);
+  }, [url]);
+
+  // Leaving the question (or the reveal) unmounts this card: the sound stops with it. So does losing the live
+  // connection: a host who is no longer in control must not keep playing.
+  useEffect(() => {
+    if (!live) audio.current?.pause();
+  }, [live]);
   useEffect(() => {
     const element = audio.current;
     return () => {
@@ -98,14 +119,16 @@ export function HostSound({ url, failed, onRetry, durationMs, caption, onReport 
       <Equalizer playing={playing} tint="bg-cyan" />
       <audio
         ref={audio}
-        src={url}
+        src={src}
         preload="auto"
         onPlay={() => {
+          isPlaying.current = true;
           setPlaying(true);
           setEnded(false);
           report.current(true, position());
         }}
         onPause={() => {
+          isPlaying.current = false;
           setPlaying(false);
           if (!audio.current?.ended) report.current(false, position());
         }}
@@ -115,8 +138,24 @@ export function HostSound({ url, failed, onRetry, durationMs, caption, onReport 
           setPlaying(false);
           setEnded(true);
           report.current(false, position());
+          if (latest.current) setSrc(latest.current);
         }}
-        onError={() => setBroken(true)}
+        onLoadedMetadata={() => {
+          const saved = resume.current;
+          const element = audio.current;
+          if (!saved || !element) return;
+          resume.current = null;
+          element.currentTime = saved.timeMs / 1000;
+          if (saved.play) element.play().catch(() => setBroken(true));
+        }}
+        onError={() => {
+          // An expired or refused link: remember where the clip was, take the newest link, and carry on from there.
+          resume.current = { timeMs: position(), play: isPlaying.current };
+          isPlaying.current = false;
+          setPlaying(false);
+          if (latest.current && latest.current !== src) setSrc(latest.current);
+          else setBroken(true);
+        }}
       />
       <div className="h-3 w-full overflow-hidden rounded-full border-2 border-ink bg-cream" aria-hidden>
         <div className="h-full bg-cyan" style={{ width: `${Math.min(100, (positionMs / Math.max(1, durationMs)) * 100)}%` }} />
@@ -137,12 +176,12 @@ export function HostSound({ url, failed, onRetry, durationMs, caption, onReport 
         <button
           type="button"
           onClick={toggle}
-          disabled={!url}
-          aria-busy={!url || undefined}
+          disabled={!src}
+          aria-busy={!src || undefined}
           className="flex h-16 cursor-pointer items-center gap-3 rounded-full bg-press px-8 font-heading text-3xl leading-none text-white shadow-chunk ring-4 ring-cyan transition-transform active:translate-y-[3px] disabled:opacity-60"
         >
           {playing ? <Pause aria-hidden className="size-7" /> : ended ? <RotateCcw aria-hidden className="size-7" /> : <Play aria-hidden className="size-7" />}
-          {!url ? "بنجهّز الصوت…" : playing ? "وقّف الصوت" : ended ? "شغّله تاني" : "شغّل الصوت"}
+          {!src ? "بنجهّز الصوت…" : playing ? "وقّف الصوت" : ended ? "شغّله تاني" : "شغّل الصوت"}
         </button>
       )}
     </Frame>
