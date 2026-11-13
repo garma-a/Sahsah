@@ -36,7 +36,9 @@ export type Selection = {
   repeatConsentBasis?: string;
 };
 
-export type Team = { number: number; name: string; score: string };
+export type TeamPlayer = { membershipId: Id; displayName: string };
+/** `players` is absent from an API that predates the roster in game views; callers then fall back to the lobby roster. */
+export type Team = { number: number; name: string; score: string; players?: TeamPlayer[] };
 export type Member = {
   id: Id;
   displayName: string;
@@ -82,7 +84,78 @@ export type BoardView = {
   board: BoardCategory[];
   idleExpiresAt: string;
 };
-/** Question and answer screens are built in a later change; only their frame is typed here. */
+export type ImageRef = {
+  kind: "image";
+  boardPosition: number;
+  questionPosition: number;
+  role: "prompt_image" | "answer_image" | "hint_image";
+  variantNumber: number;
+};
+export type AudioRef = {
+  kind: "audio";
+  boardPosition: number;
+  questionPosition: number;
+  role: "question_audio" | "answer_audio";
+  variantNumber: 0;
+};
+export type MediaRef = ImageRef | AudioRef;
+
+/** The host clip's play state as presence mirrors it: no reference or URL, only how far along it is. */
+export type Playback = { playing: boolean; positionMs: number; durationMs: number; updatedAt: string };
+
+export type Timer =
+  | { state: "ready"; remainingMs: number }
+  | { state: "running"; remainingMs: number; deadlineAt: string }
+  | { state: "paused"; remainingMs: number }
+  | { state: "elapsed"; remainingMs: 0 };
+
+export type QuestionFormat =
+  | "STANDARD"
+  | "IMAGE_BLUR"
+  | "IMAGE_ZOOM"
+  | "IMAGE_PERSON"
+  | "IMAGE_COLOR"
+  | "IMAGE_RIDDLE"
+  | "IMAGE_MEMORY"
+  | "AUDIO_GUESS"
+  | "AUDIO_REVERSE"
+  | "AUDIO_VOICE";
+
+/** What the audience reads, by format. Only the host's view ever carries an `audio` reference. */
+export type QuestionContent =
+  | { format: "STANDARD"; prompt: string; image?: ImageRef }
+  | { format: "IMAGE_BLUR" | "IMAGE_ZOOM"; prompt: string; image: ImageRef; stageIndex: number; stageSuggestions: number[] }
+  | { format: "IMAGE_PERSON" | "IMAGE_COLOR" | "IMAGE_RIDDLE"; prompt: string; image?: ImageRef }
+  | { format: "IMAGE_MEMORY"; memoryPhase: "ready"; instruction: string }
+  | { format: "IMAGE_MEMORY"; memoryPhase: "viewing_first"; instruction: string; image: ImageRef }
+  | { format: "IMAGE_MEMORY"; memoryPhase: "recall"; prompt: string }
+  | { format: "IMAGE_MEMORY"; memoryPhase: "revisit"; prompt: string; image: ImageRef }
+  | { format: "AUDIO_GUESS" | "AUDIO_REVERSE"; prompt: string; durationMs: number; audio?: AudioRef }
+  | { format: "AUDIO_VOICE"; prompt: string; durationMs: number; hint?: string; audio?: AudioRef };
+
+export type AnswerContent = {
+  format: QuestionFormat;
+  text: string;
+  image?: ImageRef;
+  colorHex?: string;
+  forwardAudio?: AudioRef;
+};
+
+export type CommandName =
+  | "open_question"
+  | "return_to_board"
+  | "advance_hint"
+  | "show_memory"
+  | "hide_memory"
+  | "pause_timer"
+  | "resume_timer"
+  | "reset_timer"
+  | "reveal_answer"
+  | "resolve_question"
+  | "adjust_score"
+  | "end_game";
+
+/** The open question (phase "question") or its revealed answer (phase "answer"). Only the host gets `controls`. */
 export type QuestionView = {
   phase: "question" | "answer";
   audience: "host" | "viewer";
@@ -91,18 +164,48 @@ export type QuestionView = {
   boardPosition: number;
   questionPosition: number;
   basePoints: BasePoints;
+  /** The current hint stage's value: the default award, never above `basePoints`. */
+  suggestedPoints: number;
   teams: Team[];
+  timer: Timer;
+  idleExpiresAt: string;
+  question: QuestionContent;
+  answer?: AnswerContent;
+  controls?: CommandName[];
+};
+
+export type CategoryResult = {
+  boardPosition: number;
+  categoryId: Id;
+  name: string;
+  resolvedCount: number;
+  teamOneAwardPoints: number;
+  teamTwoAwardPoints: number;
+  winningTeamNumber: TeamNumber | null;
+};
+export type ResultTeam = {
+  number: number;
+  name: string;
+  score: string;
+  questionAwardTotal: number;
+  manualAdjustmentTotal: string;
+  players?: TeamPlayer[];
+};
+export type GameResult = {
+  gameId: Id;
+  roomId: Id;
+  status: "finished" | "expired" | "failed";
+  endReason: "completed" | "host_ended" | "host_left" | "idle_timeout" | "platform_failure";
+  endedAt: string;
+  resolvedQuestionCount: number;
+  winningTeamNumber: TeamNumber | null;
+  teams: ResultTeam[];
+  categories: CategoryResult[];
 };
 export type ResultView = {
   phase: "result";
   audience: "host" | "viewer";
-  result: {
-    gameId: Id;
-    roomId: Id;
-    status: string;
-    winningTeamNumber: TeamNumber | null;
-    teams: { number: number; name: string; score: string }[];
-  };
+  result: GameResult;
 };
 export type GameView = BoardView | QuestionView | ResultView;
 export type RoomView = LobbyView | GameView;
@@ -187,6 +290,29 @@ export type ProblemBody = {
   selectionConflicts?: SelectionConflict[];
 };
 
+type Pointer = { expectedGameVersion: Revision; boardPosition: number; questionPosition: number };
 export type GameCommand =
-  | { name: "open_question"; expectedGameVersion: Revision; boardPosition: number; questionPosition: number }
-  | { name: "return_to_board"; expectedGameVersion: Revision; boardPosition: number; questionPosition: number };
+  | ({ name: "open_question" } & Pointer)
+  | ({ name: "return_to_board" } & Pointer)
+  | ({ name: "advance_hint" } & Pointer)
+  | ({ name: "show_memory" } & Pointer)
+  | ({ name: "hide_memory" } & Pointer)
+  | ({ name: "pause_timer" } & Pointer)
+  | ({ name: "resume_timer" } & Pointer)
+  | ({ name: "reset_timer" } & Pointer)
+  | ({ name: "reveal_answer" } & Pointer)
+  | ({ name: "resolve_question"; winningTeamNumber: TeamNumber | null; awardedPoints?: number } & Pointer)
+  | { name: "adjust_score"; expectedGameVersion: Revision; teamNumber: TeamNumber; targetTotal: string }
+  | { name: "end_game"; expectedGameVersion: Revision };
+
+export type MediaLink = {
+  ref: MediaRef;
+  url: string;
+  expiresAt: string;
+  contentType: string;
+  byteSize: string;
+  durationMs?: number;
+  width?: number;
+  height?: number;
+};
+export type MediaLinks = { links: MediaLink[]; serverTime: string };

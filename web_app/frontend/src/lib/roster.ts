@@ -1,9 +1,10 @@
-import type { Id, Member } from "@/lib/api/types";
+import type { Id, Member, TeamPlayer } from "@/lib/api/types";
 
 export type RosterEntry = Pick<Member, "id" | "displayName" | "teamNumber">;
 
-// The game views carry team names and scores but no player list, so the roster seen in the lobby is kept
-// per room and shown under each team on the board. A browser that first opens a room mid-game has none.
+// Game and result views list each team's players. An API that predates that field sends none, so the roster
+// seen in the lobby is kept per room as a fallback (see `teamPlayers`). A browser that first opens a room
+// mid-game has no fallback.
 const key = (roomId: Id) => `sahsah.roster.${roomId}`;
 
 export function saveRoster(roomId: Id, members: Member[]): void {
@@ -33,4 +34,10 @@ export function loadRoster(roomId: Id): RosterEntry[] {
   } catch {
     return [];
   }
+}
+
+/** A team's players as the view lists them; only when the view has no list (an older API) the lobby roster stands in. */
+export function teamPlayers(team: { number: number; players?: TeamPlayer[] }, roster: RosterEntry[]): { id: Id; displayName: string }[] {
+  if (team.players) return team.players.map((p) => ({ id: p.membershipId, displayName: p.displayName }));
+  return roster.filter((m) => m.teamNumber === team.number).map(({ id, displayName }) => ({ id, displayName }));
 }

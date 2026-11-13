@@ -1,7 +1,7 @@
 import { Trophy } from "lucide-react";
 import { teamTone } from "@/components/brand/tones";
 import type { Team } from "@/lib/api/types";
-import type { RosterEntry } from "@/lib/roster";
+import { teamPlayers, type RosterEntry } from "@/lib/roster";
 import { formatDigits, formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -30,7 +30,7 @@ export default function Scoreboard({ teams, members, connected }: ScoreboardProp
       <div className="grid flex-1 grid-cols-2 gap-3">
         {teams.map((team) => {
           const tone = teamTone(team.number);
-          const players = members.filter((m) => m.teamNumber === team.number);
+          const players = teamPlayers(team, members);
           return (
             <article key={team.number} aria-label={team.name} className="min-w-0 rounded-2xl border-[3px] border-ink bg-cream px-3 py-2 text-ink sm:px-4">
               <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">

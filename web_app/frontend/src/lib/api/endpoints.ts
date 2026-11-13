@@ -7,6 +7,8 @@ import type {
   Id,
   Invitation,
   InvitationPreview,
+  MediaLinks,
+  MediaRef,
   Pack,
   Page,
   PreviewSession,
@@ -126,6 +128,16 @@ export function startGame(
 
 export function executeCommand(gameId: Id, auth: Auth, operationId: string, command: GameCommand): Promise<Receipt> {
   return request(`/games/${gameId}/commands`, { method: "POST", auth, operationId, body: command });
+}
+
+/** Short-lived signed links for the images and sounds of the current view. Never log or store the URLs. */
+export function mediaAccess(gameId: Id, auth: Auth, refs: MediaRef[], signal?: AbortSignal): Promise<MediaLinks> {
+  return request(`/games/${gameId}/media-access`, { method: "POST", auth, body: { refs }, signal });
+}
+
+/** Host: move the room from the finished game's result back to the lobby to play again. */
+export function returnToLobby(roomId: Id, auth: Auth, operationId: string, expectedRoomVersion: string): Promise<Receipt> {
+  return request(`/rooms/${roomId}/lobby`, { method: "POST", auth, operationId, body: { expectedRoomVersion } });
 }
 
 export function closeRoom(roomId: Id, auth: Auth, operationId: string, expectedRoomVersion: string): Promise<Receipt> {
