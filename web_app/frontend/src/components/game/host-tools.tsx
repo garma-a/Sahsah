@@ -8,6 +8,7 @@ import ErrorBanner from "@/components/ui/error-banner";
 import Input from "@/components/ui/input";
 import type { Team, TeamNumber } from "@/lib/api/types";
 import { formatNumber, toLatinDigits } from "@/lib/format";
+import { useRadioGroup } from "@/lib/use-radio-group";
 import { cn } from "@/lib/utils";
 
 const MAX_TOTAL = 1_000_000;
@@ -89,6 +90,16 @@ function AdjustForm({ teams, onAdjust, onClose }: { teams: Team[]; onAdjust: Hos
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const pick = (next: TeamNumber) => {
+    setTeam(next);
+    setText("");
+  };
+  const radio = useRadioGroup<TeamNumber>(
+    teams.map((t) => t.number as TeamNumber),
+    team,
+    pick,
+  );
+
   const current = teams.find((t) => t.number === team);
   const latin = toLatinDigits(text.trim());
   const target = /^\d{1,7}$/.test(latin) && Number(latin) <= MAX_TOTAL ? Number(latin) : null;
@@ -123,12 +134,8 @@ function AdjustForm({ teams, onAdjust, onClose }: { teams: Team[]; onAdjust: Hos
               <button
                 key={t.number}
                 type="button"
-                role="radio"
-                aria-checked={team === t.number}
-                onClick={() => {
-                  setTeam(t.number as TeamNumber);
-                  setText("");
-                }}
+                {...radio(t.number as TeamNumber)}
+                onClick={() => pick(t.number as TeamNumber)}
                 className={cn(
                   "min-h-16 cursor-pointer rounded-2xl border-4 border-ink px-3 py-1 font-heading text-2xl leading-tight",
                   teamTone(t.number).fill,

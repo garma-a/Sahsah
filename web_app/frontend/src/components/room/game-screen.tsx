@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toneAt } from "@/components/brand/tones";
 import HostTools from "@/components/game/host-tools";
 import type { QuestionAction } from "@/components/game/host-bar";
@@ -33,6 +33,12 @@ export default function GameScreen({ channel, roomId, auth, isHost, categories }
   const intents = useIntentKeys();
   const [pending, setPending] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  // `pending` reaches the buttons on the next render; two clicks in one tick would both see the old state, so
+  // the guard against a second command while one is in flight is a ref set at once and kept in step with it.
+  const inFlight = useRef(false);
+  useEffect(() => {
+    inFlight.current = pending !== null;
+  }, [pending]);
   // The last board survives while a question is open: the question view names no category, the board does.
   const [lastBoard, setLastBoard] = useState<BoardView | null>(null);
   // Only for an API whose game views carry no team players: the roster this browser saw in the lobby.
@@ -44,31 +50,81 @@ export default function GameScreen({ channel, roomId, auth, isHost, categories }
   const gameVersion = snapshot && "gameVersion" in snapshot.source ? snapshot.source.gameVersion : null;
   const roomVersion = snapshot?.source.roomVersion ?? null;
 
-  /** Sends one command with its saved key; resolves to an error message, or null when it was accepted. */
+  // An accepted command stays "in flight" until a state at least as new as its receipt is on screen, so the
+  // buttons never come back live against the screen the command has already replaced. A timeout is the fallback.
+  const [awaiting, setAwaiting] = useState<string | null>(null);
+  if (awaiting && gameVersion && BigInt(gameVersion) >= BigInt(awaiting)) {
+    setAwaiting(null);
+    setPending(null);
+  }
+  useEffect(() => {
+    if (!awaiting) return;
+    const timer = setTimeout(() => {
+      setAwaiting(null);
+      setPending(null);
+    }, 6000);
+    return () => clearTimeout(timer);
+  }, [awaiting]);
+
+  // A problem belongs to the screen it happened on: a new phase or question starts clean.
+  const screenKey = !view ? null : view.phase === "question" || view.phase === "answer" ? `${view.phase}:${view.boardPosition}:${view.questionPosition}` : view.phase;
+  const [problemScreen, setProblemScreen] = useState(screenKey);
+  if (screenKey !== problemScreen) {
+    setProblemScreen(screenKey);
+    setProblem(null);
+  }
+
+  // Board and question are different pages: focus moves to the new page's heading so a screen reader and a
+  // keyboard user start from the top of what replaced the screen. The reveal inside a question keeps focus.
+  const page = view?.phase === "board" ? "board" : view?.phase === "result" ? "result" : view ? "question" : null;
+  const previousPage = useRef(page);
+  useEffect(() => {
+    if (!page || previousPage.current === page) return;
+    previousPage.current = page;
+    document.getElementById(page === "board" ? "page-heading" : page === "result" ? "result-title" : "question-title")?.focus({ preventScroll: true });
+  }, [page]);
+
+  /** Sends one command with its saved key. `error` is a message, or null when the command was accepted. */
   const send = useCallback(
-    async (command: GameCommand): Promise<string | null> => {
-      if (!gameId) return null;
+    async (command: GameCommand): Promise<{ error: string | null; version: string | null }> => {
+      if (!gameId) return { error: null, version: null };
       // The command names its game version, so the same click against the same state keeps the same key.
       const signature = JSON.stringify(command);
       try {
-        await executeCommand(gameId, auth, intents.key(signature), command);
+        const receipt = await executeCommand(gameId, auth, intents.key(signature), command);
         intents.done(signature);
         channel.refresh();
-        return null;
+        return { error: null, version: receipt.gameVersion ?? null };
       } catch (cause) {
         if (isConflict(cause)) channel.refresh();
-        return messageOf(cause);
+        return { error: messageOf(cause), version: null };
       }
     },
     [gameId, auth, channel, intents],
   );
 
-  const run = useCallback(
-    async (pendingKey: string, command: GameCommand) => {
+  /** Marks the command in flight until its result shows; resolves to an error message, or null when accepted. */
+  const track = useCallback(
+    async (pendingKey: string, command: GameCommand): Promise<string | null> => {
+      if (inFlight.current) return null;
+      inFlight.current = true;
       setPending(pendingKey);
-      setProblem(await send(command).finally(() => setPending(null)));
+      const { error, version } = await send(command);
+      if (error !== null || version === null) {
+        inFlight.current = false;
+        setPending(null);
+      } else setAwaiting(version);
+      return error;
     },
     [send],
+  );
+
+  const run = useCallback(
+    async (pendingKey: string, command: GameCommand) => {
+      setProblem(null);
+      setProblem(await track(pendingKey, command));
+    },
+    [track],
   );
 
   const reportPlayback = useCallback(
@@ -109,7 +165,7 @@ export default function GameScreen({ channel, roomId, auth, isHost, categories }
         <HostTools
           teams={teams}
           busy={pending !== null}
-          onAdjust={(teamNumber, targetTotal) => send({ name: "adjust_score", expectedGameVersion: gameVersion, teamNumber, targetTotal })}
+          onAdjust={(teamNumber, targetTotal) => track("adjust_score", { name: "adjust_score", expectedGameVersion: gameVersion, teamNumber, targetTotal })}
           onEnd={() => run("end_game", { name: "end_game", expectedGameVersion: gameVersion })}
         />
       )}
@@ -149,6 +205,7 @@ export default function GameScreen({ channel, roomId, auth, isHost, categories }
         gameId={gameId}
         auth={auth}
         clockOffsetMs={channel.clockOffsetMs}
+        live={channel.status === "live"}
         playback={channel.playback}
         onPlayback={reportPlayback}
         pending={pending}

@@ -6,6 +6,7 @@ import { teamTone } from "@/components/brand/tones";
 import Button from "@/components/ui/button";
 import type { Team, TeamNumber } from "@/lib/api/types";
 import { formatNumber } from "@/lib/format";
+import { useRadioGroup } from "@/lib/use-radio-group";
 import { cn } from "@/lib/utils";
 
 const STEP = 50;
@@ -37,6 +38,7 @@ export default function AwardPanel({ teams, basePoints, suggestedPoints, stageSu
   const clamp = (value: number) => Math.min(basePoints, Math.max(0, value));
   const amounts = [...new Set([suggestedPoints, ...(stageSuggestions ?? []), basePoints])].filter((v) => v <= basePoints).sort((a, b) => b - a);
   const winner = typeof choice === "number" ? teams.find((team) => team.number === choice) : undefined;
+  const radio = useRadioGroup<TeamNumber | "none">([...teams.map((team) => team.number as TeamNumber), "none"], choice, setChoice);
 
   const confirmLabel = busy
     ? "ثانية…"
@@ -67,8 +69,7 @@ export default function AwardPanel({ teams, basePoints, suggestedPoints, stageSu
             <button
               key={team.number}
               type="button"
-              role="radio"
-              aria-checked={selected}
+              {...radio(team.number as TeamNumber)}
               disabled={busy}
               onClick={() => setChoice(team.number as TeamNumber)}
               className={cn(
@@ -86,8 +87,7 @@ export default function AwardPanel({ teams, basePoints, suggestedPoints, stageSu
         })}
         <button
           type="button"
-          role="radio"
-          aria-checked={choice === "none"}
+          {...radio("none")}
           disabled={busy}
           onClick={() => setChoice("none")}
           className={cn(
@@ -157,7 +157,7 @@ export default function AwardPanel({ teams, basePoints, suggestedPoints, stageSu
           disabled={busy || choice === null}
           aria-busy={busy || undefined}
           onClick={() => choice !== null && onResolve(winner ? (winner.number as TeamNumber) : null, winner ? points : undefined)}
-          className="w-full lg:ms-auto lg:w-auto lg:min-w-80"
+          className="h-auto min-h-14 w-full whitespace-normal text-balance py-3 text-center leading-tight lg:ms-auto lg:w-auto lg:min-w-80"
         >
           {confirmLabel}
         </Button>
