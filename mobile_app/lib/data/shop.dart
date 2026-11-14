@@ -1,8 +1,9 @@
 import 'categories.dart';
 
-/// Token packs from the prototype (`TOKEN_PRESETS`, `TOKEN_PRICE` in
-/// `sahsah_prototype/src/lib/data.ts`). One token is one game.
-const tokenPrice = 10; // EGP per token.
+/// Token packs (`TOKEN_PRESETS` in the prototype). One token is one game.
+/// The production price is 100 EGP a token
+/// (`docs/database/commerce-design.md`), not the prototype's 10 EGP.
+const tokenPrice = 100; // EGP per token.
 const tokenPacks = [1, 2, 5];
 
 /// The pack marked "most popular".
