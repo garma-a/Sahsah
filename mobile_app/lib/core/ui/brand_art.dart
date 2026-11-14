@@ -12,6 +12,7 @@ abstract final class BrandImages {
   static const hero = 'assets/img/hero.webp';
   static const herowide = 'assets/img/herowide.webp';
   static const coins = 'assets/img/coins.webp';
+  static const contact = 'assets/img/contact.webp';
   static const comedy = 'assets/img/comedy.webp';
   static const cinema = 'assets/img/cinema.webp';
   static const football = 'assets/img/football.webp';
