@@ -11,13 +11,13 @@ void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   group('shop rules', () {
-    test('packs cost 10 EGP a game; gifts are 10% off', () {
-      expect(packPrice(1), 10);
-      expect(packPrice(2), 20);
-      expect(packPrice(5), 50);
-      expect(packPrice(1, gift: true), 9);
-      expect(packPrice(5, gift: true), 45);
-      expect(packListPrice(5), 50);
+    test('packs cost 100 EGP a game; gifts are 10% off', () {
+      expect(packPrice(1), 100);
+      expect(packPrice(2), 200);
+      expect(packPrice(5), 500);
+      expect(packPrice(1, gift: true), 90);
+      expect(packPrice(5, gift: true), 450);
+      expect(packListPrice(5), 500);
     });
 
     test('Egyptian mobile numbers with or without 0 and +20', () {

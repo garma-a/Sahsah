@@ -31,7 +31,7 @@ Rules follow `docs/database/gameplay-design.md` (Q49–Q60): timeout never revea
 
 These follow the prototype's pages. Payments, sign-in and the support inbox aren't in the backend yet, so each screen works up to its final button, which then explains that the feature is coming and offers to start a game (or open the socials).
 
-- **Shop** (`lib/features/shop/`): "for you" and "gift" tabs, packs of 1, 2 (most popular) and 5 games at 10 EGP a game, gifts 10% off with the recipient's Egyptian mobile number checked first. Prices and phone rules live in `lib/data/shop.dart`.
+- **Shop** (`lib/features/shop/`): "for you" and "gift" tabs, packs of 1, 2 (most popular) and 5 games at 100 EGP a game (the production price in `docs/database/commerce-design.md`), gifts 10% off with the recipient's Egyptian mobile number checked first. Prices and phone rules live in `lib/data/shop.dart`.
 - **Account** (`lib/features/account/`): playing as a guest, sign-in with name and WhatsApp number, and the unfinished game on this phone.
 - **Contact** (`lib/features/contact/`): a problem, feedback (five faces) or business/influencers, each with its own checks, beside the social accounts.
 
