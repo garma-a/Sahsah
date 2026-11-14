@@ -21,11 +21,17 @@ A mobile game lobby built from the prototype's design (`../sahsah_prototype`, li
 The backend has no rooms or game endpoints yet, so a game runs **on the host's phone** (like the prototype's demo mode) and is saved locally. It resumes after the app closes and expires after 24 hours without a host action. Games are free while testing; no token is spent.
 
 1. **Setup:** pick six categories (or use "new challenges" / random), then name the two teams. Starting while an unfinished game exists asks first.
-2. **Board:** six category cards in three columns, each with 200/400/600 tiles above and below the art. Team scores sit on top; tap one to correct its total. The flag ends the game early; X goes home and keeps the game.
-3. **Question:** the 60-second clock starts on its own (pause, continue, reset). Back to the board keeps the time. **إظهار الإجابة** reveals the answer, then award a team or nobody. Picture rounds: *who's in the picture* shows a strip of the portrait, *original colour* starts grayscale, *picture proverb*, and *memory* (show → hide to ask → revisit). Pinch to zoom any picture.
-4. **Results:** winner or tie, final scores, points per category, and play again with the same teams.
+2. **Board:** six packs as photo cards in three columns, each with a pip per question (white = open, team colour = won, faded = nobody). Team scores sit on top; tap one to correct its total. The flag ends the game early; X goes home and keeps the game.
+3. **Pack:** tapping a pack opens its six questions (200, 400, 600, two of each) beside its cover. Formats that play differently are labelled (picture, acting, clarify the picture, memory). When the pack is done you go back to the board.
+4. **Question** (laid out like the user-journey templates): team scores on the side, a "category · points" badge, a timer bar (pause, time left, reset) and **رجوع** / **إظهار الإجابة**. The 60-second clock starts on its own; leaving keeps the time.
+   - **6A normal:** the question, with its photo when it has one. Picture rounds: *who's in the picture* shows a strip of the portrait, *original colour* starts grayscale, *picture proverb*, and *memory* (show → hide to ask → revisit).
+   - **6B acting (مثّلها):** the rules and a QR code per team, then **جاهز** starts the clock. Scanning the code (so only the actor sees the word) needs game rooms in the backend; until then the codes are marked "coming soon".
+   - **6C clarify the picture:** a blurred or close-up picture and a points ladder; **وضّح الصورة** shows a clearer picture and lowers the points (600 → 400 → 200, 400 → 250 → 150, 200 → 150 → 50).
+   - **Photos:** tap any question photo to open it full screen and zoom (pinch or double-tap). The crop and grayscale stay on until the reveal.
+   - **7A answer:** the answer (and full picture), then award a team the current points or nobody, or go back to the question.
+5. **Results:** winner or tie, final scores, points per category, and play again with the same teams.
 
-Rules follow `docs/database/gameplay-design.md` (Q49–Q60): timeout never reveals or awards on its own, the 36th answer finishes the game, scores lock at the end. "Whose voice" needs audio playback and is marked coming soon. Questions come from the prototype's content (`lib/data/standard_bank.dart` is generated from `standard-bank.ts`).
+Rules follow `docs/database/gameplay-design.md` (Q49–Q60): timeout never reveals or awards on its own, the 36th answer finishes the game, scores lock at the end. "Whose voice" needs audio playback and is marked coming soon. Questions come from the prototype's content (`lib/data/standard_bank.dart` is generated from `standard-bank.ts`); the 12 staged pictures are the prototype's blur/zoom demo images in their original board slots, and the acting pack (مثّلها) is a starter set in `lib/data/question_bank.dart` to replace with real content. It borrows the cinema cover until it has its own artwork.
 
 ### Shop, account and contact
 
@@ -47,7 +53,7 @@ lib/
   core/ui/                        # surfaces, play button, pressable, art
   data/categories.dart            # categories until the backend serves them
   data/question_bank.dart         # board questions (+ generated standard_bank.dart)
-  features/game/                  # controller, setup, board, question, results
+  features/game/                  # controller, setup, board, pack, question, results, photo viewer
   features/shell/                 # game top bar, portrait bottom bar, routes
   features/home/                  # lobby (lobby.dart) + portrait home
   features/categories/            # grid, poster rows, details sheet

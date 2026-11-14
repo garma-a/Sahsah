@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sahsah_mobile/app.dart';
+import 'package:sahsah_mobile/core/ui/game_button.dart';
 import 'package:sahsah_mobile/core/i18n/lang.dart';
 import 'package:sahsah_mobile/features/game/game_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -75,21 +76,42 @@ void main() {
     expect(game.game!.teamNames, ['النسور', 'الجدعان']);
     expect(find.text('النسور'), findsOneWidget);
 
-    // Open the first 600 tile of "ثقافة عامة" (general, row 4).
-    final tile = find.bySemanticsLabel('ثقافة عامة — 600').first;
-    await tester.tap(tile);
+    // Board → the "ثقافة عامة" pack → its first 600 question, a picture
+    // that gets clearer in stages (template 6C).
+    await tester.tap(find.bySemanticsLabel(RegExp('^ثقافة عامة،')).first);
     await settle(tester);
-    expect(find.text('إظهار الإجابة'), findsOneWidget);
+    expect(find.text('اختاروا سؤال'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('question-general-4')));
+    await settle(tester);
     expect(game.game!.activeId, 'general-4');
+    expect(find.text('إظهار الإجابة'), findsOneWidget);
+
+    // The picture opens full screen to zoom in, then closes.
+    await tester.tap(find.bySemanticsLabel('كبّر الصورة').first);
+    await settle(tester);
+    expect(find.byKey(const ValueKey('photo-close')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('photo-close')));
+    await settle(tester);
+
+    // Clearer picture, fewer points: 600 → 400.
+    await tapText(tester, 'وضّح الصورة');
+    expect(game.availablePoints('general-4'), 400);
 
     await tapText(tester, 'إظهار الإجابة');
     expect(find.text('مين جاوب صح؟'), findsOneWidget);
-    await tapText(tester, 'النسور');
+    // The award button, not the team's score card on the side.
+    await tester.tap(
+      find.ancestor(of: find.text('النسور'), matching: find.byType(GameButton)),
+    );
+    await settle(tester);
 
-    // Back on the board with the points.
-    expect(game.game!.scores, [600, 0]);
+    // Back on the pack screen with the points; then back to the board.
+    expect(game.game!.scores, [400, 0]);
     expect(game.game!.results['general-4']!.team, 0);
     expect(find.text('إظهار الإجابة'), findsNothing);
+    expect(find.text('اختاروا سؤال'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('pack-back')));
+    await settle(tester);
 
     // Leaving keeps the game saved, and home offers to continue it.
     await tester.tap(find.bySemanticsLabel('خروج'));

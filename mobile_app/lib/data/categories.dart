@@ -72,6 +72,14 @@ const _memory = Category(
   'E7fazo el soora, w ba3d ma tekhtefy gawbo 3al so2al.',
   isNew: true,
 );
+const _acting = Category(
+  'acting',
+  'مثّلها',
+  'Massel-ha',
+  'واحد من الفريق يمثّل من غير ولا كلمة، والباقي يخمّن قبل ما الوقت يخلص.',
+  'Wa7ed men el fare2 yemassel men gher wala kelma, wel ba2y ykhammen 2abl ma el wa2t yekhlas.',
+  isNew: true,
+);
 const _cinema = Category(
   'cinema',
   'سينما مصرية',
@@ -165,6 +173,7 @@ const categorySections = [
     _riddle,
     _voice,
     _memory,
+    _acting,
   ]),
   CategorySection('popular', 'الأكثر شعبية', 'El Akthar Sha3beya', [
     _cinema,

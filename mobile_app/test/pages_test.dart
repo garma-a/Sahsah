@@ -86,9 +86,7 @@ void main() {
     expect(find.text('تسجيل الدخول جاي قريب'), findsOneWidget);
   });
 
-  testWidgets('contact: tabs and validation before the notice', (
-    tester,
-  ) async {
+  testWidgets('contact: tabs and validation before the notice', (tester) async {
     await pumpApp(tester, size: landscape);
     await tapText(tester, 'المزيد');
     await tapText(tester, 'تواصل معنا');
