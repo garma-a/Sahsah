@@ -94,7 +94,199 @@ Question _memory(
   image: _art('memory'),
 );
 
+/// "وضّح الصورة" (template 6C): the prototype's blur and zoom pictures,
+/// in the board slots the prototype gave them (`demo/samples.json`).
+Question _staged(
+  String categoryId,
+  int row,
+  String key,
+  String prompt,
+  String promptEn,
+  String answer,
+  String answerEn,
+) => Question(
+  categoryId: categoryId,
+  row: row,
+  kind: QuestionKind.staged,
+  prompt: prompt,
+  promptEn: promptEn,
+  answer: answer,
+  answerEn: answerEn,
+  stages: [for (var i = 1; i <= 3; i++) 'assets/game/stages/${key}_$i.webp'],
+  answerImage: 'assets/game/stages/${key}_answer.webp',
+);
+
+final _stagedSlots = {
+  for (final q in [
+    _staged(
+      'football',
+      0,
+      'b01',
+      'إيه البطولة اللي في الصورة؟',
+      'Eh el botola elly fel soora?',
+      'كأس الأمم الأفريقية',
+      'Kas El Omam El Afree2eya',
+    ),
+    _staged(
+      'ancient',
+      4,
+      'b02',
+      'إيه المعلم ده؟',
+      'Eh el ma3lam da?',
+      'أبو الهول',
+      'Abu El Hol',
+    ),
+    _staged(
+      'travel',
+      2,
+      'b03',
+      'إيه المكان اللي في الصورة؟',
+      'Eh el makan elly fel soora?',
+      'استاد القاهرة الدولي',
+      'Estad El Qahera El Dawly',
+    ),
+    _staged(
+      'football',
+      2,
+      'b04',
+      'خمن المركز الرياضي.',
+      'Khamen el markaz el reyady.',
+      'حارس مرمى',
+      '7ares marma',
+    ),
+    _staged(
+      'football',
+      3,
+      'b05',
+      'إيه الحاجة اللي قدامك؟',
+      'Eh el 7aga elly 2odamak?',
+      'قمصان كرة القدم',
+      '2omsan kora',
+    ),
+    _staged(
+      'football',
+      4,
+      'b06',
+      'إيه اللي بيحصل في الصورة؟',
+      'Eh elly beye7sal fel soora?',
+      'توجيهات المدرب',
+      'Tawgeehat el modarreb',
+    ),
+    _staged(
+      'childhood',
+      0,
+      'z01',
+      'إيه الحاجة دي؟',
+      'Eh el 7aga di?',
+      'كرة قدم',
+      'Koret 2adam',
+    ),
+    _staged(
+      'football',
+      5,
+      'z02',
+      'خمن اللي في الصورة.',
+      'Khamen elly fel soora.',
+      'لاعب كرة قدم',
+      'La3eb kora',
+    ),
+    _staged(
+      'general',
+      5,
+      'z03',
+      'إيه المشهد ده؟',
+      'Eh el mashhad da?',
+      'مباراة ديربي',
+      'Matsh derby',
+    ),
+    _staged(
+      'crafts',
+      4,
+      'z04',
+      'إيه الحاجة دي؟',
+      'Eh el 7aga di?',
+      'كأس بطولة',
+      'Kas botola',
+    ),
+    _staged(
+      'travel',
+      4,
+      'z05',
+      'إيه المعلم اللي في الصورة؟',
+      'Eh el ma3lam elly fel soora?',
+      'مسجد تاريخي',
+      'Masged tareekhy',
+    ),
+    _staged(
+      'general',
+      4,
+      'z06',
+      'إيه الرمز اللي قدامك؟',
+      'Eh el ramz elly 2odamak?',
+      'علامة استفهام ذهبية',
+      '3alamet estefham dahabeya',
+    ),
+  ])
+    q.id: q,
+};
+
+/// "مثّلها" (template 6B): a starter pack to edit later. The prompt says
+/// what kind of thing to act; the answer is the secret the actor performs.
+Question _acting(
+  int row,
+  String prompt,
+  String promptEn,
+  String answer,
+  String answerEn,
+) => Question(
+  categoryId: 'acting',
+  row: row,
+  kind: QuestionKind.acting,
+  prompt: prompt,
+  promptEn: promptEn,
+  answer: answer,
+  answerEn: answerEn,
+);
+
 final _party = <String, List<Question>>{
+  'acting': [
+    _acting(
+      0,
+      'مثّل حاجة بنعملها كل يوم',
+      'Massel 7aga bne3melha kol yom',
+      'بيشرب شاي',
+      'Beyeshrab shay',
+    ),
+    _acting(1, 'مثّل مهنة', 'Massel mehna', 'سواق تاكسي', 'Sawa2 taxi'),
+    _acting(
+      2,
+      'مثّل اسم فيلم مصري',
+      'Massel esm film masry',
+      'الناظر',
+      'El Nazer',
+    ),
+    _acting(
+      3,
+      'مثّل اسم فيلم مصري',
+      'Massel esm film masry',
+      'عسل إسود',
+      '3asal Eswed',
+    ),
+    _acting(
+      4,
+      'مثّل مثل مصري',
+      'Massel masal masry',
+      'اللي اختشوا ماتوا',
+      'Elly ekhtasho mato',
+    ),
+    _acting(
+      5,
+      'مثّل اسم أغنية مشهورة',
+      'Massel esm oghneya mashhoora',
+      'الليلة الكبيرة',
+      'El Leila El Kebeera',
+    ),
+  ],
   'person': [
     _person(0, 'محمد صلاح', 'Mohamed Salah', 'person'),
     _person(1, 'أم كلثوم', 'Om Kalthoum', 'umm'),
@@ -252,6 +444,8 @@ final _party = <String, List<Question>>{
 
 /// The question in [categoryId]'s board slot [row].
 Question questionFor(String categoryId, int row) {
+  final staged = _stagedSlots['$categoryId-$row'];
+  if (staged != null) return staged;
   final party = _party[categoryId];
   if (party != null) return party[row];
   final rows = standardBank[categoryId];

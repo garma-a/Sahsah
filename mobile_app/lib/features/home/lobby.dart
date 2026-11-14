@@ -232,7 +232,7 @@ class _Stage extends StatelessWidget {
                           padding: EdgeInsets.zero,
                           itemCount: featured.categories.length,
                           separatorBuilder: (_, _) => const SizedBox(width: 12),
-                          itemBuilder: (context, i) => _MiniRecord(
+                          itemBuilder: (context, i) => _MiniPack(
                             category: featured.categories[i],
                             color:
                                 AppColors.categoryColors[i %
@@ -253,9 +253,10 @@ class _Stage extends StatelessWidget {
   }
 }
 
-/// A category as a vinyl record: its artwork on the label, name below.
-class _MiniRecord extends StatelessWidget {
-  const _MiniRecord({
+/// A category as a small pack card: its photo in a coloured frame, with
+/// the name over the bottom.
+class _MiniPack extends StatelessWidget {
+  const _MiniPack({
     required this.category,
     required this.color,
     required this.height,
@@ -268,30 +269,53 @@ class _MiniRecord extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final lang = context.lang;
-    final disc = height - 22;
     return Semantics(
       button: true,
       child: Pressable(
         onTap: () => showCategorySheet(context, category),
-        child: SizedBox(
-          width: disc,
-          child: Column(
-            children: [
-              VinylDisc(
-                size: disc,
-                labelColor: color,
-                image: BrandImages.category(category.id),
-                labelFraction: 0.56,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                lang.t(category.name, category.nameEn),
-                maxLines: 1,
-                textAlign: TextAlign.center,
-                overflow: TextOverflow.ellipsis,
-                style: AppText.sans(11, weight: FontWeight.w700, height: 1.3),
-              ),
-            ],
+        child: Container(
+          width: height * 0.78,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: color, width: 3),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(11),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Image.asset(
+                  BrandImages.category(category.id),
+                  fit: BoxFit.cover,
+                  alignment: const Alignment(0, -0.3),
+                ),
+                const DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.center,
+                      colors: [Color(0xF00B0F2E), Color(0x000B0F2E)],
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 6,
+                  right: 6,
+                  bottom: 6,
+                  child: Text(
+                    lang.t(category.name, category.nameEn),
+                    maxLines: 2,
+                    textAlign: TextAlign.center,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppText.sans(
+                      11,
+                      weight: FontWeight.w700,
+                      height: 1.2,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

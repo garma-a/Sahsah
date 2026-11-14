@@ -8,11 +8,11 @@ import '../../core/i18n/lang.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/brand_art.dart';
 import '../../core/ui/pressable.dart';
-import '../../core/ui/retro.dart';
 import '../../core/ui/surfaces.dart';
 import '../../data/categories.dart';
 import 'game_controller.dart';
 import 'model/question.dart';
+import 'pack_screen.dart';
 import 'question_screen.dart';
 import 'results_screen.dart';
 import 'ui/game_ui.dart';
@@ -47,27 +47,33 @@ class _BoardScreenState extends State<BoardScreen> {
   }
 
   Future<void> _openQuestion(String id) async {
-    final game = context.game;
-    game.open(id);
+    await playQuestion(context, id);
+    if (mounted && (context.game.game?.finished ?? false)) _showResults();
+  }
+
+  /// A pack's six questions on their own screen (200 / 400 / 600).
+  Future<void> _openPack(String categoryId) async {
     await Navigator.of(context).push(
       PageRouteBuilder<void>(
-        transitionDuration: const Duration(milliseconds: 260),
+        transitionDuration: const Duration(milliseconds: 280),
         reverseTransitionDuration: const Duration(milliseconds: 200),
-        pageBuilder: (_, _, _) => QuestionScreen(questionId: id),
+        pageBuilder: (_, _, _) => PackScreen(categoryId: categoryId),
         transitionsBuilder: (_, animation, _, child) => FadeTransition(
           opacity: animation,
-          child: ScaleTransition(
-            scale: Tween(begin: 0.96, end: 1.0).animate(
-              CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
-            ),
+          child: SlideTransition(
+            position: Tween(begin: const Offset(0, 0.04), end: Offset.zero)
+                .animate(
+                  CurvedAnimation(
+                    parent: animation,
+                    curve: Curves.easeOutCubic,
+                  ),
+                ),
             child: child,
           ),
         ),
       ),
     );
-    if (!mounted) return;
-    if (game.game?.activeId == id) game.leave();
-    if (game.game?.finished ?? false) _showResults();
+    if (mounted && (context.game.game?.finished ?? false)) _showResults();
   }
 
   void _showResults() {
@@ -128,7 +134,7 @@ class _BoardScreenState extends State<BoardScreen> {
               child: _TopBar(game: game, onExit: _exit, onEnd: _endGame),
             ),
             Expanded(
-              child: _Board(game: game, onOpen: _openQuestion),
+              child: _Board(game: game, onOpen: _openPack),
             ),
           ],
         ),
@@ -464,6 +470,8 @@ class _Board extends StatelessWidget {
   }
 }
 
+/// A pack on the board: its cover photo, name and one pip per question.
+/// Tapping it opens the pack's questions.
 class _CategoryCard extends StatelessWidget {
   const _CategoryCard({
     required this.categoryId,
@@ -480,97 +488,164 @@ class _CategoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(builder: (context, box) => _build(context, box));
-  }
-
-  Widget _build(BuildContext context, BoxConstraints box) {
     final lang = context.lang;
     final category = allCategories.firstWhere((c) => c.id == categoryId);
     final slot = game.categoryIds.indexOf(categoryId);
-    final sleeve =
+    final frame =
         AppColors.categoryColors[slot % AppColors.categoryColors.length];
-    final ink = AppColors.inkOn(sleeve);
+    final ids = [for (var r = 0; r < tilePoints.length; r++) '$categoryId-$r'];
+    final left = ids.where((id) => !game.results.containsKey(id)).length;
+    final done = left == 0;
+    final open =
+        ids.contains(game.activeId) ||
+        ids.any(
+          (id) =>
+              !game.results.containsKey(id) &&
+              game.progress[id]?.revealed == true,
+        );
     final name = lang.t(category.name, category.nameEn);
-    final done = [
-      for (var r = 0; r < tilePoints.length; r++)
-        game.results.containsKey('$categoryId-$r'),
-    ].every((d) => d);
+    final radius = BorderRadius.circular(18);
 
-    const pad = 8.0;
-    const titleHeight = 24.0;
-    final bodyHeight = box.maxHeight - pad * 2 - titleHeight - 4;
-    final disc = bodyHeight.clamp(0.0, box.maxWidth * 0.44);
-
-    // 200/200, 400/400, 600/600 in rows beside the record.
-    Widget tiles() => Column(
-      children: [
-        for (final (i, row) in const [
-          [0, 1],
-          [2, 3],
-          [4, 5],
-        ].indexed) ...[
-          if (i > 0) const SizedBox(height: 5),
-          Expanded(
-            child: Row(
+    return Semantics(
+      button: !done,
+      label: done
+          ? lang.t('$name، خلصت', '$name, khelset')
+          : lang.t(
+              '$name، باقي ${lang.toAr(left)} أسئلة',
+              '$name, ba2y $left as2ela',
+            ),
+      excludeSemantics: true,
+      child: Pressable(
+        scale: 0.97,
+        onTap: done ? null : () => onOpen(categoryId),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: radius,
+            border: Border.all(color: frame, width: 3),
+            boxShadow: [cssShadow(const Color(0x66000000), y: 10, blur: 24)],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(15),
+            child: Stack(
+              fit: StackFit.expand,
               children: [
-                for (final (j, r) in row.indexed) ...[
-                  if (j > 0) const SizedBox(width: 5),
-                  Expanded(
-                    child: _Tile(
-                      id: '$categoryId-$r',
-                      points: tilePoints[r],
-                      result: game.results['$categoryId-$r'],
-                      inProgress: game.progress.containsKey('$categoryId-$r'),
-                      categoryName: name,
-                      teamNames: game.teamNames,
-                      onTap: () => onOpen('$categoryId-$r'),
+                ColorFiltered(
+                  colorFilter: done
+                      ? const ColorFilter.matrix([
+                          0.2126, 0.7152, 0.0722, 0, 0, //
+                          0.2126, 0.7152, 0.0722, 0, 0, //
+                          0.2126, 0.7152, 0.0722, 0, 0, //
+                          0, 0, 0, 1, 0, //
+                        ])
+                      : const ColorFilter.mode(
+                          Colors.transparent,
+                          BlendMode.dst,
+                        ),
+                  child: Image.asset(
+                    BrandImages.category(categoryId),
+                    fit: BoxFit.cover,
+                    alignment: const Alignment(0, -0.35),
+                  ),
+                ),
+                const DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.center,
+                      colors: [Color(0xF00B0F2E), Color(0x000B0F2E)],
                     ),
                   ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ],
-    );
-
-    return Container(
-      padding: const EdgeInsets.all(pad),
-      decoration: BoxDecoration(
-        color: sleeve,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.deep, width: 2.5),
-        boxShadow: [cssShadow(const Color(0x66000000), y: 10, blur: 24)],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SizedBox(
-            height: titleHeight,
-            child: Text(
-              name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: AppText.display(18, height: 1.3, color: ink),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Expanded(
-            child: Row(
-              children: [
-                Expanded(child: tiles()),
-                const SizedBox(width: 8),
-                Opacity(
-                  opacity: done ? 0.4 : 1,
-                  child: VinylDisc(
-                    size: disc,
-                    labelColor: AppColors.cream,
-                    image: BrandImages.category(categoryId),
-                    labelFraction: 0.58,
+                ),
+                if (done)
+                  ColoredBox(color: AppColors.deep.withValues(alpha: 0.45)),
+                PositionedDirectional(
+                  top: 8,
+                  start: 8,
+                  child: _Badge(
+                    color: done ? AppColors.green : AppColors.deep,
+                    ink: Colors.white,
+                    icon: done ? LucideIcons600.check : null,
+                    label: done
+                        ? lang.t('خلصت', 'Khelset')
+                        : lang.t('باقي ${lang.toAr(left)}', 'Ba2y $left'),
+                  ),
+                ),
+                if (open && !done)
+                  PositionedDirectional(
+                    top: 8,
+                    end: 8,
+                    child: _Badge(
+                      color: AppColors.play,
+                      ink: Colors.white,
+                      icon: LucideIcons600.circlePlay,
+                      label: lang.t('سؤال مفتوح', 'So2al maftoo7'),
+                    ),
+                  ),
+                Positioned(
+                  left: 10,
+                  right: 10,
+                  bottom: 8,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppText.display(20, height: 1.25),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          for (final (i, id) in ids.indexed) ...[
+                            if (i > 0) const SizedBox(width: 4),
+                            Expanded(child: _Pip(result: game.results[id])),
+                          ],
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Badge extends StatelessWidget {
+  const _Badge({
+    required this.color,
+    required this.ink,
+    required this.label,
+    this.icon,
+  });
+
+  final Color color;
+  final Color ink;
+  final String label;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 12, color: ink),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            label,
+            style: AppText.sans(11, weight: FontWeight.w700, color: ink),
           ),
         ],
       ),
@@ -578,104 +653,25 @@ class _CategoryCard extends StatelessWidget {
   }
 }
 
-class _Tile extends StatelessWidget {
-  const _Tile({
-    required this.id,
-    required this.points,
-    required this.result,
-    required this.inProgress,
-    required this.categoryName,
-    required this.teamNames,
-    required this.onTap,
-  });
+/// One question's state on a pack card: open, won by a team, or nobody.
+class _Pip extends StatelessWidget {
+  const _Pip({required this.result});
 
-  final String id;
-  final int points;
   final TileResult? result;
-  final bool inProgress;
-  final String categoryName;
-  final List<String> teamNames;
-  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final lang = context.lang;
     final r = result;
-    final won = r?.team;
-    final label = r == null
-        ? '$categoryName — $points'
-        : won != null
-        ? lang.t(
-            '$categoryName — $points — كسبه ${teamNames[won]}',
-            '$categoryName — $points — kasabo ${teamNames[won]}',
-          )
-        : lang.t(
-            '$categoryName — $points — محدش كسبه',
-            '$categoryName — $points — ma7adsh kasabo',
-          );
-
-    final Widget face;
-    if (r == null) {
-      face = Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(999),
-          gradient: const LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [AppColors.ivory, AppColors.cream],
-          ),
-          border: Border.all(
-            color: AppColors.deep,
-            width: inProgress ? 3 : 1.5,
-          ),
-          boxShadow: [cssShadow(const Color(0x40000000), y: 3, blur: 6)],
-        ),
-        alignment: Alignment.center,
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Text(
-            lang.toAr(points),
-            style: AppText.num(18, color: AppColors.deep, height: 1),
-          ),
-        ),
-      );
-    } else if (won != null) {
-      face = Container(
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(999),
-          color: teamColors[won],
-          border: Border.all(color: AppColors.deep, width: 1.5),
-        ),
-        child: Icon(
-          LucideIcons600.check,
-          size: 18,
-          color: AppColors.inkOn(teamColors[won]),
-        ),
-      );
-    } else {
-      face = Container(
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(999),
-          color: AppColors.deep.withValues(alpha: 0.35),
-        ),
-        child: Icon(
-          LucideIcons.x,
-          size: 16,
-          color: AppColors.ivory.withValues(alpha: 0.5),
-        ),
-      );
-    }
-
-    return Semantics(
-      button: r == null,
-      label: label,
-      excludeSemantics: true,
-      child: Pressable(
-        scale: 0.92,
-        onTap: r == null ? onTap : null,
-        child: face,
+    final team = r?.team;
+    return Container(
+      height: 6,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(3),
+        color: r == null
+            ? AppColors.ivory.withValues(alpha: 0.85)
+            : team == null
+            ? AppColors.ivory.withValues(alpha: 0.2)
+            : teamColors[team],
       ),
     );
   }

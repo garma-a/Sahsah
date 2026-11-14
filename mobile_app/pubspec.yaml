@@ -28,6 +28,7 @@ flutter:
   assets:
     - assets/img/
     - assets/game/
+    - assets/game/stages/
     - assets/logo/
   fonts:
     - family: Lalezar
