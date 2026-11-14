@@ -67,12 +67,21 @@
         },
         "score": {
           "$ref": "#/$defs/Score"
+        },
+        "players": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TeamPlayer"
+          },
+          "maxItems": 6,
+          "description": "Players seated on this team, in seat order. Live views list current players; results list everyone who played."
         }
       },
       "required": [
         "number",
         "name",
-        "score"
+        "score",
+        "players"
       ]
     },
     "Teams": {
@@ -1973,6 +1982,14 @@
         },
         "manualAdjustmentTotal": {
           "$ref": "#/$defs/SignedInteger"
+        },
+        "players": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TeamPlayer"
+          },
+          "maxItems": 6,
+          "description": "Players seated on this team, in seat order. Live views list current players; results list everyone who played."
         }
       },
       "required": [
@@ -1980,7 +1997,8 @@
         "name",
         "score",
         "questionAwardTotal",
-        "manualAdjustmentTotal"
+        "manualAdjustmentTotal",
+        "players"
       ]
     },
     "Result": {
@@ -4379,6 +4397,24 @@
         "language",
         "source",
         "view"
+      ]
+    },
+    "TeamPlayer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "membershipId": {
+          "$ref": "#/$defs/Id"
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        }
+      },
+      "required": [
+        "membershipId",
+        "displayName"
       ]
     }
   },

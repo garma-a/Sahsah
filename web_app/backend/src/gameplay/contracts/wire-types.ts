@@ -10,7 +10,7 @@ export interface WireTypes {
   Secret: (string);
   Basis: (string);
   Language: ("ar" | "franco");
-  Team: ({ "number": (number); "name": (string); "score": (WireTypes["Score"]) });
+  Team: ({ "number": (number); "name": (string); "score": (WireTypes["Score"]); "players": (((WireTypes["TeamPlayer"]))[]) });
   Teams: (((WireTypes["Team"]))[]);
   Selection: ({ "boardPosition": (number); "categoryId": (WireTypes["Id"]); "packId": (WireTypes["Id"]); "observedRevision": (WireTypes["Revision"]); "repeatConsentBasis"?: (WireTypes["Basis"]) });
   Selections: (((WireTypes["Selection"]))[]);
@@ -73,7 +73,7 @@ export interface WireTypes {
   ViewerQuestionView: ({ "phase": ("question"); "audience": ("viewer"); "roomId": (WireTypes["Id"]); "gameId": (WireTypes["Id"]); "boardPosition": (number); "questionPosition": (number); "basePoints": (200 | 400 | 600); "suggestedPoints": (number); "teams": (WireTypes["Teams"]); "timer": (WireTypes["Timer"]); "idleExpiresAt": (WireTypes["Time"]); "question": (WireTypes["ViewerQuestion"]) });
   ViewerAnswerView: ((((WireTypes["ViewerStandardAnswerView"])) | ((WireTypes["ViewerImageBlurAnswerView"])) | ((WireTypes["ViewerImageZoomAnswerView"])) | ((WireTypes["ViewerAudioGuessAnswerView"])) | ((WireTypes["ViewerAudioReverseAnswerView"])) | ((WireTypes["ViewerImagePersonAnswerView"])) | ((WireTypes["ViewerImageColorAnswerView"])) | ((WireTypes["ViewerImageRiddleAnswerView"])) | ((WireTypes["ViewerAudioVoiceAnswerView"])) | ((WireTypes["ViewerImageMemoryAnswerView"]))));
   CategoryResult: ({ "boardPosition": (number); "categoryId": (WireTypes["Id"]); "name": (string); "resolvedCount": (number); "teamOneAwardPoints": (number); "teamTwoAwardPoints": (number); "winningTeamNumber": ((1 | 2 | null)) | null });
-  ResultTeam: ({ "number": (number); "name": (string); "score": (WireTypes["Score"]); "questionAwardTotal": (number); "manualAdjustmentTotal": (WireTypes["SignedInteger"]) });
+  ResultTeam: ({ "number": (number); "name": (string); "score": (WireTypes["Score"]); "questionAwardTotal": (number); "manualAdjustmentTotal": (WireTypes["SignedInteger"]); "players": (((WireTypes["TeamPlayer"]))[]) });
   Result: ({ "gameId": (WireTypes["Id"]); "roomId": (WireTypes["Id"]); "status": ("finished" | "expired" | "failed"); "endReason": ("completed" | "host_ended" | "host_left" | "idle_timeout" | "platform_failure"); "endedAt": (WireTypes["Time"]); "resolvedQuestionCount": (number); "winningTeamNumber": ((1 | 2 | null)) | null; "teams": (((WireTypes["ResultTeam"]))[]); "categories": (((WireTypes["CategoryResult"]))[]) });
   ResultView: ({ "phase": ("result"); "audience": ("host" | "viewer"); "result": (WireTypes["Result"]) });
   Snapshot: ((((WireTypes["LobbySnapshot"])) | ((WireTypes["GameSnapshot"]))));
@@ -159,4 +159,5 @@ export interface WireTypes {
   InitialSelection: ({ "boardPosition": (number); "categoryId": (WireTypes["Id"]); "packId": (WireTypes["Id"]); "observedRevision": (WireTypes["Revision"]) });
   InitialSelections: (((WireTypes["InitialSelection"]))[]);
   CategorySection: ({ "id": (WireTypes["Id"]); "name": (string); "displayOrder": (number) });
+  TeamPlayer: ({ "membershipId": (WireTypes["Id"]); "displayName": (string) });
 }
