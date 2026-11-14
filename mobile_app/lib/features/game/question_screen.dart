@@ -93,6 +93,24 @@ class _QuestionScreenState extends State<QuestionScreen> {
     super.dispose();
   }
 
+  /// Back (button or gesture): the question can't be left open, so the
+  /// host decides who took the points — or keeps playing.
+  Future<void> _leave() async {
+    final game = context.game;
+    final id = widget.questionId;
+    final choice = await showDialog<int>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.6),
+      builder: (_) => _LeaveDialog(
+        question: game.question(id),
+        teamNames: game.game!.teamNames,
+        points: game.availablePoints(id),
+      ),
+    );
+    if (!mounted || choice == null) return;
+    _award(choice == _LeaveDialog.nobody ? null : choice);
+  }
+
   void _award(int? team) {
     final game = context.game;
     final lang = context.lang;
@@ -159,6 +177,7 @@ class _QuestionScreenState extends State<QuestionScreen> {
             onBackToAnswer: p.revealed
                 ? () => setState(() => _showQuestion = false)
                 : null,
+            onBack: _leave,
           );
 
     final card = _QuestionCard(
@@ -169,45 +188,66 @@ class _QuestionScreenState extends State<QuestionScreen> {
       child: content,
     );
 
-    return GameScaffold(
-      child: LayoutBuilder(
-        builder: (context, box) {
-          final landscape = box.maxWidth > box.maxHeight * 1.1;
-          if (landscape) {
-            return Padding(
-              padding: const EdgeInsets.fromLTRB(12, 18, 12, 12),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  SizedBox(width: 190, child: _TeamsColumn(game: game)),
-                  const SizedBox(width: 14),
-                  Expanded(child: card),
-                ],
+    // The back gesture can't leave an open question; it explains why.
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _leave();
+      },
+      child: GameScaffold(
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: LayoutBuilder(
+                builder: (context, box) {
+                  final landscape = box.maxWidth > box.maxHeight * 1.1;
+                  if (landscape) {
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 18, 12, 12),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          SizedBox(width: 190, child: _TeamsColumn(game: game)),
+                          const SizedBox(width: 14),
+                          Expanded(child: card),
+                        ],
+                      ),
+                    );
+                  }
+                  return Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TeamScore(
+                                game: game,
+                                team: 0,
+                                compact: true,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TeamScore(
+                                game: game,
+                                team: 1,
+                                compact: true,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 22),
+                        Expanded(child: card),
+                      ],
+                    ),
+                  );
+                },
               ),
-            );
-          }
-          return Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: TeamScore(game: game, team: 0, compact: true),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TeamScore(game: game, team: 1, compact: true),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 22),
-                Expanded(child: card),
-              ],
             ),
-          );
-        },
+          ],
+        ),
       ),
     );
   }
@@ -309,6 +349,7 @@ class _QuestionView extends StatelessWidget {
     required this.progress,
     required this.questionId,
     this.onBackToAnswer,
+    required this.onBack,
   });
 
   final Question question;
@@ -317,6 +358,9 @@ class _QuestionView extends StatelessWidget {
 
   /// Set when the answer is already revealed (7A "back to the question").
   final VoidCallback? onBackToAnswer;
+
+  /// Leave the question: asks who took the points first.
+  final VoidCallback onBack;
 
   @override
   Widget build(BuildContext context) {
@@ -414,9 +458,9 @@ class _QuestionView extends StatelessWidget {
       width: 150,
       child: GlassButton(
         height: 50,
-        icon: context.lang.ar ? LucideIcons.arrowRight : LucideIcons.arrowLeft,
+        icon: lang.ar ? LucideIcons.arrowRight : LucideIcons.arrowLeft,
         label: lang.t('رجوع', 'Rogoo3'),
-        onTap: () => Navigator.of(context).maybePop(),
+        onTap: onBack,
       ),
     );
 
@@ -459,7 +503,7 @@ class _QuestionView extends StatelessWidget {
             const Spacer(),
             if (canClarify) ...[
               SizedBox(
-                width: 180,
+                width: 200,
                 child: GoldButton(
                   height: 50,
                   icon: LucideIcons600.zoomIn,
@@ -467,9 +511,9 @@ class _QuestionView extends StatelessWidget {
                   onTap: () => game.advanceStage(questionId),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 12),
             ],
-            SizedBox(width: 200, child: primary),
+            SizedBox(width: 240, child: primary),
           ],
         ),
       ],
@@ -1431,6 +1475,166 @@ class _MemoryPlaceholder extends StatelessWidget {
               ),
             ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// "Who took the points?" before leaving an open question. Pops a team
+/// index, [nobody], or null to keep playing.
+class _LeaveDialog extends StatelessWidget {
+  const _LeaveDialog({
+    required this.question,
+    required this.teamNames,
+    required this.points,
+  });
+
+  static const nobody = -1;
+
+  final Question question;
+  final List<String> teamNames;
+  final int points;
+
+  @override
+  Widget build(BuildContext context) {
+    final lang = context.lang;
+    final nav = Navigator.of(context);
+
+    Widget team(int i) => GameButton(
+      key: ValueKey('leave-team-$i'),
+      height: 54,
+      radius: 16,
+      depth: 5,
+      color: teamColors[i],
+      borderColor: AppColors.deep,
+      onTap: () => nav.pop(i),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                teamNames[i],
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppText.sans(
+                  16,
+                  weight: FontWeight.w700,
+                  color: AppColors.inkOn(teamColors[i]),
+                ),
+              ),
+            ),
+            Text(
+              '+${lang.toAr(points)}',
+              textDirection: TextDirection.ltr,
+              style: AppText.num(17, color: AppColors.inkOn(teamColors[i])),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    return Dialog(
+      backgroundColor: AppColors.forest,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+        side: BorderSide(color: AppColors.gold.withValues(alpha: 0.4)),
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                lang.t(
+                  'قبل ما ترجعوا… مين خد النقط؟',
+                  'Abl ma terga3o… meen khad el no2at?',
+                ),
+                textAlign: TextAlign.center,
+                style: AppText.display(24, height: 1.2),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                lang.t(
+                  'السؤال لازم يتحسم عشان ترجعوا للوحة.',
+                  'El so2al lazem yet7esem 3ashan terga3o lel lo7a.',
+                ),
+                textAlign: TextAlign.center,
+                style: AppText.sans(
+                  13,
+                  color: AppColors.ivory.withValues(alpha: 0.7),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: lang.t('الإجابة: ', 'El egaba: '),
+                        style: AppText.sans(
+                          14,
+                          weight: FontWeight.w700,
+                          color: AppColors.gold,
+                        ),
+                      ),
+                      TextSpan(
+                        text: lang.t(question.answer, question.answerEn),
+                        style: AppText.sans(15, weight: FontWeight.w700),
+                      ),
+                    ],
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(child: team(0)),
+                  const SizedBox(width: 10),
+                  Expanded(child: team(1)),
+                ],
+              ),
+              const SizedBox(height: 10),
+              GlassButton(
+                height: 50,
+                icon: LucideIcons.x,
+                label: lang.t('ولا حد', 'Wala 7ad'),
+                onTap: () => nav.pop(nobody),
+              ),
+              const SizedBox(height: 4),
+              TextButton.icon(
+                key: const ValueKey('leave-stay'),
+                onPressed: () => nav.pop(),
+                icon: const Icon(
+                  LucideIcons.undo2,
+                  size: 16,
+                  color: AppColors.gold,
+                ),
+                label: Text(
+                  lang.t('لأ، كمّلوا السؤال', 'La2, kammelo el so2al'),
+                  style: AppText.sans(
+                    14,
+                    weight: FontWeight.w700,
+                    color: AppColors.gold,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

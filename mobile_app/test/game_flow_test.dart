@@ -86,6 +86,20 @@ void main() {
     expect(game.game!.activeId, 'general-4');
     expect(find.text('إظهار الإجابة'), findsOneWidget);
 
+    // Back (button or gesture) asks who took the points first; "keep
+    // playing" stays on the question.
+    await tapText(tester, 'رجوع');
+    expect(find.text('قبل ما ترجعوا… مين خد النقط؟'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('leave-stay')));
+    await settle(tester);
+    await tester.binding.handlePopRoute();
+    await settle(tester);
+    expect(find.text('قبل ما ترجعوا… مين خد النقط؟'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('leave-stay')));
+    await settle(tester);
+    expect(game.game!.activeId, 'general-4');
+    expect(game.game!.results, isEmpty);
+
     // The picture opens full screen to zoom in, then closes.
     await tester.tap(find.bySemanticsLabel('كبّر الصورة').first);
     await settle(tester);
@@ -109,6 +123,19 @@ void main() {
     expect(game.game!.scores, [400, 0]);
     expect(game.game!.results['general-4']!.team, 0);
     expect(find.text('إظهار الإجابة'), findsNothing);
+    expect(find.text('اختاروا سؤال'), findsOneWidget);
+
+    // Leaving a question settles it: back → the second team took it.
+    // (Let the award confirmation slide away first.)
+    await tester.pump(const Duration(seconds: 3));
+    await settle(tester);
+    await tester.tap(find.byKey(const ValueKey('question-general-0')));
+    await settle(tester);
+    await tapText(tester, 'رجوع');
+    await tester.tap(find.byKey(const ValueKey('leave-team-1')));
+    await settle(tester);
+    expect(game.game!.results['general-0']!.team, 1);
+    expect(game.game!.scores, [400, 200]);
     expect(find.text('اختاروا سؤال'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('pack-back')));
     await settle(tester);
