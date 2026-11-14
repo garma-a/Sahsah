@@ -1,15 +1,80 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-@custom-variant dark (&:is(.dark *));
+/*
+  Sahsah design tokens. Brand colours come from the client's brand sheet and are
+  defined once here; components use the Tailwind utilities (bg-cream, text-charcoal...).
+  The heading face is a single token (--font-heading) so the client's licensed
+  display face can replace the Lalezar stand-in in one place.
+*/
+@theme {
+  --color-charcoal: #2b3230;
+  --color-cyan: #33c3d6;
+  --color-orange-red: #ee4b2b;
+  --color-sun: #ffd233;
+  --color-cream: #fff3dc;
+  --color-red: #ff3b3b;
+  --color-maroon: #8b0029;
+  --color-amber: #ffc21a;
+  --color-green: #3fbf6b;
+  --color-teal: #128c8a;
+  --color-pink: #ff0a84;
+  --color-logo-blue: #22529e;
 
+  /* Derived: the chunky button face. White on it passes AA (4.6:1); the raw orange-red does not. */
+  --color-press: #d63a19;
+  --color-press-deep: #a52a10;
+  /* Derived: the pink for ribbons and tiles (white on it passes AA, 5.3:1). */
+  --color-pink-press: #d1066c;
+  /* Derived neutrals for the dark hero and the board wall. */
+  --color-ink: #1d2321;
+  --color-paper-shade: #ecdcb8;
+  --color-night: #0e1412;
+
+  --font-heading: var(--font-lalezar), "Lalezar", "Noto Naskh Arabic", system-ui, sans-serif;
+  --font-sans: var(--font-alexandria), "Alexandria", system-ui, sans-serif;
+
+  --shadow-poster: 0 10px 18px -8px rgb(29 35 33 / 0.55), 0 2px 0 rgb(29 35 33 / 0.25);
+  --shadow-chunk: 0 5px 0 var(--color-press-deep);
+
+  --animate-ticker: ticker 38s linear infinite;
+  --animate-rise: rise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-pop: pop 0.35s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+
+  @keyframes ticker {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(50%);
+    }
+  }
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(22px) rotate(var(--r, 0deg));
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) rotate(var(--r, 0deg));
+    }
+  }
+  @keyframes pop {
+    from {
+      transform: scale(0.6);
+    }
+    to {
+      transform: scale(1);
+    }
+  }
+}
+
+/* shadcn semantic tokens, mapped onto the brand palette. */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
@@ -22,59 +87,97 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
 }
 
 :root {
-  --radius: 0.75rem;
-  --background: #faf8f0;
-  --foreground: #163e33;
-  --card: #ffffff;
-  --card-foreground: #163e33;
-  --popover: #ffffff;
-  --popover-foreground: #163e33;
-  --primary: #1b5543;
+  --background: var(--color-cream);
+  --foreground: var(--color-charcoal);
+  --card: #fffaf0;
+  --card-foreground: var(--color-charcoal);
+  --primary: var(--color-press);
   --primary-foreground: #ffffff;
-  --secondary: #f1e7ca;
-  --secondary-foreground: #163e33;
-  --muted: #f0eee7;
-  --muted-foreground: #626b62;
-  --accent: #ead7a4;
-  --accent-foreground: #163e33;
-  --destructive: #b42318;
-  --border: #d9ddd3;
-  --input: #d9ddd3;
-  --ring: #b69c52;
-}
+  --secondary: var(--color-cyan);
+  --secondary-foreground: var(--color-charcoal);
+  --muted: var(--color-paper-shade);
+  --muted-foreground: #5b625f;
+  --accent: var(--color-sun);
+  --accent-foreground: var(--color-charcoal);
+  --destructive: #b3261e;
+  --border: #d9c7a0;
+  --input: #b8a67f;
+  --ring: var(--color-cyan);
 
-.dark {
-  --background: #102e25;
-  --foreground: #faf8f0;
-  --card: #163e33;
-  --card-foreground: #faf8f0;
-  --popover: #163e33;
-  --popover-foreground: #faf8f0;
-  --primary: #ead7a4;
-  --primary-foreground: #102e25;
-  --secondary: #245543;
-  --secondary-foreground: #faf8f0;
-  --muted: #1b4436;
-  --muted-foreground: #bac7ba;
-  --accent: #245543;
-  --accent-foreground: #faf8f0;
-  --destructive: #f28c80;
-  --border: #38604f;
-  --input: #38604f;
-  --ring: #ead7a4;
+  /* Paper grain: tileable fractal noise, drawn in code so no image is shipped. */
+  --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n' x='0' y='0' width='100%' height='100%'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.22  0 0 0 0 0.16  0 0 0 0 0.08  0 0 0 0.2 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
 }
 
 @layer base {
-  * { @apply border-border outline-ring/50; }
+  * {
+    @apply border-border;
+  }
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
   body {
-    @apply bg-background text-foreground antialiased;
-    font-family: Arial, Tahoma, sans-serif;
+    @apply bg-cream font-sans text-charcoal antialiased;
+    min-height: 100dvh;
+    overflow-x: hidden;
+  }
+  /* A two-tone ring reads on cream, charcoal and every brand fill. */
+  :focus-visible {
+    outline: 3px solid var(--color-ink);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 6px var(--color-sun);
+  }
+  ::selection {
+    background: var(--color-sun);
+    color: var(--color-ink);
+  }
+}
+
+@layer utilities {
+  .font-heading {
+    font-family: var(--font-heading);
+    font-weight: 400;
+  }
+  /* Cream paper with grain. */
+  .paper {
+    background-color: var(--color-cream);
+    background-image: var(--grain);
+    background-size: 220px 220px;
+  }
+  .paper-card {
+    background-color: #fff8ea;
+    background-image: var(--grain);
+    background-size: 220px 220px;
+  }
+  .grain-dark {
+    background-image: var(--grain);
+    background-size: 220px 220px;
+    background-blend-mode: soft-light;
+  }
+  /* The cream shelf rises to an arch with a cyan rim (desktop); on phones the page is cream throughout. */
+  @media (min-width: 1024px) {
+    .arch {
+      border-radius: 50% 50% 0 0 / 130px 130px 0 0;
+      box-shadow: 0 -5px 0 var(--color-cyan);
+    }
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
