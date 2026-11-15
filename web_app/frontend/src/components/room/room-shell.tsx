@@ -34,7 +34,11 @@ export default function RoomShell({ covers, status, actions, children, wide, hea
           </div>
         </header>
         <main className="relative z-10 flex flex-1 flex-col">
-          {heading && <h1 className="sr-only">{heading}</h1>}
+          {heading && (
+            <h1 id="page-heading" tabIndex={-1} className="sr-only focus:outline-none">
+              {heading}
+            </h1>
+          )}
           {children}
         </main>
       </div>
