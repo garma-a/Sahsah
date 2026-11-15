@@ -6,7 +6,20 @@ async function bootstrap() {
   const app = await createApplication();
   const config = app.get(ConfigService);
   app.enableShutdownHooks();
-  await app.listen(Number(config.get("PORT", 3001)), config.get<string>("HOST", "0.0.0.0"));
+  const port = Number(config.get("PORT", 3001));
+  await app.listen(port, config.get<string>("HOST", "0.0.0.0"));
+  printLocalPreviewAccess(port);
+}
+
+/**
+ * Local runs only: print the preview passcode so testers can sign in. Local media storage is
+ * refused in production and never configured on a deployment, so deployed logs never carry it.
+ */
+function printLocalPreviewAccess(port: number) {
+  const passcode = process.env.GAMEPLAY_PREVIEW_PASSCODE;
+  const local = process.env.NODE_ENV !== "production" && Boolean(process.env.GAMEPLAY_LOCAL_MEDIA_DIR);
+  if (!local || !passcode) return;
+  console.log(`\n  Sahsah API ready on http://localhost:${port}\n  Preview passcode (local only): ${passcode}\n`);
 }
 
 bootstrap().catch((error: unknown) => {
