@@ -3,16 +3,19 @@
 import { useMemo } from "react";
 import Button from "@/components/ui/button";
 import Poster from "@/components/home/poster";
+import { RowEnds } from "@/components/home/shelf-decor";
 import { toneAt } from "@/components/brand/tones";
 import type { ApiError } from "@/lib/api/client";
 import type { Category } from "@/lib/api/types";
 import { toShelves, type CategoriesState } from "@/lib/use-categories";
+import { cn } from "@/lib/utils";
 import { BOARD_SIZE } from "@/stores/draft-store";
 
 // Rows are centred flex lines whose items share one width per breakpoint (--cols), so a section of four
 // fills or centres its row and never leaves an empty slot, and an odd last row is centred too.
-const list =
-  "flex flex-wrap justify-center gap-x-[var(--gap)] gap-y-9 [--cols:2] [--gap:1.5rem] sm:[--cols:3] md:[--cols:4] lg:[--cols:5] lg:[--gap:2rem]";
+// The row-end collages (shelf-decor.tsx) size themselves from the same variables, set on the wrapper.
+const grid = "relative [--cols:2] [--gap:1.5rem] sm:[--cols:3] md:[--cols:4] lg:[--cols:5] lg:[--gap:2rem]";
+const list = "flex flex-wrap justify-center gap-x-[var(--gap)] gap-y-9";
 const item = "w-[calc((100%-(var(--cols)-1)*var(--gap))/var(--cols))]";
 
 type ShelvesProps = {
@@ -45,20 +48,23 @@ export default function Shelves({ state, selected, onToggle, onRetry }: ShelvesP
             {shelf.name}
           </h2>
           <div aria-hidden className={`mt-2 mb-9 h-[3px] w-full ${toneAt(shelfIndex).rule}`} />
-          <ul className={list}>
-            {shelf.categories.map((category, index) => (
-              <li key={category.id} className={item}>
-                <Poster
-                  category={category}
-                  toneIndex={toneOf.get(category.id) ?? index}
-                  selected={selected.includes(category.id)}
-                  full={selected.length >= BOARD_SIZE}
-                  eager={shelfIndex === 0 && index < 4}
-                  onToggle={onToggle}
-                />
-              </li>
-            ))}
-          </ul>
+          <div className={grid}>
+            <RowEnds count={shelf.categories.length} variant={shelfIndex} />
+            <ul className={list}>
+              {shelf.categories.map((category, index) => (
+                <li key={category.id} className={item}>
+                  <Poster
+                    category={category}
+                    toneIndex={toneOf.get(category.id) ?? index}
+                    selected={selected.includes(category.id)}
+                    full={selected.length >= BOARD_SIZE}
+                    eager={shelfIndex === 0 && index < 4}
+                    onToggle={onToggle}
+                  />
+                </li>
+              ))}
+            </ul>
+          </div>
         </section>
       ))}
     </div>
@@ -72,7 +78,7 @@ function ShelfSkeleton() {
         <div key={row}>
           <div className="h-10 w-48 rounded-md bg-charcoal/15" />
           <div className="mt-2 mb-9 h-[3px] w-full bg-charcoal/15" />
-          <div className={list}>
+          <div className={cn(grid, list)}>
             {[0, 1, 2, 3].map((n) => (
               <div key={n} className={`${item} aspect-[4/5] border-[5px] border-charcoal/15 bg-charcoal/10`} />
             ))}

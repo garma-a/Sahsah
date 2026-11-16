@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Logo from "@/components/brand/logo";
 import Hero from "@/components/home/hero";
 import SelectionBar from "@/components/home/selection-bar";
+import { GutterDecor } from "@/components/home/shelf-decor";
 import Shelves from "@/components/home/shelves";
 import SessionDialog from "@/components/setup/session-dialog";
 import Button from "@/components/ui/button";
@@ -106,6 +107,7 @@ export default function HomeView() {
         tabIndex={-1}
         className={cn("arch paper relative z-10 scroll-mt-4 outline-none lg:-mt-32", selected.length > 0 ? "pb-56 sm:pb-40" : "pb-24")}
       >
+        <GutterDecor />
         <div className="absolute inset-x-0 top-0 z-20 hidden justify-center lg:flex">
           <Button onClick={play} size="xl" className="h-[4.75rem] min-w-[19rem] -translate-y-[58%] text-5xl ring-[5px] active:translate-y-[calc(-58%+3px)]">
             العب!
