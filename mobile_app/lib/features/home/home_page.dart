@@ -82,7 +82,6 @@ class HomePage extends StatelessWidget {
         ],
       ),
     );
-    final gift = padded(_GiftCard(onTap: () => nav.go(AppRoute.gift)));
 
     Widget stack(List<Widget> items, {double gap = 28}) => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -101,7 +100,7 @@ class HomePage extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (resume != null) ...[resume, const SizedBox(height: 14)],
-            stack([play, ...rows, howTo, gift]),
+            stack([play, ...rows, howTo]),
           ],
         ),
       ),
@@ -482,113 +481,6 @@ class _Steps extends StatelessWidget {
             ),
           ],
         ],
-      ),
-    );
-  }
-}
-
-/// Compact gift promo that leads to the shop's gift section.
-class _GiftCard extends StatelessWidget {
-  const _GiftCard({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final lang = context.lang;
-    final discount = lang.toAr((giftDiscount * 100).round());
-    final radius = BorderRadius.circular(22);
-    return Semantics(
-      button: true,
-      child: Pressable(
-        onTap: onTap,
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 116),
-          foregroundDecoration: BoxDecoration(
-            borderRadius: radius,
-            border: Border.all(color: AppColors.gold.withValues(alpha: 0.3)),
-          ),
-          child: ClipRRect(
-            borderRadius: radius,
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: Image.asset(
-                    BrandImages.coins,
-                    fit: BoxFit.cover,
-                    alignment: const Alignment(0.6, 0),
-                  ),
-                ),
-                Positioned.fill(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        begin: AlignmentDirectional.centerStart,
-                        end: AlignmentDirectional.centerEnd,
-                        colors: [
-                          AppColors.card,
-                          Color(0xD9101540),
-                          Color(0x33101540),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(18),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 3,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.play,
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              child: Text(
-                                lang.t('خصم $discount٪', '$discount% off'),
-                                style: AppText.sans(
-                                  12,
-                                  weight: FontWeight.w700,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              lang.t('اهدي صاحبك لعبة', 'Ehdy sa7bak le3ba'),
-                              style: AppText.display(24, height: 1.1),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: const BoxDecoration(
-                          color: AppColors.gold,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          LucideIcons600.gift,
-                          size: 22,
-                          color: AppColors.forest,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }

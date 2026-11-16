@@ -130,6 +130,13 @@ void main() {
     tester,
   ) async {
     await pumpApp(tester, size: const Size(892, 412));
+    // No game yet: no "new game" button, no gift tile (gifts are bought on
+    // the website), no dead "two teams" chip, and a wallet that says play
+    // is free.
+    expect(find.text('لعبة جديدة'), findsNothing);
+    expect(find.text('هدية'), findsNothing);
+    expect(find.text('فريقين'), findsNothing);
+    expect(find.text('اللعب مجاني'), findsOneWidget);
 
     // Lobby fits the screen: no page scroll, play button at the end side
     // (left in Arabic), menu tiles at the start side.

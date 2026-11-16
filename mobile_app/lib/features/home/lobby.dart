@@ -47,7 +47,9 @@ class _Lobby extends StatelessWidget {
   }
 }
 
-/// Square menu tiles: categories, shop, gift, more.
+/// Square menu tiles: categories, shop, more. They are dark with a coloured
+/// icon and edge, so the red play button stays the loudest thing on screen.
+/// (Gifts are bought on the website, so there's no gift tile.)
 class _MenuColumn extends StatelessWidget {
   const _MenuColumn();
 
@@ -55,72 +57,57 @@ class _MenuColumn extends StatelessWidget {
   Widget build(BuildContext context) {
     final lang = context.lang;
     final nav = ShellNav.of(context);
-    // Each tile a bold retro colour, dark ink on the light ones.
     final items = [
       (
         LucideIcons600.layoutGrid,
         lang.t('الفئات', 'Fe2at'),
         AppRoute.categories,
         AppColors.teal,
-        AppColors.deep,
       ),
       (
         LucideIcons600.shoppingBag,
         lang.t('المتجر', 'El Matgar'),
         AppRoute.shop,
         AppColors.gold,
-        AppColors.deep,
-      ),
-      (
-        LucideIcons600.gift,
-        lang.t('هدية', 'Hedeya'),
-        AppRoute.gift,
-        AppColors.pink,
-        Colors.white,
       ),
       (
         LucideIcons600.settings,
         lang.t('المزيد', 'Aktar'),
         AppRoute.more,
         AppColors.purple,
-        Colors.white,
       ),
     ];
-    const gap = 8.0;
+    const gap = 10.0;
     return LayoutBuilder(
       builder: (context, box) {
         final tile = math.min(
-          74.0,
+          84.0,
           (box.maxHeight - gap * (items.length - 1)) / items.length,
         );
         return Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            for (final (i, (icon, label, route, face, ink))
-                in items.indexed) ...[
+            for (final (i, (icon, label, route, accent)) in items.indexed) ...[
               if (i > 0) const SizedBox(height: gap),
               GameButton(
                 width: 84,
                 height: tile,
                 depth: 5,
-                color: face,
-                borderColor: AppColors.deep,
+                color: Color.lerp(AppColors.ui, accent, 0.12)!,
+                edgeColor: Color.lerp(AppColors.deep, accent, 0.55),
+                borderColor: accent.withValues(alpha: 0.75),
                 onTap: () => nav.go(route),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(icon, size: 22, color: ink),
-                    const SizedBox(height: 3),
+                    Icon(icon, size: 24, color: accent),
+                    const SizedBox(height: 4),
                     Text(
                       label,
                       maxLines: 1,
                       overflow: TextOverflow.fade,
                       softWrap: false,
-                      style: AppText.sans(
-                        12,
-                        weight: FontWeight.w700,
-                        color: ink,
-                      ),
+                      style: AppText.sans(13, weight: FontWeight.w700),
                     ),
                   ],
                 ),
@@ -185,17 +172,7 @@ class _Stage extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: [
-                          _Chip(
-                            icon: LucideIcons.users,
-                            label: lang.t('فريقين', 'Fare2een'),
-                          ),
-                          _HelpChip(onTap: () => _showHowTo(context)),
-                        ],
-                      ),
+                      _HelpChip(onTap: () => _showHowTo(context)),
                       const Spacer(),
                       Row(
                         children: [
@@ -323,7 +300,9 @@ class _MiniPack extends StatelessWidget {
   }
 }
 
-/// End column: resume, the big play button, join with a code.
+/// End column: the main button, then the smaller ones. With a game in
+/// progress the main button continues it and "new game" steps down to a
+/// small button; otherwise the main button starts a game.
 class _PlayColumn extends StatelessWidget {
   const _PlayColumn({required this.tokens, required this.active});
 
@@ -335,25 +314,33 @@ class _PlayColumn extends StatelessWidget {
     final lang = context.lang;
     final nav = ShellNav.of(context);
     final game = active;
+    void resume() => Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const BoardScreen()));
+    // A lone Arabic zero is a small dot, so say it.
+    String score(int n) => n == 0 && lang.ar ? 'صفر' : lang.toAr(n);
+
+    final sub = AppText.sans(
+      13,
+      weight: FontWeight.w600,
+      color: Colors.white.withValues(alpha: 0.9),
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (game != null) ...[
-          _ResumeTile(game: game),
-          const SizedBox(height: 10),
-        ],
         Expanded(
           child: Align(
             alignment: Alignment.bottomCenter,
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 160),
+              constraints: const BoxConstraints(maxHeight: 170),
               child: GameButton(
+                key: const ValueKey('lobby-main'),
                 color: AppColors.play,
                 radius: 26,
                 depth: 8,
                 borderColor: AppColors.deep,
-                onTap: () => nav.go(AppRoute.play),
+                onTap: game == null ? () => nav.go(AppRoute.play) : resume,
                 child: Padding(
                   padding: const EdgeInsets.all(8),
                   child: FittedBox(
@@ -367,25 +354,32 @@ class _PlayColumn extends StatelessWidget {
                           color: Colors.white,
                         ),
                         Text(
-                          lang.t('ابدأ لعبة', 'Ebda2 le3ba'),
+                          game == null
+                              ? lang.t('ابدأ لعبة', 'Ebda2 le3ba')
+                              : lang.t('كمّلوا لعبتكم', 'Kammelo le3betkom'),
                           style: AppText.display(
-                            34,
+                            game == null ? 34 : 30,
                             height: 1.1,
                             color: Colors.white,
                           ),
                         ),
                         const SizedBox(height: 2),
-                        Text(
-                          lang.t(
-                            '${lang.toAr(boardCategories)} فئات · ${lang.toAr(boardQuestions)} سؤال',
-                            '$boardCategories fe2at · $boardQuestions so2al',
+                        if (game == null)
+                          Text(
+                            lang.t(
+                              '${lang.toAr(boardCategories)} فئات · ${lang.toAr(boardQuestions)} سؤال',
+                              '$boardCategories fe2at · $boardQuestions so2al',
+                            ),
+                            style: sub,
+                          )
+                        else
+                          // Where the game stands.
+                          Text(
+                            '${game.teamNames[0]} ${score(game.scores[0])}'
+                            '  ·  '
+                            '${game.teamNames[1]} ${score(game.scores[1])}',
+                            style: sub,
                           ),
-                          style: AppText.sans(
-                            12,
-                            weight: FontWeight.w600,
-                            color: Colors.white.withValues(alpha: 0.8),
-                          ),
-                        ),
                       ],
                     ),
                   ),
@@ -394,6 +388,36 @@ class _PlayColumn extends StatelessWidget {
             ),
           ),
         ),
+        if (game != null) ...[
+          const SizedBox(height: 10),
+          GameButton(
+            key: const ValueKey('lobby-new'),
+            height: 46,
+            depth: 4,
+            color: AppColors.ui,
+            borderColor: AppColors.ivory.withValues(alpha: 0.3),
+            onTap: () => nav.go(AppRoute.play),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  LucideIcons600.plus,
+                  size: 17,
+                  color: AppColors.ivory,
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    lang.t('لعبة جديدة', 'Le3ba gedeeda'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppText.sans(15, weight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 10),
         GameButton(
           height: 54,
@@ -425,83 +449,6 @@ class _PlayColumn extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-/// Unfinished game: a compact tile above the play button.
-class _ResumeTile extends StatelessWidget {
-  const _ResumeTile({required this.game});
-
-  final Game game;
-
-  @override
-  Widget build(BuildContext context) {
-    final lang = context.lang;
-    return GameButton(
-      height: 60,
-      depth: 5,
-      // The brand red mixed into the card green, like the portrait card.
-      color: Color.lerp(AppColors.card, AppColors.play, 0.3)!,
-      edgeColor: Color.lerp(AppColors.deep, AppColors.play, 0.2)!,
-      borderColor: AppColors.play.withValues(alpha: 0.8),
-      onTap: () => Navigator.of(
-        context,
-      ).push(MaterialPageRoute(builder: (_) => const BoardScreen())),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        child: Row(
-          children: [
-            Container(
-              width: 34,
-              height: 34,
-              decoration: const BoxDecoration(
-                color: AppColors.play,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.play_arrow_rounded,
-                size: 22,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    lang.t('كمّلوا لعبتكم', 'Kammelo le3betkom'),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppText.display(17, height: 1.2),
-                  ),
-                  Text.rich(
-                    TextSpan(
-                      children: [
-                        for (var t = 0; t < 2; t++) ...[
-                          if (t > 0) const TextSpan(text: '  ·  '),
-                          TextSpan(
-                            text: '${game.teamNames[t]} ',
-                            style: AppText.sans(11, weight: FontWeight.w600),
-                          ),
-                          TextSpan(
-                            text: lang.toAr(game.scores[t]),
-                            style: AppText.num(13, color: teamColors[t]),
-                          ),
-                        ],
-                      ],
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
