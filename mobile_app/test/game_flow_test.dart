@@ -193,5 +193,11 @@ void main() {
     await tapText(tester, 'اخرج');
     expect(game.hasActiveGame, isTrue);
     expect(find.text('كمّلوا لعبتكم'), findsOneWidget);
+    // Continuing is now the main button; starting over steps down.
+    expect(find.text('ابدأ لعبة'), findsNothing);
+    expect(find.text('لعبة جديدة'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('lobby-main')));
+    await settle(tester);
+    expect(find.byKey(const ValueKey('turn-chip')), findsOneWidget);
   });
 }
