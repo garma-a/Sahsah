@@ -1,0 +1,677 @@
+{
+  "section": {
+    "name": "باقات تجريبية"
+  },
+  "categories": [
+    {
+      "key": "pack1",
+      "name": "الكورة المصرية",
+      "description": "أسئلة عن تاريخ ونجوم الكورة المصرية",
+      "cover": "generated/covers/pack1.png",
+      "packs": [
+        {
+          "number": 1,
+          "questions": [
+            {
+              "id": "P1-Q1",
+              "slot": 1,
+              "prompt": "مصر كسبت كأس الأمم الأفريقية كام مرة؟",
+              "answer": "7 مرات (1957، 1959، 1986، 1998، 2006، 2008، 2010)",
+              "source": "Pack1_Egyptian_Football/Q1_easy_T0",
+              "format": "STANDARD"
+            },
+            {
+              "id": "P1-Q2",
+              "slot": 2,
+              "prompt": "الاستاد ده اسمه إيه؟",
+              "answer": "استاد القاهرة الدولي",
+              "source": "Pack1_Egyptian_Football/Q2_easy_T1",
+              "format": "STANDARD",
+              "media": {
+                "prompt": "Pack1_Egyptian_Football/Q2_easy_T1/unnamed.jpg"
+              }
+            },
+            {
+              "id": "P1-Q3",
+              "slot": 3,
+              "prompt": "مين اللاعب ده؟ افتحوا التلميحات واحدة واحدة",
+              "answer": "محمد صلاح",
+              "source": "Pack1_Egyptian_Football/Q3_medium_T3",
+              "format": "IMAGE_CLUES",
+              "media": {
+                "prompt": "Pack1_Egyptian_Football/Q3_medium_T3/question_image.webp",
+                "clues": [
+                  {
+                    "file": "Pack1_Egyptian_Football/Q3_medium_T3/hint_1.png",
+                    "points": 300
+                  },
+                  {
+                    "file": "Pack1_Egyptian_Football/Q3_medium_T3/hint_2.png",
+                    "points": 200
+                  },
+                  {
+                    "file": "Pack1_Egyptian_Football/Q3_medium_T3/hint_3.png",
+                    "points": 150
+                  },
+                  {
+                    "file": "Pack1_Egyptian_Football/Q3_medium_T3/hint_4.png",
+                    "points": 100
+                  }
+                ]
+              }
+            },
+            {
+              "id": "P1-Q4",
+              "slot": 4,
+              "prompt": "مصر أول منتخب عربي وأفريقي يلعب كأس العالم.. في سنة كام؟",
+              "answer": "1934 (في إيطاليا)",
+              "source": "Pack1_Egyptian_Football/Q4_medium_T0",
+              "format": "STANDARD"
+            },
+            {
+              "id": "P1-Q5",
+              "slot": 5,
+              "prompt": "مين اللاعب ده؟ افتحوا التلميحات واحدة واحدة",
+              "answer": "محمد أبو تريكة",
+              "source": "Pack1_Egyptian_Football/Q5_hard_T3",
+              "format": "IMAGE_CLUES",
+              "media": {
+                "prompt": "Pack1_Egyptian_Football/Q5_hard_T3/question_image.jpeg",
+                "clues": [
+                  {
+                    "file": "Pack1_Egyptian_Football/Q5_hard_T3/hint_1.png",
+                    "points": 450
+                  },
+                  {
+                    "file": "Pack1_Egyptian_Football/Q5_hard_T3/hint_2.png",
+                    "points": 300
+                  },
+                  {
+                    "file": "Pack1_Egyptian_Football/Q5_hard_T3/hint_3.png",
+                    "points": 200
+                  },
+                  {
+                    "file": "Pack1_Egyptian_Football/Q5_hard_T3/hint_4.png",
+                    "points": 150
+                  }
+                ]
+              }
+            },
+            {
+              "id": "P1-Q6",
+              "slot": 6,
+              "prompt": "المدرب ده كسب مع منتخب مصر كام بطولة أمم أفريقيا؟",
+              "answer": "3 بطولات (2006، 2008، 2010)",
+              "source": "Pack1_Egyptian_Football/Q6_hard_T1",
+              "format": "STANDARD",
+              "media": {
+                "prompt": "Pack1_Egyptian_Football/Q6_hard_T1/Hassan_Shehata_(1975).jpg"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "pack2",
+      "name": "نوستالجيا التسعينات",
+      "description": "كرتون وأغاني ومسلسلات التسعينات",
+      "cover": "generated/covers/pack2.png",
+      "packs": [
+        {
+          "number": 1,
+          "questions": [
+            {
+              "id": "P2-Q1",
+              "slot": 1,
+              "prompt": "اسم الشخصية الكرتونية دي إيه؟",
+              "answer": "بكار",
+              "source": "Pack2_Nostalgia_90s/Q1_easy_T1",
+              "format": "IMAGE_BLUR",
+              "media": {
+                "blur": "Pack2_Nostalgia_90s/Q1_easy_T1/MV5BY2FiMDQ4ZWUtYThiYS00M2ZlLWI2NTktNzY4YjZiYjU0ZmUzXkEyXkFqcGc@._V1_.jpg"
+              }
+            },
+            {
+              "id": "P2-Q2",
+              "slot": 2,
+              "prompt": "زمان كنا بنعمل إيه بالقلم الرصاص ده مع الشريط؟",
+              "answer": "بنلف الشريط ونظبطه لما يتسحب أو يتلخبط",
+              "source": "Pack2_Nostalgia_90s/Q2_easy_T1",
+              "format": "STANDARD",
+              "note": "Generated image replaces the duplicated Bakar picture.",
+              "media": {
+                "prompt": "generated/pack2-q2-cassette-pencil.png"
+              }
+            },
+            {
+              "id": "P2-Q3",
+              "slot": 3,
+              "prompt": "مين اللي غنى التتر ده؟",
+              "answer": "محمد منير (تتر بكار)",
+              "source": "Pack2_Nostalgia_90s/Q3_medium_T1-2",
+              "format": "AUDIO_GUESS",
+              "media": {
+                "audio": "Pack2_Nostalgia_90s/Q3_medium_T1-2/bakar.mov"
+              }
+            },
+            {
+              "id": "P2-Q4",
+              "slot": 4,
+              "prompt": "ده كان بيتعمل بيه إيه؟",
+              "answer": "كارت ميناتل للتليفونات العمومية",
+              "source": "Pack2_Nostalgia_90s/Q4_medium_T3",
+              "format": "IMAGE_CLUES",
+              "media": {
+                "prompt": "Pack2_Nostalgia_90s/Q4_medium_T3/question_image.png",
+                "clues": [
+                  {
+                    "file": "Pack2_Nostalgia_90s/Q4_medium_T3/hint_1.png",
+                    "points": 250
+                  },
+                  {
+                    "file": "Pack2_Nostalgia_90s/Q4_medium_T3/hint_2.png",
+                    "points": 150
+                  }
+                ],
+                "answer": "Pack2_Nostalgia_90s/Q4_medium_T3/answer_image.jpeg"
+              }
+            },
+            {
+              "id": "P2-Q5",
+              "slot": 5,
+              "prompt": "الأغنية دي نزلت سنة كام؟",
+              "answer": "1996 (نور العين، عمرو دياب)",
+              "source": "Pack2_Nostalgia_90s/Q5_hard_T1-2",
+              "format": "AUDIO_GUESS",
+              "media": {
+                "audio": "Pack2_Nostalgia_90s/Q5_hard_T1-2/nour elein.mov"
+              }
+            },
+            {
+              "id": "P2-Q6",
+              "slot": 6,
+              "prompt": "اسم المسلسل ده إيه؟",
+              "answer": "لن أعيش في جلباب أبي",
+              "source": "Pack2_Nostalgia_90s/Q6_hard_T3",
+              "format": "IMAGE_CLUES",
+              "media": {
+                "prompt": "Pack2_Nostalgia_90s/Q6_hard_T3/question_image.png",
+                "clues": [
+                  {
+                    "file": "Pack2_Nostalgia_90s/Q6_hard_T3/hint_1.png",
+                    "points": 450
+                  },
+                  {
+                    "file": "Pack2_Nostalgia_90s/Q6_hard_T3/hint_2.png",
+                    "points": 300
+                  },
+                  {
+                    "file": "Pack2_Nostalgia_90s/Q6_hard_T3/hint_3.png",
+                    "points": 200
+                  },
+                  {
+                    "file": "Pack2_Nostalgia_90s/Q6_hard_T3/hint_4.png",
+                    "points": 150
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "pack3",
+      "name": "خمّن الكلمة من الإيموجي",
+      "description": "اقروا الإيموجي وخمّنوا الكلمة",
+      "cover": "generated/covers/pack3.png",
+      "packs": [
+        {
+          "number": 1,
+          "questions": [
+            {
+              "id": "P3-Q1",
+              "slot": 1,
+              "prompt": "الإيموجي دي تقول إيه؟",
+              "answer": "فانوس رمضان",
+              "source": "Pack3_Guess_the_Word_Emoji/Q1_easy_T1",
+              "format": "STANDARD",
+              "media": {
+                "prompt": "Pack3_Guess_the_Word_Emoji/Q1_easy_T1/question_image.png"
+              }
+            },
+            {
+              "id": "P3-Q2",
+              "slot": 2,
+              "prompt": "الإيموجي دي تقول إيه؟ (أكلة)",
+              "answer": "سندوتش طعمية",
+              "source": "Pack3_Guess_the_Word_Emoji/Q2_easy_T1",
+              "format": "STANDARD",
+              "media": {
+                "prompt": "Pack3_Guess_the_Word_Emoji/Q2_easy_T1/question_image.png"
+              }
+            },
+            {
+              "id": "P3-Q3",
+              "slot": 3,
+              "prompt": "الإيموجي دي تقول إيه؟ (اسم فيلم)",
+              "answer": "الفيل الأزرق",
+              "source": "Pack3_Guess_the_Word_Emoji/Q3_medium_T1",
+              "format": "STANDARD",
+              "media": {
+                "prompt": "Pack3_Guess_the_Word_Emoji/Q3_medium_T1/question_image.png"
+              }
+            },
+            {
+              "id": "P3-Q4",
+              "slot": 4,
+              "prompt": "الإيموجي دي تقول إيه؟ (اسم فيلم)",
+              "answer": "عسل إسود",
+              "source": "Pack3_Guess_the_Word_Emoji/Q4_medium_T1",
+              "format": "STANDARD",
+              "media": {
+                "prompt": "Pack3_Guess_the_Word_Emoji/Q4_medium_T1/question_image.png"
+              }
+            },
+            {
+              "id": "P3-Q5",
+              "slot": 5,
+              "prompt": "الإيموجي دي تقول إيه؟ (مثل شعبي)",
+              "answer": "القرد في عين أمه غزال",
+              "source": "Pack3_Guess_the_Word_Emoji/Q5_hard_T1",
+              "format": "STANDARD",
+              "media": {
+                "prompt": "Pack3_Guess_the_Word_Emoji/Q5_hard_T1/question_image.png"
+              }
+            },
+            {
+              "id": "P3-Q6",
+              "slot": 6,
+              "prompt": "الإيموجي دي تقول إيه؟ (مثل شعبي)",
+              "answer": "اللي إيده في الميه مش زي اللي إيده في النار",
+              "source": "Pack3_Guess_the_Word_Emoji/Q6_hard_T1",
+              "format": "STANDARD",
+              "media": {
+                "prompt": "Pack3_Guess_the_Word_Emoji/Q6_hard_T1/question_image.png"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "pack4",
+      "name": "تمثيل: أفلام الألفينات",
+      "description": "مثّلوا أفلام الألفينات من غير ولا كلمة",
+      "cover": "generated/covers/pack4.png",
+      "packs": [
+        {
+          "number": 1,
+          "questions": [
+            {
+              "id": "P4-Q1",
+              "slot": 1,
+              "prompt": "حد من الفريق يمسح الكود ويمثّل اسم الفيلم من غير ولا كلمة. معاكم دقيقة!",
+              "answer": "اللمبي (2002)",
+              "source": "Pack4_Charades_2000s_Films/Q1_easy_T4",
+              "format": "CHARADES",
+              "media": {
+                "prompt": "Pack4_Charades_2000s_Films/Q1_easy_T4/private_card.png",
+                "answer": "Pack4_Charades_2000s_Films/Q1_easy_T4/private_card.png"
+              }
+            },
+            {
+              "id": "P4-Q2",
+              "slot": 2,
+              "prompt": "حد من الفريق يمسح الكود ويمثّل اسم الفيلم من غير ولا كلمة. معاكم دقيقة!",
+              "answer": "الناظر (2000)",
+              "source": "Pack4_Charades_2000s_Films/Q2_easy_T4",
+              "format": "CHARADES",
+              "media": {
+                "prompt": "Pack4_Charades_2000s_Films/Q2_easy_T4/private_card.png",
+                "answer": "Pack4_Charades_2000s_Films/Q2_easy_T4/private_card.png"
+              }
+            },
+            {
+              "id": "P4-Q3",
+              "slot": 3,
+              "prompt": "حد من الفريق يمسح الكود ويمثّل اسم الفيلم من غير ولا كلمة. معاكم دقيقة!",
+              "answer": "السفارة في العمارة (2005)",
+              "source": "Pack4_Charades_2000s_Films/Q3_medium_T4",
+              "format": "CHARADES",
+              "media": {
+                "prompt": "Pack4_Charades_2000s_Films/Q3_medium_T4/private_card.png",
+                "answer": "Pack4_Charades_2000s_Films/Q3_medium_T4/private_card.png"
+              }
+            },
+            {
+              "id": "P4-Q4",
+              "slot": 4,
+              "prompt": "حد من الفريق يمسح الكود ويمثّل اسم الفيلم من غير ولا كلمة. معاكم دقيقة!",
+              "answer": "طير إنت (2009)",
+              "source": "Pack4_Charades_2000s_Films/Q4_medium_T4",
+              "format": "CHARADES",
+              "media": {
+                "prompt": "Pack4_Charades_2000s_Films/Q4_medium_T4/private_card.png",
+                "answer": "Pack4_Charades_2000s_Films/Q4_medium_T4/private_card.png"
+              }
+            },
+            {
+              "id": "P4-Q5",
+              "slot": 5,
+              "prompt": "حد من الفريق يمسح الكود ويمثّل اسم الفيلم من غير ولا كلمة. معاكم دقيقة!",
+              "answer": "عمارة يعقوبيان (2006)",
+              "source": "Pack4_Charades_2000s_Films/Q5_hard_T4",
+              "format": "CHARADES",
+              "media": {
+                "prompt": "Pack4_Charades_2000s_Films/Q5_hard_T4/private_card.png",
+                "answer": "Pack4_Charades_2000s_Films/Q5_hard_T4/private_card.png"
+              }
+            },
+            {
+              "id": "P4-Q6",
+              "slot": 6,
+              "prompt": "حد من الفريق يمسح الكود ويمثّل اسم الفيلم من غير ولا كلمة. معاكم دقيقة!",
+              "answer": "كده رضا (2007)",
+              "source": "Pack4_Charades_2000s_Films/Q6_hard_T4",
+              "format": "CHARADES",
+              "media": {
+                "prompt": "Pack4_Charades_2000s_Films/Q6_hard_T4/private_card.png",
+                "answer": "Pack4_Charades_2000s_Films/Q6_hard_T4/private_card.png"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "pack5",
+      "name": "العد التنازلي: حساب",
+      "description": "احفظوا الأرقام ووصّلوا للرقم المطلوب",
+      "cover": "generated/covers/pack5.png",
+      "packs": [
+        {
+          "number": 1,
+          "questions": [
+            {
+              "id": "P5-Q1",
+              "slot": 1,
+              "prompt": "باستخدام الأرقام اللي شفتها، وصّلوا لـ 50 أو أقرب رقم ليه. جمع وطرح وضرب وقسمة، وكل رقم مرة واحدة بس.",
+              "answer": "5 × 10 = 50",
+              "source": "Pack5_Countdown_Math/Q1_easy_T2",
+              "format": "IMAGE_MEMORY",
+              "config": {
+                "instructionAr": "ركّزوا في الأرقام! هتظهر 8 ثواني بس وبعدين تختفي"
+              },
+              "media": {
+                "prompt": "Pack5_Countdown_Math/Q1_easy_T2/numbers_image.png",
+                "answer": "Pack5_Countdown_Math/Q1_easy_T2/numbers_image.png"
+              }
+            },
+            {
+              "id": "P5-Q2",
+              "slot": 2,
+              "prompt": "باستخدام الأرقام اللي شفتها، وصّلوا لـ 56 أو أقرب رقم ليه. جمع وطرح وضرب وقسمة، وكل رقم مرة واحدة بس.",
+              "answer": "7 × 8 = 56",
+              "source": "Pack5_Countdown_Math/Q2_easy_T2",
+              "format": "IMAGE_MEMORY",
+              "config": {
+                "instructionAr": "ركّزوا في الأرقام! هتظهر 8 ثواني بس وبعدين تختفي"
+              },
+              "media": {
+                "prompt": "Pack5_Countdown_Math/Q2_easy_T2/numbers_image.png",
+                "answer": "Pack5_Countdown_Math/Q2_easy_T2/numbers_image.png"
+              }
+            },
+            {
+              "id": "P5-Q3",
+              "slot": 3,
+              "prompt": "باستخدام الأرقام اللي شفتها، وصّلوا لـ 154 أو أقرب رقم ليه. جمع وطرح وضرب وقسمة، وكل رقم مرة واحدة بس.",
+              "answer": "6 × 25 = 150، + 4 = 154",
+              "source": "Pack5_Countdown_Math/Q3_medium_T2",
+              "format": "IMAGE_MEMORY",
+              "config": {
+                "instructionAr": "ركّزوا في الأرقام! هتظهر 8 ثواني بس وبعدين تختفي"
+              },
+              "media": {
+                "prompt": "Pack5_Countdown_Math/Q3_medium_T2/numbers_image.png",
+                "answer": "Pack5_Countdown_Math/Q3_medium_T2/numbers_image.png"
+              }
+            },
+            {
+              "id": "P5-Q4",
+              "slot": 4,
+              "prompt": "باستخدام الأرقام اللي شفتها، وصّلوا لـ 373 أو أقرب رقم ليه. جمع وطرح وضرب وقسمة، وكل رقم مرة واحدة بس.",
+              "answer": "3 + 50 = 53، × 7 = 371، + 2 = 373",
+              "source": "Pack5_Countdown_Math/Q4_medium_T2",
+              "format": "IMAGE_MEMORY",
+              "config": {
+                "instructionAr": "ركّزوا في الأرقام! هتظهر 8 ثواني بس وبعدين تختفي"
+              },
+              "media": {
+                "prompt": "Pack5_Countdown_Math/Q4_medium_T2/numbers_image.png",
+                "answer": "Pack5_Countdown_Math/Q4_medium_T2/numbers_image.png"
+              }
+            },
+            {
+              "id": "P5-Q5",
+              "slot": 5,
+              "prompt": "باستخدام الأرقام اللي شفتها، وصّلوا لـ 813 أو أقرب رقم ليه. جمع وطرح وضرب وقسمة، وكل رقم مرة واحدة بس.",
+              "answer": "7 + 75 = 82، × 9 = 738، + (3 × 25 = 75) = 813",
+              "source": "Pack5_Countdown_Math/Q5_hard_T2",
+              "format": "IMAGE_MEMORY",
+              "config": {
+                "instructionAr": "ركّزوا في الأرقام! هتظهر 10 ثواني بس وبعدين تختفي"
+              },
+              "media": {
+                "prompt": "Pack5_Countdown_Math/Q5_hard_T2/numbers_image.png",
+                "answer": "Pack5_Countdown_Math/Q5_hard_T2/numbers_image.png"
+              }
+            },
+            {
+              "id": "P5-Q6",
+              "slot": 6,
+              "prompt": "باستخدام الأرقام اللي شفتها، وصّلوا لـ 951 أو أقرب رقم ليه. جمع وطرح وضرب وقسمة، وكل رقم مرة واحدة بس.",
+              "answer": "4 + 6 = 10، × 100 = 1000، − (50 − 1 = 49) = 951",
+              "source": "Pack5_Countdown_Math/Q6_hard_T2",
+              "format": "IMAGE_MEMORY",
+              "config": {
+                "instructionAr": "ركّزوا في الأرقام! هتظهر 10 ثواني بس وبعدين تختفي"
+              },
+              "media": {
+                "prompt": "Pack5_Countdown_Math/Q6_hard_T2/numbers_image.png",
+                "answer": "Pack5_Countdown_Math/Q6_hard_T2/numbers_image.png"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "pack6",
+      "name": "خمّن المكان",
+      "description": "أماكن مشهورة في مصر",
+      "cover": "generated/covers/pack6.png",
+      "packs": [
+        {
+          "number": 1,
+          "questions": [
+            {
+              "id": "P6-Q1",
+              "slot": 1,
+              "prompt": "المكان ده فين؟",
+              "answer": "برج القاهرة",
+              "source": "Pack6_Guess_the_Location/Q1_easy_T1",
+              "format": "IMAGE_BLUR",
+              "media": {
+                "blur": "Pack6_Guess_the_Location/Q1_easy_T1/Linguamid-arabic-with-Hamid-Cairo-tower-1.jpg"
+              }
+            },
+            {
+              "id": "P6-Q2",
+              "slot": 2,
+              "prompt": "المكان ده فين؟",
+              "answer": "قلعة صلاح الدين (جامع محمد علي)",
+              "source": "Pack6_Guess_the_Location/Q2_easy_T3",
+              "format": "IMAGE_CLUES",
+              "media": {
+                "prompt": "Pack6_Guess_the_Location/Q2_easy_T3/question_image.png",
+                "clues": [
+                  {
+                    "file": "Pack6_Guess_the_Location/Q2_easy_T3/hint_1.png",
+                    "points": 125
+                  },
+                  {
+                    "file": "Pack6_Guess_the_Location/Q2_easy_T3/hint_2.png",
+                    "points": 75
+                  }
+                ],
+                "answer": "Pack6_Guess_the_Location/Q2_easy_T3/answer_image.jpg"
+              }
+            },
+            {
+              "id": "P6-Q3",
+              "slot": 3,
+              "prompt": "المكان ده فين؟",
+              "answer": "الصحراء البيضاء (الفرافرة)",
+              "source": "Pack6_Guess_the_Location/Q3_medium_T1",
+              "format": "STANDARD",
+              "media": {
+                "prompt": "Pack6_Guess_the_Location/Q3_medium_T1/images-4.jpeg"
+              }
+            },
+            {
+              "id": "P6-Q4",
+              "slot": 4,
+              "prompt": "المكان ده فين؟",
+              "answer": "معبد أبو سمبل (أسوان)",
+              "source": "Pack6_Guess_the_Location/Q4_medium_T3",
+              "format": "IMAGE_CLUES",
+              "media": {
+                "prompt": "Pack6_Guess_the_Location/Q4_medium_T3/question_image.png",
+                "clues": [
+                  {
+                    "file": "Pack6_Guess_the_Location/Q4_medium_T3/hint_1.png",
+                    "points": 250
+                  },
+                  {
+                    "file": "Pack6_Guess_the_Location/Q4_medium_T3/hint_2.png",
+                    "points": 150
+                  }
+                ],
+                "answer": "Pack6_Guess_the_Location/Q4_medium_T3/answer_image.webp"
+              }
+            },
+            {
+              "id": "P6-Q5",
+              "slot": 5,
+              "prompt": "المكان ده فين؟",
+              "answer": "وادي الحيتان (الفيوم)",
+              "source": "Pack6_Guess_the_Location/Q5_hard_T1",
+              "format": "IMAGE_ZOOM",
+              "media": {
+                "zoom": "Pack6_Guess_the_Location/Q5_hard_T1/Valley-of-the-Whales_Wadi-Hitan-171_pp.jpg",
+                "focus": [
+                  0.5,
+                  0.76
+                ]
+              }
+            },
+            {
+              "id": "P6-Q6",
+              "slot": 6,
+              "prompt": "المكان ده فين؟",
+              "answer": "قلعة شالي (واحة سيوة)",
+              "source": "Pack6_Guess_the_Location/Q6_hard_T3",
+              "format": "IMAGE_CLUES",
+              "media": {
+                "prompt": "Pack6_Guess_the_Location/Q6_hard_T3/question_image.png",
+                "clues": [
+                  {
+                    "file": "Pack6_Guess_the_Location/Q6_hard_T3/hint_1.png",
+                    "points": 400
+                  },
+                  {
+                    "file": "Pack6_Guess_the_Location/Q6_hard_T3/hint_2.png",
+                    "points": 200
+                  }
+                ],
+                "answer": "Pack6_Guess_the_Location/Q6_hard_T3/answer_image.jpg"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "pack7",
+      "name": "موسيقى مصرية",
+      "description": "أغاني ومطربين وملحنين مصريين",
+      "cover": "generated/covers/pack7.png",
+      "packs": [
+        {
+          "number": 1,
+          "questions": [
+            {
+              "id": "P7-Q1",
+              "slot": 1,
+              "prompt": "مين اللي غنّوا مهرجان «بنت الجيران»؟",
+              "answer": "حسن شاكوش وعمر كمال",
+              "source": "Pack7_Egyptian_Music/Q1_easy_T1-2",
+              "format": "STANDARD",
+              "note": "Rewritten as text: no audio clip for this song yet."
+            },
+            {
+              "id": "P7-Q2",
+              "slot": 2,
+              "prompt": "أغنية «تملّي معاك» (2000) لمين؟",
+              "answer": "عمرو دياب",
+              "source": "Pack7_Egyptian_Music/Q2_easy_T1-2",
+              "format": "STANDARD",
+              "note": "Rewritten as text: no audio clip for this song yet."
+            },
+            {
+              "id": "P7-Q3",
+              "slot": 3,
+              "prompt": "اسم الأغنية دي إيه؟",
+              "answer": "سواح (عبد الحليم حافظ)",
+              "source": "Pack7_Egyptian_Music/Q3_medium_T1-2",
+              "format": "AUDIO_GUESS",
+              "media": {
+                "audio": "Pack7_Egyptian_Music/Q3_medium_T1-2/سواح.mov"
+              }
+            },
+            {
+              "id": "P7-Q4",
+              "slot": 4,
+              "prompt": "مين المطرب اللي غنّى «شبابيك»؟",
+              "answer": "محمد منير",
+              "source": "Pack7_Egyptian_Music/Q4_medium_T1-2",
+              "format": "STANDARD",
+              "note": "Rewritten as text: no audio clip for this song yet."
+            },
+            {
+              "id": "P7-Q5",
+              "slot": 5,
+              "prompt": "مين اللي لحّن «إنت عمري» لأم كلثوم؟",
+              "answer": "محمد عبد الوهاب",
+              "source": "Pack7_Egyptian_Music/Q5_hard_T1-2",
+              "format": "STANDARD",
+              "note": "Rewritten as text: no audio clip for this song yet."
+            },
+            {
+              "id": "P7-Q6",
+              "slot": 6,
+              "prompt": "مين اللي لحّن «أهو ده اللي صار»؟",
+              "answer": "سيد درويش",
+              "source": "Pack7_Egyptian_Music/Q6_hard_T1-2",
+              "format": "STANDARD",
+              "note": "Rewritten as text: no audio clip for this song yet."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -100,7 +100,7 @@ References: [Drizzle migrations](https://orm.drizzle.team/docs/migrations), [cus
 
 ## Gameplay API
 
-The optional gameplay module exposes `/api/v1` REST and `/api/v1/realtime` native WebSocket operations. It defaults to disabled. See [the reviewed contract](../../docs/api/README.md) and [implementation, configuration and load evidence](../../docs/api/implementation-and-operations.md). `0002_gameplay_rooms.sql` and `0003_gameplay_history.sql` add draft selections/receipts, revisions, controller recovery and immutable-history guards. `0004_category_presentation.sql` adds category sections, descriptions and public covers. Reapply runtime grants after migrating.
+The optional gameplay module exposes `/api/v1` REST and `/api/v1/realtime` native WebSocket operations. It defaults to disabled. See [the reviewed contract](../../docs/api/README.md) and [implementation, configuration and load evidence](../../docs/api/implementation-and-operations.md). `0002_gameplay_rooms.sql` and `0003_gameplay_history.sql` add draft selections/receipts, revisions, controller recovery and immutable-history guards. `0004_category_presentation.sql` adds category sections, descriptions and public covers. `0005_question_formats_clues_charades.sql` adds the clue-image and charades formats and a fourth hint variant. Reapply runtime grants after migrating.
 
 `pnpm test` includes contract metadata, full-cycle HTTP/WS, all-format media and contention tests against disposable PostgreSQL. For a bounded local smoke measurement run `pnpm build` then `LOAD_ROOMS=10 LOAD_CYCLES=2 node scripts/gameplay-load.mjs`; up to 100 rooms/600 clients are supported by this fixture. This never certifies a Railway deployment. No frontend/prototype/mobile gameplay UI is migrated by this backend change.
 
@@ -110,7 +110,7 @@ The optional gameplay module exposes `/api/v1` REST and `/api/v1/realtime` nativ
 docker compose up -d            # PostgreSQL 18 on localhost:5433, with local-only roles
 cp .env.example .env            # then set the values below
 pnpm db:migrate && pnpm db:grant-runtime
-pnpm content:seed               # placeholder categories, packs, questions and media
+pnpm content:seed               # the client packs; media must already be uploaded (below)
 pnpm dev
 ```
 
@@ -118,7 +118,16 @@ Local `.env` values: the two database URLs shown in `.env.example`, `GAMEPLAY_EN
 
 **Preview mode** ([ADR 0017](../../docs/adr/0017-passcode-preview-without-login.md)) stands in for login until it exists. `POST /api/v1/preview/sessions` with `{ "passcode", "displayName" }` creates a host account for that browser with 10,000 tokens and returns a 30-day `credential` to send as `Authorization: Bearer …`; sending `{ "credential", "displayName" }` renews it. Preview admission uses API process pressure only and admits 20 open rooms. It is off unless the passcode is set, refuses to start alongside `GAMEPLAY_IDENTITY_JWKS_URL`, and its database must be discarded before real accounts exist.
 
-**Media storage** is chosen by configuration. With `GAMEPLAY_LOCAL_MEDIA_DIR`, files live under `private/` and `public/` in that directory and this API serves them at `/api/dev-media` (private files only through five-minute signed links); production refuses this setting. Otherwise private question media is signed from R2 and category covers are read from `GAMEPLAY_PUBLIC_MEDIA_BASE_URL`. `pnpm content:seed` writes to whichever storage is configured and can be rerun safely; for R2 it needs the write-capable `R2_IMPORT_*` key and `R2_PUBLIC_BUCKET`, which the API deployment never receives.
+**Content** lives in `content/packs.json` (the authored packs: text, formats, points and source file names) and `content/assets.json` (every prepared media file's key, size and hash). Media never enters the repository or the database host:
+
+- `CONTENT_SOURCE_DIR=<client pack folder> pnpm content:upload` runs once from a developer machine. It converts pictures to WebP, draws blur/zoom stages and category covers, extracts MP3 from the clients' QuickTime clips, uploads to R2 (or `GAMEPLAY_LOCAL_MEDIA_DIR`) and rewrites `content/assets.json`. Keys are content hashes, so reruns upload only what changed.
+- `pnpm content:seed` writes the catalog rows into the database in `MIGRATION_DATABASE_URL`, after checking that every listed file is in storage (R2 read key and `GAMEPLAY_PUBLIC_MEDIA_BASE_URL`, or the local directory). A new database needs only `db:migrate`, `db:grant-runtime` and `content:seed`.
+
+`tests/fixtures/seed-placeholders.mjs` generates numbered placeholder content covering every format; only the tests use it.
+
+**Charades cards** ([ADR 0019](../../docs/adr/0019-charades-card-link-without-membership.md)) open from a QR code on the question screen at `/act/…` on the frontend, derived from `GAMEPLAY_JOIN_BASE_URL`. To scan with a phone on the same Wi-Fi during local testing, use this machine's network address instead of `localhost` in `GAMEPLAY_JOIN_BASE_URL` (e.g. `http://192.168.1.20:3000/join/`), `CORS_ORIGINS` and the frontend's `NEXT_PUBLIC_API_URL`, and run the frontend with `pnpm dev --hostname 0.0.0.0`.
+
+**Media storage** is chosen by configuration. With `GAMEPLAY_LOCAL_MEDIA_DIR`, files live under `private/` and `public/` in that directory and this API serves them at `/api/dev-media` (private files only through five-minute signed links); production refuses this setting. Otherwise private question media is signed from R2 and category covers are read from `GAMEPLAY_PUBLIC_MEDIA_BASE_URL`. `pnpm content:upload` writes to whichever storage is configured; for R2 it needs the write-capable `R2_IMPORT_*` key and `R2_PUBLIC_BUCKET`, which the API deployment never receives.
 
 Behind a platform proxy set `TRUSTED_PROXY_HOPS` (Railway: 1) so rate limits and pending-connection limits apply per player rather than to the proxy.
 

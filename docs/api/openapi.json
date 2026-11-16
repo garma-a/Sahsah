@@ -2568,6 +2568,91 @@
           }
         }
       }
+    },
+    "/games/{gameId}/questions/{boardPosition}/{questionPosition}/charades-card": {
+      "get": {
+        "operationId": "openCharadesCard",
+        "summary": "Open the open charades question's private card by its code link",
+        "tags": [
+          "Media"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "name": "gameId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            }
+          },
+          {
+            "name": "boardPosition",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 6
+            }
+          },
+          {
+            "name": "questionPosition",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 6
+            }
+          },
+          {
+            "name": "t",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{22}$"
+            },
+            "description": "Card token from the code. Never log."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "$ref": "#/components/schemas/Id"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CharadesCard"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Problem410"
+          },
+          "429": {
+            "$ref": "#/components/responses/Problem429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem503"
+          }
+        },
+        "description": "ADR 0019: no membership check. Works only while that charades question is the open, unrevealed question of an active game. TTL300s presigned read."
+      }
     }
   },
   "components": {
@@ -2869,7 +2954,7 @@
           "variantNumber": {
             "type": "integer",
             "minimum": 0,
-            "maximum": 2
+            "maximum": 3
           }
         },
         "required": [
@@ -3598,6 +3683,12 @@
           },
           {
             "$ref": "#/components/schemas/AudioVoiceHostQuestion"
+          },
+          {
+            "$ref": "#/components/schemas/ImageCluesQuestion"
+          },
+          {
+            "$ref": "#/components/schemas/CharadesQuestion"
           }
         ],
         "discriminator": {
@@ -3612,7 +3703,9 @@
             "IMAGE_MEMORY": "#/components/schemas/MemoryQuestion",
             "AUDIO_GUESS": "#/components/schemas/AudioGuessHostQuestion",
             "AUDIO_REVERSE": "#/components/schemas/AudioReverseHostQuestion",
-            "AUDIO_VOICE": "#/components/schemas/AudioVoiceHostQuestion"
+            "AUDIO_VOICE": "#/components/schemas/AudioVoiceHostQuestion",
+            "IMAGE_CLUES": "#/components/schemas/ImageCluesQuestion",
+            "CHARADES": "#/components/schemas/CharadesQuestion"
           }
         }
       },
@@ -3647,6 +3740,12 @@
           },
           {
             "$ref": "#/components/schemas/AudioVoiceViewerQuestion"
+          },
+          {
+            "$ref": "#/components/schemas/ImageCluesQuestion"
+          },
+          {
+            "$ref": "#/components/schemas/CharadesQuestion"
           }
         ],
         "discriminator": {
@@ -3661,7 +3760,9 @@
             "IMAGE_MEMORY": "#/components/schemas/MemoryQuestion",
             "AUDIO_GUESS": "#/components/schemas/AudioGuessViewerQuestion",
             "AUDIO_REVERSE": "#/components/schemas/AudioReverseViewerQuestion",
-            "AUDIO_VOICE": "#/components/schemas/AudioVoiceViewerQuestion"
+            "AUDIO_VOICE": "#/components/schemas/AudioVoiceViewerQuestion",
+            "IMAGE_CLUES": "#/components/schemas/ImageCluesQuestion",
+            "CHARADES": "#/components/schemas/CharadesQuestion"
           }
         }
       },
@@ -4475,6 +4576,12 @@
           },
           {
             "$ref": "#/components/schemas/HostImageMemoryAnswerView"
+          },
+          {
+            "$ref": "#/components/schemas/HostImageCluesAnswerView"
+          },
+          {
+            "$ref": "#/components/schemas/HostCharadesAnswerView"
           }
         ]
       },
@@ -4582,6 +4689,12 @@
           },
           {
             "$ref": "#/components/schemas/ViewerImageMemoryAnswerView"
+          },
+          {
+            "$ref": "#/components/schemas/ViewerImageCluesAnswerView"
+          },
+          {
+            "$ref": "#/components/schemas/ViewerCharadesAnswerView"
           }
         ]
       },
@@ -8518,6 +8631,532 @@
         "required": [
           "membershipId",
           "displayName"
+        ]
+      },
+      "ImageCluesQuestion": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": [
+              "IMAGE_CLUES"
+            ]
+          },
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "image": {
+            "$ref": "#/components/schemas/ImageRef"
+          },
+          "clue": {
+            "$ref": "#/components/schemas/ImageRef"
+          },
+          "stageIndex": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4
+          },
+          "stageSuggestions": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 600
+            },
+            "minItems": 2,
+            "maxItems": 5
+          }
+        },
+        "required": [
+          "format",
+          "prompt",
+          "image",
+          "stageIndex",
+          "stageSuggestions"
+        ]
+      },
+      "CharadesQuestion": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": [
+              "CHARADES"
+            ]
+          },
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "cardUrl": {
+            "type": "string",
+            "format": "uri",
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "format",
+          "prompt",
+          "cardUrl"
+        ]
+      },
+      "ImageCluesViewerAnswer": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": [
+              "IMAGE_CLUES"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "image": {
+            "$ref": "#/components/schemas/ImageRef"
+          }
+        },
+        "required": [
+          "format",
+          "text"
+        ]
+      },
+      "ViewerImageCluesAnswerView": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "phase": {
+            "type": "string",
+            "enum": [
+              "answer"
+            ]
+          },
+          "audience": {
+            "type": "string",
+            "enum": [
+              "viewer"
+            ]
+          },
+          "roomId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "gameId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "boardPosition": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 6
+          },
+          "questionPosition": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 6
+          },
+          "basePoints": {
+            "type": "integer",
+            "enum": [
+              200,
+              400,
+              600
+            ]
+          },
+          "suggestedPoints": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 600
+          },
+          "teams": {
+            "$ref": "#/components/schemas/Teams"
+          },
+          "timer": {
+            "$ref": "#/components/schemas/Timer"
+          },
+          "idleExpiresAt": {
+            "$ref": "#/components/schemas/Time"
+          },
+          "question": {
+            "$ref": "#/components/schemas/ImageCluesQuestion"
+          },
+          "answer": {
+            "$ref": "#/components/schemas/ImageCluesViewerAnswer"
+          }
+        },
+        "required": [
+          "phase",
+          "audience",
+          "roomId",
+          "gameId",
+          "boardPosition",
+          "questionPosition",
+          "basePoints",
+          "suggestedPoints",
+          "teams",
+          "timer",
+          "idleExpiresAt",
+          "question",
+          "answer"
+        ]
+      },
+      "ImageCluesHostAnswer": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": [
+              "IMAGE_CLUES"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "image": {
+            "$ref": "#/components/schemas/ImageRef"
+          }
+        },
+        "required": [
+          "format",
+          "text"
+        ]
+      },
+      "HostImageCluesAnswerView": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "phase": {
+            "type": "string",
+            "enum": [
+              "answer"
+            ]
+          },
+          "audience": {
+            "type": "string",
+            "enum": [
+              "host"
+            ]
+          },
+          "roomId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "gameId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "boardPosition": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 6
+          },
+          "questionPosition": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 6
+          },
+          "basePoints": {
+            "type": "integer",
+            "enum": [
+              200,
+              400,
+              600
+            ]
+          },
+          "suggestedPoints": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 600
+          },
+          "teams": {
+            "$ref": "#/components/schemas/Teams"
+          },
+          "timer": {
+            "$ref": "#/components/schemas/Timer"
+          },
+          "idleExpiresAt": {
+            "$ref": "#/components/schemas/Time"
+          },
+          "question": {
+            "$ref": "#/components/schemas/ImageCluesQuestion"
+          },
+          "answer": {
+            "$ref": "#/components/schemas/ImageCluesHostAnswer"
+          },
+          "controls": {
+            "$ref": "#/components/schemas/Controls"
+          },
+          "feedback": {
+            "$ref": "#/components/schemas/Feedback"
+          }
+        },
+        "required": [
+          "phase",
+          "audience",
+          "roomId",
+          "gameId",
+          "boardPosition",
+          "questionPosition",
+          "basePoints",
+          "suggestedPoints",
+          "teams",
+          "timer",
+          "idleExpiresAt",
+          "question",
+          "answer",
+          "controls",
+          "feedback"
+        ]
+      },
+      "CharadesViewerAnswer": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": [
+              "CHARADES"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "image": {
+            "$ref": "#/components/schemas/ImageRef"
+          }
+        },
+        "required": [
+          "format",
+          "text"
+        ]
+      },
+      "ViewerCharadesAnswerView": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "phase": {
+            "type": "string",
+            "enum": [
+              "answer"
+            ]
+          },
+          "audience": {
+            "type": "string",
+            "enum": [
+              "viewer"
+            ]
+          },
+          "roomId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "gameId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "boardPosition": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 6
+          },
+          "questionPosition": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 6
+          },
+          "basePoints": {
+            "type": "integer",
+            "enum": [
+              200,
+              400,
+              600
+            ]
+          },
+          "suggestedPoints": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 600
+          },
+          "teams": {
+            "$ref": "#/components/schemas/Teams"
+          },
+          "timer": {
+            "$ref": "#/components/schemas/Timer"
+          },
+          "idleExpiresAt": {
+            "$ref": "#/components/schemas/Time"
+          },
+          "question": {
+            "$ref": "#/components/schemas/CharadesQuestion"
+          },
+          "answer": {
+            "$ref": "#/components/schemas/CharadesViewerAnswer"
+          }
+        },
+        "required": [
+          "phase",
+          "audience",
+          "roomId",
+          "gameId",
+          "boardPosition",
+          "questionPosition",
+          "basePoints",
+          "suggestedPoints",
+          "teams",
+          "timer",
+          "idleExpiresAt",
+          "question",
+          "answer"
+        ]
+      },
+      "CharadesHostAnswer": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": [
+              "CHARADES"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "image": {
+            "$ref": "#/components/schemas/ImageRef"
+          }
+        },
+        "required": [
+          "format",
+          "text"
+        ]
+      },
+      "HostCharadesAnswerView": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "phase": {
+            "type": "string",
+            "enum": [
+              "answer"
+            ]
+          },
+          "audience": {
+            "type": "string",
+            "enum": [
+              "host"
+            ]
+          },
+          "roomId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "gameId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "boardPosition": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 6
+          },
+          "questionPosition": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 6
+          },
+          "basePoints": {
+            "type": "integer",
+            "enum": [
+              200,
+              400,
+              600
+            ]
+          },
+          "suggestedPoints": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 600
+          },
+          "teams": {
+            "$ref": "#/components/schemas/Teams"
+          },
+          "timer": {
+            "$ref": "#/components/schemas/Timer"
+          },
+          "idleExpiresAt": {
+            "$ref": "#/components/schemas/Time"
+          },
+          "question": {
+            "$ref": "#/components/schemas/CharadesQuestion"
+          },
+          "answer": {
+            "$ref": "#/components/schemas/CharadesHostAnswer"
+          },
+          "controls": {
+            "$ref": "#/components/schemas/Controls"
+          },
+          "feedback": {
+            "$ref": "#/components/schemas/Feedback"
+          }
+        },
+        "required": [
+          "phase",
+          "audience",
+          "roomId",
+          "gameId",
+          "boardPosition",
+          "questionPosition",
+          "basePoints",
+          "suggestedPoints",
+          "teams",
+          "timer",
+          "idleExpiresAt",
+          "question",
+          "answer",
+          "controls",
+          "feedback"
+        ]
+      },
+      "CharadesCard": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "maxLength": 4096
+          },
+          "expiresAt": {
+            "$ref": "#/components/schemas/Time"
+          },
+          "contentType": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 16384
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 16384
+          }
+        },
+        "required": [
+          "url",
+          "expiresAt",
+          "contentType"
         ]
       }
     },

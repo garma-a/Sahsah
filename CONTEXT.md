@@ -82,6 +82,14 @@ Content hidden from selection in new games while existing games and progress are
 **Hint stage**:
 One of three progressively clearer blur/zoom views with positive decreasing suggested points, beginning at the tile's original value.
 
+**Clue image**:
+A question format showing a picture with up to four cumulative clue cards the host reveals one at a time, each reveal lowering the suggested points.
+_Avoid_: Hint stage, which is a blur/zoom view of the same picture.
+
+**Charades card**:
+A private picture naming what to act, opened only by whoever scans or follows the question's code while it is open, then acted silently for their team.
+_Avoid_: Prompt image, which everyone on the shared screen sees.
+
 **Invitation code**:
 A six-digit code for entering a room, valid for 24 hours from issue unless rotated earlier. Its expiry does not end an existing game.
 _Avoid_: Reconnect credential, which proves an existing guest's identity.

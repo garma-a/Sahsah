@@ -1,6 +1,7 @@
 import { LANGUAGE, request, type Auth } from "./client";
 import type {
   Category,
+  CharadesCard,
   ControlStatus,
   CurrentRoom,
   GameCommand,
@@ -77,6 +78,11 @@ export function getInvitation(roomId: Id, auth: Auth): Promise<Invitation> {
 
 export function previewInvitation(code: string, signal?: AbortSignal): Promise<InvitationPreview> {
   return request(`/room-invitations/${code}`, { signal });
+}
+
+/** ADR 0019: the code is the credential, so this sends no account or seat proof. */
+export function charadesCard(gameId: string, board: number, question: number, token: string, signal?: AbortSignal): Promise<CharadesCard> {
+  return request(`/games/${gameId}/questions/${board}/${question}/charades-card`, { query: { t: token }, signal });
 }
 
 export function joinRoom(

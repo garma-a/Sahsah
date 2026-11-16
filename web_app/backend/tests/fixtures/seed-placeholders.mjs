@@ -1,5 +1,6 @@
-// Registers placeholder sections, categories, packs, questions and media so the
-// game is playable before real content exists. Safe to rerun: identifiers and
+// Test fixture: registers placeholder sections, categories, packs, questions and
+// media covering every question format. Real content is loaded by
+// scripts/content/seed.mjs. Safe to rerun: identifiers and
 // storage keys are derived from names, and existing rows are left untouched.
 //
 // Database: MIGRATION_DATABASE_URL (migration owner).
@@ -108,8 +109,8 @@ const sections = [
   { name: "ثقافة عامة", categories: ["جغرافيا", "تاريخ", "علوم", "تكنولوجيا"] },
 ];
 const templates = [
-  ["STANDARD", "IMAGE_BLUR", "STANDARD", "IMAGE_ZOOM", "IMAGE_MEMORY", "AUDIO_GUESS"],
-  ["STANDARD", "IMAGE_RIDDLE", "IMAGE_PERSON", "IMAGE_COLOR", "AUDIO_REVERSE", "AUDIO_VOICE"],
+  ["STANDARD", "IMAGE_BLUR", "IMAGE_CLUES", "IMAGE_ZOOM", "IMAGE_MEMORY", "AUDIO_GUESS"],
+  ["CHARADES", "IMAGE_RIDDLE", "IMAGE_PERSON", "IMAGE_COLOR", "AUDIO_REVERSE", "AUDIO_VOICE"],
 ];
 const stagePoints = { 200: [200, 150, 50], 400: [400, 250, 150], 600: [600, 400, 200] };
 const staffId = "00000000-0000-4000-8000-000000000018";
@@ -159,6 +160,8 @@ async function main() {
             const [prompt, answer, config] = {
               STANDARD: [`كم يساوي ${arabic(a)} × ${arabic(b)}؟`, arabic(a * b), {}],
               IMAGE_BLUR: ["ما الرقم المختبئ في الصورة؟", shown, {}],
+              IMAGE_CLUES: ["ما الرقم في الصورة؟ افتحوا التلميحات واحدة واحدة", shown, {}],
+              CHARADES: ["حد يمسح الكود ويمثّل الرقم من غير ولا كلمة", shown, {}],
               IMAGE_ZOOM: ["ما الرقم الظاهر في الصورة المقرّبة؟", shown, {}],
               IMAGE_MEMORY: ["ما الرقم الذي كان في الصورة؟", shown, {}],
               IMAGE_RIDDLE: ["اضرب الرقم الظاهر في الصورة في ٢. ما الناتج؟", arabic(number * 2), {}],
@@ -174,11 +177,16 @@ async function main() {
             );
             const pin = (role, assetId, variant = 0, suggested = null) =>
               client.query("INSERT INTO question_media(question_id,media_role,media_asset_id,variant_number,suggested_points) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING", [questionId, role, assetId, variant, suggested]);
-            if (format.startsWith("IMAGE_")) {
+            if (format.startsWith("IMAGE_") || format === "CHARADES") {
               const options = { hue, label: name, number: shown };
               const original = await image(`${tag}:original`, options);
               await pin("source_image", original);
               if (format !== "IMAGE_RIDDLE") await pin("answer_image", original);
+              if (format === "IMAGE_CLUES") {
+                const clues = { 200: [150, 75], 400: [300, 200, 150, 100], 600: [450, 300, 200, 150] }[cap];
+                for (const [stage, points] of clues.entries())
+                  await pin("hint_image", await image(`${tag}:clue${stage}`, { ...options, label: `تلميح ${arabic(stage + 1)}` }), stage, points);
+              }
               if (format === "IMAGE_BLUR" || format === "IMAGE_ZOOM") {
                 const operation = format === "IMAGE_BLUR" ? "blur" : "crop";
                 for (let stage = 0; stage < 3; stage++)

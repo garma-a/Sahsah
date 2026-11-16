@@ -10,6 +10,7 @@ import { GameOperations } from "./operations.js";
 import { language as validLanguage } from "../catalog/catalog.js";
 import {
   answerView,
+  hintStages,
   local,
   questionView,
   suggested,
@@ -384,7 +385,7 @@ export class ProjectionService {
     const controls = ["return_to_board", "adjust_score", "end_game"];
     if (q.revealedAt) controls.push("resolve_question");
     else {
-      if (["IMAGE_BLUR", "IMAGE_ZOOM"].includes(q.format) && q.stageIndex < 2)
+      if (q.stageIndex < hintStages(q) - 1)
         controls.push("advance_hint");
       if (q.format === "IMAGE_MEMORY")
         controls.push(q.memoryImageVisible ? "hide_memory" : "show_memory");
