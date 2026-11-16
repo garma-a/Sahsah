@@ -31,6 +31,22 @@
   --color-paper-shade: #ecdcb8;
   --color-night: #0e1412;
 
+  /*
+    The cinema stage behind the game: posters, TV cabinet and props, taken straight from the brand sheet.
+    The posters are drawn in these colours and then faded on the wall, so the board stays the brightest thing.
+  */
+  --color-cabinet: #262e2c;
+  --color-poster-cream: #e8dfc6;
+  --color-poster-teal: #4fbdba;
+  --color-poster-red: #e44a22;
+  --color-poster-orange: #f39223;
+  --color-poster-mustard: #fdc010;
+  --color-poster-crimson: #8b0029;
+  --color-poster-olive: #679348;
+  --color-poster-pink: #ff0a8a;
+  /* Derived: the shelf the TV stands on. */
+  --color-shelf: #4a2e22;
+
   --font-heading: var(--font-lalezar), "Lalezar", "Noto Naskh Arabic", system-ui, sans-serif;
   --font-sans: var(--font-alexandria), "Alexandria", system-ui, sans-serif;
 
@@ -166,6 +182,45 @@
   }
   .tabular {
     font-variant-numeric: tabular-nums;
+  }
+
+  /* The TV cabinet: a charcoal body with a soft top light, grain, and an ink outline. */
+  .cabinet {
+    background-color: var(--color-cabinet);
+    background-image:
+      linear-gradient(180deg, rgb(232 223 198 / 0.1) 0%, transparent 18%, transparent 82%, rgb(0 0 0 / 0.25) 100%),
+      var(--grain);
+    background-size: 100% 100%, 220px 220px;
+    background-blend-mode: normal, soft-light;
+    box-shadow:
+      0 8px 0 var(--color-ink),
+      0 30px 60px -12px rgb(0 0 0 / 0.7);
+  }
+  /* The glass: deep and slightly curved, with a teal trim and faint scanlines behind the content. */
+  .screen-glass {
+    background-color: #151b19;
+    background-image:
+      repeating-linear-gradient(0deg, rgb(232 223 198 / 0.035) 0 1px, transparent 1px 4px),
+      radial-gradient(ellipse at 50% 40%, rgb(79 189 186 / 0.12) 0%, transparent 70%);
+    box-shadow:
+      0 0 0 3px var(--color-ink),
+      0 0 0 6px var(--color-poster-teal),
+      0 0 0 9px var(--color-ink),
+      inset 0 0 0 2px rgb(0 0 0 / 0.6),
+      inset 0 0 70px rgb(0 0 0 / 0.75);
+  }
+  /* Speaker slots in the TV's chin. */
+  .grille {
+    background-image: repeating-linear-gradient(90deg, var(--color-night) 0 5px, transparent 5px 10px);
+  }
+  /* A worn poster: paper grain, a fold across each axis and light rubbed off the edges. */
+  .poster-wear {
+    background-image:
+      linear-gradient(90deg, transparent 49.4%, rgb(0 0 0 / 0.22) 49.6%, rgb(255 255 255 / 0.18) 50.2%, transparent 50.6%),
+      linear-gradient(0deg, transparent 49.4%, rgb(0 0 0 / 0.18) 49.6%, rgb(255 255 255 / 0.14) 50.2%, transparent 50.6%),
+      radial-gradient(ellipse at 50% 50%, transparent 55%, rgb(232 223 198 / 0.35) 100%),
+      var(--grain);
+    background-size: 100% 100%, 100% 100%, 100% 100%, 160px 160px;
   }
 
   /*

@@ -200,8 +200,8 @@ function LiveRoom({ roomId, auth, role, membershipId, covers, categories }: Live
     </Button>
   ) : null;
 
-  const shell = (children: React.ReactNode, wide?: boolean, heading?: string) => (
-    <RoomShell covers={covers} status={status} actions={actions} wide={wide} heading={heading}>
+  const shell = (children: React.ReactNode, stage?: boolean, heading?: string) => (
+    <RoomShell covers={covers} status={status} actions={actions} stage={stage} heading={heading}>
       {closeError && <ErrorBanner className="mb-3">{closeError}</ErrorBanner>}
       {children}
     </RoomShell>
