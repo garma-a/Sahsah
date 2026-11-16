@@ -178,6 +178,63 @@ void main() {
     expect(game.availablePoints('cinema-4'), 600);
   });
 
+  test('the turn passes after every settled question', () {
+    expect(game.game!.turn, 0);
+    game.open('cinema-0');
+    game.award('cinema-0', 1); // Whoever scores, the pick moves on.
+    expect(game.game!.turn, 1);
+    game.open('cinema-1');
+    game.award('cinema-1', null);
+    expect(game.game!.turn, 0);
+
+    // The host can hand the pick over, and it survives a save.
+    game.switchTurn();
+    expect(game.game!.turn, 1);
+    expect(Game.fromJson(game.game!.toJson()).turn, 1);
+    // Saves from before turns existed start with the first team.
+    final old = game.game!.toJson()..remove('turn');
+    expect(Game.fromJson(old).turn, 0);
+  });
+
+  test('the last award can be taken back once', () {
+    game.open('football-0'); // Staged: 200 → 150.
+    game.advanceStage('football-0');
+    game.reveal('football-0');
+    game.award('football-0', 0);
+    expect(game.game!.scores, [150, 0]);
+    expect(game.canUndoAward, isTrue);
+
+    expect(game.undoAward('cinema-0'), isFalse); // Not the last award.
+    expect(game.undoAward('football-0'), isTrue);
+    final g = game.game!;
+    expect(g.scores, [0, 0]);
+    expect(g.results, isEmpty);
+    expect(g.turn, 0);
+    // The tile is open again exactly as it was left.
+    final p = game.progressOf('football-0');
+    expect(p.revealed, isTrue);
+    expect(p.stage, 1);
+    expect(game.undoAward('football-0'), isFalse);
+
+    // Awarding again works, this time to the other team.
+    game.open('football-0');
+    game.award('football-0', 1);
+    expect(g.scores, [0, 150]);
+    expect(g.turn, 1);
+  });
+
+  test('the award that ends the game cannot be undone', () {
+    for (final c in categories) {
+      for (var r = 0; r < 6; r++) {
+        game.open('$c-$r');
+        game.award('$c-$r', 0);
+      }
+    }
+    expect(game.game!.finished, isTrue);
+    expect(game.canUndoAward, isFalse);
+    expect(game.undoAward('memory-5'), isFalse);
+  });
+
   test('every board slot has a question', () {
     for (final c in [...categories, 'acting', 'general', 'travel']) {
       for (var r = 0; r < 6; r++) {

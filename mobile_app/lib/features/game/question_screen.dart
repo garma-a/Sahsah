@@ -26,10 +26,18 @@ String _forTeam(String name) =>
 
 /// Opens question [id] and waits until the host leaves it. Leaving without
 /// a decision keeps its time, stage and reveal for later (Q54).
-Future<void> playQuestion(BuildContext context, String id) async {
-  final game = context.game;
+Future<void> playQuestion(BuildContext context, String id) =>
+    playQuestionOn(Navigator.of(context), context.game, id);
+
+/// [playQuestion] without a context: also used to reopen a question after
+/// its award is taken back.
+Future<void> playQuestionOn(
+  NavigatorState navigator,
+  GameController game,
+  String id,
+) async {
   game.open(id);
-  await Navigator.of(context).push(
+  await navigator.push(
     PageRouteBuilder<void>(
       transitionDuration: const Duration(milliseconds: 260),
       reverseTransitionDuration: const Duration(milliseconds: 200),
@@ -105,6 +113,8 @@ class _QuestionScreenState extends State<QuestionScreen> {
         question: game.question(id),
         teamNames: game.game!.teamNames,
         points: game.availablePoints(id),
+        revealed: game.progressOf(id).revealed,
+        onReveal: () => game.reveal(id),
       ),
     );
     if (!mounted || choice == null) return;
@@ -124,24 +134,66 @@ class _QuestionScreenState extends State<QuestionScreen> {
             '✓ ${lang.toAr(points)} نقطة محسومة ${_forTeam(names[team])}',
             '✓ $points no2ta ma7sooma le ${names[team]}',
           );
+    final id = widget.questionId;
     final messenger = ScaffoldMessenger.of(context);
-    Navigator.of(context).pop();
+    final navigator = Navigator.of(context);
+    final ink = team == null
+        ? AppColors.ivory
+        : AppColors.inkOn(teamColors[team]);
+    // A wrong tap can be taken back for a few seconds (not on the tile
+    // that ends the game: its scores lock).
+    final undoable = game.canUndoAward;
+    navigator.pop();
     messenger
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 2),
+          width: 460,
+          persist: false,
+          duration: Duration(seconds: undoable ? 4 : 2),
           backgroundColor: team == null ? AppColors.ui : teamColors[team],
-          content: Text(
-            message,
-            style: AppText.sans(
-              15,
-              weight: FontWeight.w700,
-              color: team == null
-                  ? AppColors.ivory
-                  : AppColors.inkOn(teamColors[team]),
-            ),
+          padding: const EdgeInsetsDirectional.fromSTEB(16, 6, 8, 6),
+          content: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  message,
+                  style: AppText.sans(15, weight: FontWeight.w700, color: ink),
+                ),
+              ),
+              if (undoable)
+                TextButton.icon(
+                  key: const ValueKey('award-undo'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: ink,
+                    minimumSize: const Size(0, 44),
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    shape: StadiumBorder(
+                      side: BorderSide(
+                        color: ink.withValues(alpha: 0.6),
+                        width: 1.5,
+                      ),
+                    ),
+                  ),
+                  onPressed: () {
+                    messenger.hideCurrentSnackBar();
+                    // Back on the same question to pick again.
+                    if (game.undoAward(id) && navigator.mounted) {
+                      playQuestionOn(navigator, game, id);
+                    }
+                  },
+                  icon: const Icon(LucideIcons.undo2, size: 16),
+                  label: Text(
+                    lang.t('تراجع', 'Taraga3'),
+                    style: AppText.sans(
+                      14,
+                      weight: FontWeight.w700,
+                      color: ink,
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
       );
@@ -455,7 +507,7 @@ class _QuestionView extends StatelessWidget {
 
     final disabled = memoryWaiting || actingRules;
     final back = SizedBox(
-      width: 150,
+      width: 130,
       child: GlassButton(
         height: 50,
         icon: lang.ar ? LucideIcons.arrowRight : LucideIcons.arrowLeft,
@@ -500,20 +552,38 @@ class _QuestionView extends StatelessWidget {
         Row(
           children: [
             back,
-            const Spacer(),
-            if (canClarify) ...[
-              SizedBox(
-                width: 200,
-                child: GoldButton(
-                  height: 50,
-                  icon: LucideIcons600.zoomIn,
-                  label: lang.t('وضّح الصورة', 'Wada7 el soora'),
-                  onTap: () => game.advanceStage(questionId),
-                ),
+            const SizedBox(width: 12),
+            // The buttons shrink to share the row on a narrow card
+            // instead of overflowing it.
+            Expanded(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  if (canClarify) ...[
+                    Flexible(
+                      flex: 5,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 200),
+                        child: GoldButton(
+                          height: 50,
+                          icon: LucideIcons600.zoomIn,
+                          label: lang.t('وضّح الصورة', 'Wada7 el soora'),
+                          onTap: () => game.advanceStage(questionId),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                  ],
+                  Flexible(
+                    flex: 6,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 240),
+                      child: primary,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 12),
-            ],
-            SizedBox(width: 240, child: primary),
+            ),
           ],
         ),
       ],
@@ -1483,11 +1553,13 @@ class _MemoryPlaceholder extends StatelessWidget {
 
 /// "Who took the points?" before leaving an open question. Pops a team
 /// index, [nobody], or null to keep playing.
-class _LeaveDialog extends StatelessWidget {
+class _LeaveDialog extends StatefulWidget {
   const _LeaveDialog({
     required this.question,
     required this.teamNames,
     required this.points,
+    required this.revealed,
+    required this.onReveal,
   });
 
   static const nobody = -1;
@@ -1496,10 +1568,27 @@ class _LeaveDialog extends StatelessWidget {
   final List<String> teamNames;
   final int points;
 
+  /// The answer was already shown on the question screen.
+  final bool revealed;
+
+  /// The host asked to see the answer from here; it counts as a reveal.
+  final VoidCallback onReveal;
+
+  @override
+  State<_LeaveDialog> createState() => _LeaveDialogState();
+}
+
+class _LeaveDialogState extends State<_LeaveDialog> {
+  // Pressing back by mistake mustn't spoil the answer.
+  late bool _shown = widget.revealed;
+
   @override
   Widget build(BuildContext context) {
     final lang = context.lang;
     final nav = Navigator.of(context);
+    final question = widget.question;
+    final teamNames = widget.teamNames;
+    final points = widget.points;
 
     Widget team(int i) => GameButton(
       key: ValueKey('leave-team-$i'),
@@ -1571,35 +1660,65 @@ class _LeaveDialog extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 10),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.06),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text.rich(
-                  TextSpan(
-                    children: [
-                      TextSpan(
-                        text: lang.t('الإجابة: ', 'El egaba: '),
-                        style: AppText.sans(
-                          14,
-                          weight: FontWeight.w700,
-                          color: AppColors.gold,
-                        ),
+              if (!_shown)
+                Center(
+                  child: OutlinedButton.icon(
+                    key: const ValueKey('leave-show-answer'),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 44),
+                      side: BorderSide(
+                        color: AppColors.ivory.withValues(alpha: 0.3),
                       ),
-                      TextSpan(
-                        text: lang.t(question.answer, question.answerEn),
-                        style: AppText.sans(15, weight: FontWeight.w700),
+                      shape: const StadiumBorder(),
+                    ),
+                    onPressed: () {
+                      widget.onReveal();
+                      setState(() => _shown = true);
+                    },
+                    icon: const Icon(
+                      LucideIcons.eye,
+                      size: 16,
+                      color: AppColors.ivory,
+                    ),
+                    label: Text(
+                      lang.t(
+                        'الإجابة مخفية · اظهروها',
+                        'El egaba makhfeya · ezharooha',
                       ),
-                    ],
+                      style: AppText.sans(14, weight: FontWeight.w700),
+                    ),
                   ),
-                  textAlign: TextAlign.center,
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: lang.t('الإجابة: ', 'El egaba: '),
+                          style: AppText.sans(
+                            14,
+                            weight: FontWeight.w700,
+                            color: AppColors.gold,
+                          ),
+                        ),
+                        TextSpan(
+                          text: lang.t(question.answer, question.answerEn),
+                          style: AppText.sans(15, weight: FontWeight.w700),
+                        ),
+                      ],
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
                 ),
-              ),
               const SizedBox(height: 14),
               Row(
                 children: [
@@ -1613,7 +1732,7 @@ class _LeaveDialog extends StatelessWidget {
                 height: 50,
                 icon: LucideIcons.x,
                 label: lang.t('ولا حد', 'Wala 7ad'),
-                onTap: () => nav.pop(nobody),
+                onTap: () => nav.pop(_LeaveDialog.nobody),
               ),
               const SizedBox(height: 4),
               TextButton.icon(
