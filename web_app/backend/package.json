@@ -32,7 +32,8 @@
     "db:status": "npm run build && node --env-file-if-exists=.env dist/database/cli.js status",
     "db:grant-runtime": "npm run build && node --env-file-if-exists=.env dist/database/cli.js grant-runtime",
     "test:database": "npm run build && node --test tests/database/*.test.mjs",
-    "content:seed": "node --env-file-if-exists=.env scripts/content/seed-placeholders.mjs"
+    "content:seed": "node --env-file-if-exists=.env scripts/content/seed.mjs",
+    "content:upload": "node --env-file-if-exists=.env scripts/content/upload.mjs"
   },
   "dependencies": {
     "@adminjs/express": "6.1.1",
@@ -75,6 +76,7 @@
     "@types/react-dom": "^18.3.0",
     "@types/ws": "8.18.2",
     "drizzle-kit": "0.31.11",
+    "sharp": "0.34.5",
     "typescript": "5.9.3"
   }
 }

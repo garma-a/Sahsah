@@ -223,7 +223,7 @@
         "variantNumber": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 2
+          "maximum": 3
         }
       },
       "required": [
@@ -945,6 +945,12 @@
         },
         {
           "$ref": "#/$defs/AudioVoiceHostQuestion"
+        },
+        {
+          "$ref": "#/$defs/ImageCluesQuestion"
+        },
+        {
+          "$ref": "#/$defs/CharadesQuestion"
         }
       ]
     },
@@ -979,6 +985,12 @@
         },
         {
           "$ref": "#/$defs/AudioVoiceViewerQuestion"
+        },
+        {
+          "$ref": "#/$defs/ImageCluesQuestion"
+        },
+        {
+          "$ref": "#/$defs/CharadesQuestion"
         }
       ]
     },
@@ -1794,6 +1806,12 @@
         },
         {
           "$ref": "#/$defs/HostImageMemoryAnswerView"
+        },
+        {
+          "$ref": "#/$defs/HostImageCluesAnswerView"
+        },
+        {
+          "$ref": "#/$defs/HostCharadesAnswerView"
         }
       ]
     },
@@ -1901,6 +1919,12 @@
         },
         {
           "$ref": "#/$defs/ViewerImageMemoryAnswerView"
+        },
+        {
+          "$ref": "#/$defs/ViewerImageCluesAnswerView"
+        },
+        {
+          "$ref": "#/$defs/ViewerCharadesAnswerView"
         }
       ]
     },
@@ -4415,6 +4439,498 @@
       "required": [
         "membershipId",
         "displayName"
+      ]
+    },
+    "ImageCluesQuestion": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "IMAGE_CLUES"
+          ]
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "image": {
+          "$ref": "#/$defs/ImageRef"
+        },
+        "clue": {
+          "$ref": "#/$defs/ImageRef"
+        },
+        "stageIndex": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4
+        },
+        "stageSuggestions": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 600
+          },
+          "minItems": 2,
+          "maxItems": 5
+        }
+      },
+      "required": [
+        "format",
+        "prompt",
+        "image",
+        "stageIndex",
+        "stageSuggestions"
+      ]
+    },
+    "CharadesQuestion": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "CHARADES"
+          ]
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "cardUrl": {
+          "type": "string",
+          "format": "uri",
+          "maxLength": 2000
+        }
+      },
+      "required": [
+        "format",
+        "prompt",
+        "cardUrl"
+      ]
+    },
+    "ImageCluesViewerAnswer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "IMAGE_CLUES"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "image": {
+          "$ref": "#/$defs/ImageRef"
+        }
+      },
+      "required": [
+        "format",
+        "text"
+      ]
+    },
+    "ViewerImageCluesAnswerView": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "answer"
+          ]
+        },
+        "audience": {
+          "type": "string",
+          "enum": [
+            "viewer"
+          ]
+        },
+        "roomId": {
+          "$ref": "#/$defs/Id"
+        },
+        "gameId": {
+          "$ref": "#/$defs/Id"
+        },
+        "boardPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "questionPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "basePoints": {
+          "type": "integer",
+          "enum": [
+            200,
+            400,
+            600
+          ]
+        },
+        "suggestedPoints": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600
+        },
+        "teams": {
+          "$ref": "#/$defs/Teams"
+        },
+        "timer": {
+          "$ref": "#/$defs/Timer"
+        },
+        "idleExpiresAt": {
+          "$ref": "#/$defs/Time"
+        },
+        "question": {
+          "$ref": "#/$defs/ImageCluesQuestion"
+        },
+        "answer": {
+          "$ref": "#/$defs/ImageCluesViewerAnswer"
+        }
+      },
+      "required": [
+        "phase",
+        "audience",
+        "roomId",
+        "gameId",
+        "boardPosition",
+        "questionPosition",
+        "basePoints",
+        "suggestedPoints",
+        "teams",
+        "timer",
+        "idleExpiresAt",
+        "question",
+        "answer"
+      ]
+    },
+    "ImageCluesHostAnswer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "IMAGE_CLUES"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "image": {
+          "$ref": "#/$defs/ImageRef"
+        }
+      },
+      "required": [
+        "format",
+        "text"
+      ]
+    },
+    "HostImageCluesAnswerView": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "answer"
+          ]
+        },
+        "audience": {
+          "type": "string",
+          "enum": [
+            "host"
+          ]
+        },
+        "roomId": {
+          "$ref": "#/$defs/Id"
+        },
+        "gameId": {
+          "$ref": "#/$defs/Id"
+        },
+        "boardPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "questionPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "basePoints": {
+          "type": "integer",
+          "enum": [
+            200,
+            400,
+            600
+          ]
+        },
+        "suggestedPoints": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600
+        },
+        "teams": {
+          "$ref": "#/$defs/Teams"
+        },
+        "timer": {
+          "$ref": "#/$defs/Timer"
+        },
+        "idleExpiresAt": {
+          "$ref": "#/$defs/Time"
+        },
+        "question": {
+          "$ref": "#/$defs/ImageCluesQuestion"
+        },
+        "answer": {
+          "$ref": "#/$defs/ImageCluesHostAnswer"
+        },
+        "controls": {
+          "$ref": "#/$defs/Controls"
+        },
+        "feedback": {
+          "$ref": "#/$defs/Feedback"
+        }
+      },
+      "required": [
+        "phase",
+        "audience",
+        "roomId",
+        "gameId",
+        "boardPosition",
+        "questionPosition",
+        "basePoints",
+        "suggestedPoints",
+        "teams",
+        "timer",
+        "idleExpiresAt",
+        "question",
+        "answer",
+        "controls",
+        "feedback"
+      ]
+    },
+    "CharadesViewerAnswer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "CHARADES"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "image": {
+          "$ref": "#/$defs/ImageRef"
+        }
+      },
+      "required": [
+        "format",
+        "text"
+      ]
+    },
+    "ViewerCharadesAnswerView": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "answer"
+          ]
+        },
+        "audience": {
+          "type": "string",
+          "enum": [
+            "viewer"
+          ]
+        },
+        "roomId": {
+          "$ref": "#/$defs/Id"
+        },
+        "gameId": {
+          "$ref": "#/$defs/Id"
+        },
+        "boardPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "questionPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "basePoints": {
+          "type": "integer",
+          "enum": [
+            200,
+            400,
+            600
+          ]
+        },
+        "suggestedPoints": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600
+        },
+        "teams": {
+          "$ref": "#/$defs/Teams"
+        },
+        "timer": {
+          "$ref": "#/$defs/Timer"
+        },
+        "idleExpiresAt": {
+          "$ref": "#/$defs/Time"
+        },
+        "question": {
+          "$ref": "#/$defs/CharadesQuestion"
+        },
+        "answer": {
+          "$ref": "#/$defs/CharadesViewerAnswer"
+        }
+      },
+      "required": [
+        "phase",
+        "audience",
+        "roomId",
+        "gameId",
+        "boardPosition",
+        "questionPosition",
+        "basePoints",
+        "suggestedPoints",
+        "teams",
+        "timer",
+        "idleExpiresAt",
+        "question",
+        "answer"
+      ]
+    },
+    "CharadesHostAnswer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "CHARADES"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "image": {
+          "$ref": "#/$defs/ImageRef"
+        }
+      },
+      "required": [
+        "format",
+        "text"
+      ]
+    },
+    "HostCharadesAnswerView": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "answer"
+          ]
+        },
+        "audience": {
+          "type": "string",
+          "enum": [
+            "host"
+          ]
+        },
+        "roomId": {
+          "$ref": "#/$defs/Id"
+        },
+        "gameId": {
+          "$ref": "#/$defs/Id"
+        },
+        "boardPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "questionPosition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "basePoints": {
+          "type": "integer",
+          "enum": [
+            200,
+            400,
+            600
+          ]
+        },
+        "suggestedPoints": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600
+        },
+        "teams": {
+          "$ref": "#/$defs/Teams"
+        },
+        "timer": {
+          "$ref": "#/$defs/Timer"
+        },
+        "idleExpiresAt": {
+          "$ref": "#/$defs/Time"
+        },
+        "question": {
+          "$ref": "#/$defs/CharadesQuestion"
+        },
+        "answer": {
+          "$ref": "#/$defs/CharadesHostAnswer"
+        },
+        "controls": {
+          "$ref": "#/$defs/Controls"
+        },
+        "feedback": {
+          "$ref": "#/$defs/Feedback"
+        }
+      },
+      "required": [
+        "phase",
+        "audience",
+        "roomId",
+        "gameId",
+        "boardPosition",
+        "questionPosition",
+        "basePoints",
+        "suggestedPoints",
+        "teams",
+        "timer",
+        "idleExpiresAt",
+        "question",
+        "answer",
+        "controls",
+        "feedback"
       ]
     }
   },

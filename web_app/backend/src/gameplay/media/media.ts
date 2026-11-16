@@ -143,6 +143,92 @@ export class MediaService {
     private games: GameOperations,
     private projections: ProjectionService,
   ) {}
+  /**
+   * ADR 0019: whoever holds a charades code may open its card, without joining
+   * the room, but only while that question is open and unrevealed.
+   */
+  @scoped("media.charades")
+  async charadesCard(
+    gameId: string,
+    boardPosition: number,
+    questionPosition: number,
+    token: string,
+  ): Promise<Contract<"CharadesCard">> {
+    requireState(/^[A-Za-z0-9_-]{22}$/.test(token), "CARD_NOT_FOUND", 404);
+    const asset = await this.database.transaction(
+      async (db) => {
+        const game = await this.games.game(db, gameId, false),
+          now = await freshTime(db);
+        const slot = { gameId, boardPosition, questionPosition };
+        const q = (
+          await db.select().from(s.gameQuestions).where(this.games.slot(slot))
+        )[0];
+        const config = q?.contentSnapshot?.config as
+          | { cardToken?: string }
+          | undefined;
+        const expected = Buffer.from(config?.cardToken ?? ""),
+          given = Buffer.from(token);
+        requireState(
+          q?.format === "CHARADES" &&
+            expected.length === given.length &&
+            timingSafeEqual(expected, given),
+          "CARD_NOT_FOUND",
+          404,
+        );
+        requireState(!game.contentPurgedAt, "CONTENT_PURGED", 410);
+        requireState(
+          game.status === "active" &&
+            now.getTime() < new Date(game.idleExpiresAt).getTime() &&
+            game.activeBoardPosition === boardPosition &&
+            game.activeQuestionPosition === questionPosition &&
+            !q.revealedAt,
+          "CARD_CLOSED",
+          409,
+        );
+        const row = (
+          await db
+            .select({ asset: s.mediaAssets })
+            .from(s.gameQuestionMedia)
+            .innerJoin(
+              s.mediaAssets,
+              eq(s.mediaAssets.id, s.gameQuestionMedia.mediaAssetId),
+            )
+            .where(
+              and(
+                eq(s.gameQuestionMedia.gameId, gameId),
+                eq(s.gameQuestionMedia.boardPosition, boardPosition),
+                eq(s.gameQuestionMedia.questionPosition, questionPosition),
+                eq(s.gameQuestionMedia.mediaRole, "prompt_image"),
+              ),
+            )
+        )[0];
+        requireState(
+          row &&
+            ["r2", "local"].includes(row.asset.storageProvider) &&
+            row.asset.accessScope === "private" &&
+            row.asset.state === "ready",
+          "MEDIA_UNAVAILABLE",
+          503,
+        );
+        return row.asset;
+      },
+      { consistentRead: true },
+    );
+    const signer = this.runtime.options.signMedia;
+    requireState(signer, "MEDIA_UNAVAILABLE", 503);
+    const link = await signer({
+      provider: asset.storageProvider,
+      namespace: asset.storageNamespace,
+      key: asset.storageKey,
+    });
+    return {
+      url: link.url,
+      expiresAt: link.expiresAt,
+      contentType: asset.contentType!,
+      ...(asset.widthPx !== null ? { width: asset.widthPx } : {}),
+      ...(asset.heightPx !== null ? { height: asset.heightPx } : {}),
+    };
+  }
   @scoped("media.access")
   async access(
     actor: Actor,

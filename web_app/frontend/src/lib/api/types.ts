@@ -119,7 +119,9 @@ export type QuestionFormat =
   | "IMAGE_MEMORY"
   | "AUDIO_GUESS"
   | "AUDIO_REVERSE"
-  | "AUDIO_VOICE";
+  | "AUDIO_VOICE"
+  | "IMAGE_CLUES"
+  | "CHARADES";
 
 /** What the audience reads, by format. Only the host's view ever carries an `audio` reference. */
 export type QuestionContent =
@@ -131,7 +133,14 @@ export type QuestionContent =
   | { format: "IMAGE_MEMORY"; memoryPhase: "recall"; prompt: string }
   | { format: "IMAGE_MEMORY"; memoryPhase: "revisit"; prompt: string; image: ImageRef }
   | { format: "AUDIO_GUESS" | "AUDIO_REVERSE"; prompt: string; durationMs: number; audio?: AudioRef }
-  | { format: "AUDIO_VOICE"; prompt: string; durationMs: number; hint?: string; audio?: AudioRef };
+  | { format: "AUDIO_VOICE"; prompt: string; durationMs: number; hint?: string; audio?: AudioRef }
+  /** The picture stays; each revealed clue card replaces the previous one (cards repeat earlier clues). */
+  | { format: "IMAGE_CLUES"; prompt: string; image: ImageRef; clue?: ImageRef; stageIndex: number; stageSuggestions: number[] }
+  /** Everyone sees the code; only whoever opens it sees the card (ADR 0019). */
+  | { format: "CHARADES"; prompt: string; cardUrl: string };
+
+/** The private charades card, fetched by the page its code opens. */
+export type CharadesCard = { url: string; expiresAt: string; contentType: string; width?: number; height?: number };
 
 export type AnswerContent = {
   format: QuestionFormat;

@@ -96,6 +96,8 @@ export class GameplayHttpInterceptor implements NestInterceptor, OnModuleInit {
       path.endsWith("/categories") ||
       path.includes("/packs") ||
       path.endsWith("/gameplay/availability") ||
+      // ADR 0019: the card's code is its own credential; still rate limited per address.
+      (req.method === "GET" && path.endsWith("/charades-card")) ||
       (invitation && req.method === "GET");
     let subject: string | undefined;
     if (anonymousJoin && typeof req.body.reconnectSecret === "string")

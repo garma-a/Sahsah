@@ -84,7 +84,7 @@ export function stateInvariants(row: unknown): void {
         typeof value === "number" &&
           Number.isInteger(value) &&
           value >= 0 &&
-          value <= 2,
+          value <= 4,
         "STATE_STAGE_INDEX",
       );
     if (key === "remainingMs")

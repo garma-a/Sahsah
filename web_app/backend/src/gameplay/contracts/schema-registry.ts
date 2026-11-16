@@ -162,5 +162,16 @@ export function makeSchemas(factory: <T>(name: string) => ZodType<T>) {
     InitialSelections: factory<WireTypes["InitialSelections"]>("InitialSelections"),
     CategorySection: factory<WireTypes["CategorySection"]>("CategorySection"),
     TeamPlayer: factory<WireTypes["TeamPlayer"]>("TeamPlayer"),
+    ImageCluesQuestion: factory<WireTypes["ImageCluesQuestion"]>("ImageCluesQuestion"),
+    CharadesQuestion: factory<WireTypes["CharadesQuestion"]>("CharadesQuestion"),
+    ImageCluesViewerAnswer: factory<WireTypes["ImageCluesViewerAnswer"]>("ImageCluesViewerAnswer"),
+    ViewerImageCluesAnswerView: factory<WireTypes["ViewerImageCluesAnswerView"]>("ViewerImageCluesAnswerView"),
+    ImageCluesHostAnswer: factory<WireTypes["ImageCluesHostAnswer"]>("ImageCluesHostAnswer"),
+    HostImageCluesAnswerView: factory<WireTypes["HostImageCluesAnswerView"]>("HostImageCluesAnswerView"),
+    CharadesViewerAnswer: factory<WireTypes["CharadesViewerAnswer"]>("CharadesViewerAnswer"),
+    ViewerCharadesAnswerView: factory<WireTypes["ViewerCharadesAnswerView"]>("ViewerCharadesAnswerView"),
+    CharadesHostAnswer: factory<WireTypes["CharadesHostAnswer"]>("CharadesHostAnswer"),
+    HostCharadesAnswerView: factory<WireTypes["HostCharadesAnswerView"]>("HostCharadesAnswerView"),
+    CharadesCard: factory<WireTypes["CharadesCard"]>("CharadesCard"),
   };
 }

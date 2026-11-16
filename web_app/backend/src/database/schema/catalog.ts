@@ -306,7 +306,7 @@ export const questionMedia = t.pgTable(
       .onUpdate("no action"),
     t.check(
       "question_media_variant_shape",
-      sql`(media_role = 'hint_image' AND variant_number BETWEEN 0 AND 2 AND suggested_points IS NOT NULL AND suggested_points BETWEEN 1 AND 600) OR (media_role <> 'hint_image' AND variant_number = 0 AND suggested_points IS NULL)`,
+      sql`(media_role = 'hint_image' AND variant_number BETWEEN 0 AND 3 AND suggested_points IS NOT NULL AND suggested_points BETWEEN 1 AND 600) OR (media_role <> 'hint_image' AND variant_number = 0 AND suggested_points IS NULL)`,
     ),
   ],
 );

@@ -218,7 +218,7 @@ export const gameQuestionMedia = t.pgTable("game_question_media", {
     columns: [table.gameId, table.boardPosition, table.questionPosition],
     foreignColumns: [gameQuestions.gameId, gameQuestions.boardPosition, gameQuestions.questionPosition],
   }).onDelete("no action").onUpdate("no action"),
-  t.check("game_question_media_variant_role", sql`(media_role = 'hint_image' AND variant_number BETWEEN 0 AND 2) OR (media_role <> 'hint_image' AND variant_number = 0)`),
+  t.check("game_question_media_variant_role", sql`(media_role = 'hint_image' AND variant_number BETWEEN 0 AND 3) OR (media_role <> 'hint_image' AND variant_number = 0)`),
 ]);
 
 export const gamePlayers = t.pgTable("game_players", {

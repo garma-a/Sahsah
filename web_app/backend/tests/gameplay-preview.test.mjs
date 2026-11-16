@@ -39,7 +39,7 @@ test(
 
     // The seed is the same command a developer runs; a rerun changes nothing.
     const seed = () =>
-      exec(process.execPath, ["scripts/content/seed-placeholders.mjs"], {
+      exec(process.execPath, ["tests/fixtures/seed-placeholders.mjs"], {
         env: {
           PATH: process.env.PATH,
           MIGRATION_DATABASE_URL: pg.url("sahsah_owner", "sahsah_preview"),
@@ -339,11 +339,46 @@ test(
           await command("advance_hint", slot);
           await load([(await view(guest)).question.image], guest);
         }
+        if (format === "IMAGE_CLUES") {
+          assert.equal(host.question.clue, undefined);
+          assert.deepEqual(host.controls.includes("advance_hint"), true);
+          const clues = host.question.stageSuggestions.length - 1;
+          assert.equal(clues, 4);
+          for (let stage = 1; stage <= clues; stage++) {
+            await command("advance_hint", slot);
+            const seen = (await view(guest)).question;
+            assert.equal(seen.stageIndex, stage);
+            assert.equal(seen.clue.variantNumber, stage - 1);
+            await load([seen.clue], guest);
+          }
+          assert.equal((await view()).controls.includes("advance_hint"), false);
+        }
+        let card;
+        if (format === "CHARADES") {
+          // ADR 0019: the code opens the card with no account; the room never gets the card itself.
+          const seen = (await view(guest)).question;
+          assert.equal(seen.image, undefined);
+          card = new URL(seen.cardUrl);
+          assert.equal(card.pathname, `/act/${gameId}/${boardPosition}/${questionPosition}`);
+          const open = (token) =>
+            fetch(`${base}/games/${gameId}/questions/${boardPosition}/${questionPosition}/charades-card?t=${token}`);
+          const opened = await open(card.searchParams.get("t"));
+          assert.equal(opened.status, 200);
+          const file = await fetch((await opened.json()).url);
+          assert.equal(file.status, 200);
+          await file.arrayBuffer();
+          assert.equal((await open("A".repeat(22))).status, 404);
+        }
         if (format.startsWith("AUDIO_")) {
           assert.equal((await view(guest)).question.audio, undefined);
           await load([host.question.audio]);
         }
         await command("reveal_answer", slot);
+        if (card)
+          assert.equal(
+            (await fetch(`${base}/games/${gameId}/questions/${boardPosition}/${questionPosition}/charades-card?t=${card.searchParams.get("t")}`)).status,
+            409,
+          );
         host = await view();
         if (host.answer.image) await load([host.answer.image], guest);
         if (host.answer.forwardAudio) await load([host.answer.forwardAudio]);
@@ -352,7 +387,7 @@ test(
           winningTeamNumber: questionPosition % 2 ? 1 : 2,
         });
       }
-    assert.equal(formats.size, 10);
+    assert.equal(formats.size, 12);
     assert.deepEqual([...fetched].sort(), [
       "answer_audio",
       "answer_image",

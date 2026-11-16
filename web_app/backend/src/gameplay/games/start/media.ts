@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import * as s from "../../../database/schema/index.js";
 import { requireState } from "../../platform/problem.js";
 import { settings, points } from "../content.js";
@@ -23,6 +24,19 @@ export function prepareQuestionMedia(
       ...(["IMAGE_BLUR", "IMAGE_ZOOM"].includes(q.format)
         ? { stageSuggestions: stages.map((m) => m.suggestedPoints) }
         : {}),
+      // Clue stage 0 is the bare picture at the tile's value; each card lowers it.
+      ...(q.format === "IMAGE_CLUES"
+        ? {
+            stageSuggestions: [
+              points(q.slotNumber),
+              ...stages.map((m) => m.suggestedPoints),
+            ],
+          }
+        : {}),
+      // Each game gets its own card link, so an old code never opens a new game's card.
+      ...(q.format === "CHARADES"
+        ? { cardToken: randomBytes(16).toString("base64url") }
+        : {}),
     },
     points(q.slotNumber),
   );
@@ -42,6 +56,16 @@ export function prepareQuestionMedia(
       [0, 1, 2].every((v) => has("hint_image", v)) && has("answer_image"),
       "CONTENT_NOT_READY",
     );
+  else if (q.format === "IMAGE_CLUES")
+    requireState(
+      has("prompt_image") &&
+        stages.length >= 1 &&
+        stages.length <= 4 &&
+        stages.every((m, i) => m.variantNumber === i),
+      "CONTENT_NOT_READY",
+    );
+  else if (q.format === "CHARADES")
+    requireState(has("prompt_image") && has("answer_image"), "CONTENT_NOT_READY");
   else if (q.format.startsWith("IMAGE_"))
     requireState(
       has("prompt_image") &&

@@ -361,6 +361,22 @@ export class GameplayController {
       body,
     );
   }
+  @Get("games/:gameId/questions/:boardPosition/:questionPosition/charades-card")
+  @SerializeOptions({ schema: schemas.CharadesCard })
+  async charadesCard(
+    @Param("gameId") gameId: string,
+    @Param("boardPosition") board: string,
+    @Param("questionPosition") question: string,
+    @Query("t") token: unknown,
+  ) {
+    this.runtime.enabled();
+    return this.media.charadesCard(
+      id(gameId),
+      position(board),
+      position(question),
+      typeof token === "string" ? token : "",
+    );
+  }
   @Post("games/:gameId/media-access")
   @HttpCode(200)
   @SerializeOptions({ schema: schemas.MediaLinks })

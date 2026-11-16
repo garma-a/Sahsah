@@ -5,6 +5,7 @@ import HintStages from "@/components/game/hint-stages";
 import HostBar, { type QuestionAction } from "@/components/game/host-bar";
 import MediaImage from "@/components/game/media-image";
 import { HostSound, ViewerSound } from "@/components/game/sound-card";
+import { QRCodeSVG } from "qrcode.react";
 import TimerDial from "@/components/game/timer-dial";
 import type { Tone } from "@/components/brand/tones";
 import ErrorBanner from "@/components/ui/error-banner";
@@ -94,14 +95,17 @@ export default function QuestionScreen({
   // Pictures and the host's clip come over short-lived signed links, asked for only while this view carries them.
   // After the reveal only the picture on screen is needed (the answer image, else the question image).
   const shown = answerImage ?? promptImage;
-  const refs: MediaRef[] = [shown, audio].filter((ref): ref is MediaRef => ref !== undefined);
+  // A clue question keeps its picture and adds the latest clue card (each card repeats the earlier clues).
+  const clue = answering && question.format === "IMAGE_CLUES" ? question.clue : undefined;
+  const cardUrl = answering && question.format === "CHARADES" ? question.cardUrl : undefined;
+  const refs: MediaRef[] = [shown, clue, audio].filter((ref): ref is MediaRef => ref !== undefined);
   const media = useMediaLinks(gameId, auth, refs);
   const controls = view.controls ?? [];
   const stages = "stageSuggestions" in question ? question : undefined;
   const hint = question.format === "AUDIO_VOICE" ? question.hint : undefined;
   const swatch = answer?.colorHex && /^#[0-9a-f]{3,8}$/i.test(answer.colorHex) ? answer.colorHex : undefined;
   const prompt = promptOf(question);
-  const short = prompt.length <= 40 && !shown && !hasSound;
+  const short = prompt.length <= 40 && !shown && !hasSound && !cardUrl;
 
   return (
     <section aria-labelledby="question-title" className="flex flex-1 flex-col gap-4">
@@ -127,7 +131,7 @@ export default function QuestionScreen({
           )}
         </header>
 
-        <div className={cn("flex flex-1 items-center gap-8 py-6 lg:py-8", shown || hasSound ? "flex-col lg:flex-row" : "flex-col justify-center")}>
+        <div className={cn("flex flex-1 items-center gap-8 py-6 lg:py-8", shown || hasSound || cardUrl ? "flex-col lg:flex-row" : "flex-col justify-center")}>
           <div className="flex w-full min-w-0 flex-1 flex-col items-center gap-6 text-center">
             <h1
               id="question-title"
@@ -159,13 +163,40 @@ export default function QuestionScreen({
             )}
           </div>
           {shown && (
-            <MediaImage
-              url={media.urls.get(mediaKey(shown))}
-              failed={media.failed}
-              onRetry={media.retry}
-              alt={answerImage ? "صورة الإجابة" : "صورة السؤال"}
-              className="w-full max-w-md shrink-0 lg:w-[26rem] lg:rotate-[-2deg]"
-            />
+            <div className="flex w-full max-w-md shrink-0 flex-col items-center gap-5 lg:w-[26rem]">
+              <MediaImage
+                url={media.urls.get(mediaKey(shown))}
+                failed={media.failed}
+                onRetry={media.retry}
+                alt={answerImage ? "صورة الإجابة" : "صورة السؤال"}
+                className={cn("w-full", !clue && "lg:rotate-[-2deg]")}
+              />
+              {clue && (
+                <MediaImage
+                  url={media.urls.get(mediaKey(clue))}
+                  failed={media.failed}
+                  onRetry={media.retry}
+                  alt="كارت التلميحات"
+                  className="w-full lg:rotate-[1.5deg]"
+                />
+              )}
+            </div>
+          )}
+          {cardUrl && (
+            <div className="flex w-full max-w-sm shrink-0 flex-col items-center gap-4 rounded-[1.6rem] border-4 border-ink bg-white p-5 shadow-[0_8px_0_var(--color-ink)]">
+              <QRCodeSVG value={cardUrl} size={240} level="M" marginSize={1} fgColor="#1d2321" bgColor="#ffffff" role="img" title="كود كارت التمثيل" />
+              <p className="text-center font-heading text-2xl leading-snug">اللي هيمثّل يمسح الكود ويشوف الكارت لوحده</p>
+              {hostView && (
+                <a
+                  href={cardUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-full border-[3px] border-ink bg-sun px-5 py-1 font-heading text-xl shadow-[0_3px_0_var(--color-ink)] hover:bg-cream"
+                >
+                  افتح الكارت هنا
+                </a>
+              )}
+            </div>
           )}
           {hasSound &&
             (audio ? (

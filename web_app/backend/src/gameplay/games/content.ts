@@ -35,7 +35,13 @@ const configSchema = z
   .object({
     stageSuggestions: z
       .array(z.number().int().positive().max(600))
-      .length(3)
+      .min(2)
+      .max(5)
+      .optional(),
+    // Charades only: the unguessable part of the card link (ADR 0019).
+    cardToken: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{22}$/)
       .optional(),
     instructionAr: z.string().trim().min(1).max(4000).optional(),
     instructionFranco: z.string().trim().min(1).max(4000).optional(),
@@ -71,10 +77,40 @@ export function settings(
   if (["IMAGE_BLUR", "IMAGE_ZOOM"].includes(format)) {
     invariant(cap === 200 || cap === 400 || cap === 600, "SLOT_POINTS_CAP");
     const suggestions = config.stageSuggestions ?? defaultPointStages(cap);
-    requireState(validPointStages(suggestions, cap), "CONTENT_NOT_READY");
+    requireState(
+      suggestions.length === 3 && validPointStages(suggestions, cap),
+      "CONTENT_NOT_READY",
+    );
     return { ...config, stageSuggestions: suggestions };
   }
+  if (format === "IMAGE_CLUES")
+    requireState(
+      config.stageSuggestions !== undefined &&
+        validPointStages(config.stageSuggestions, cap),
+      "CONTENT_NOT_READY",
+    );
+  if (format === "CHARADES")
+    requireState(config.cardToken !== undefined, "CONTENT_NOT_READY");
   return config;
+}
+/** Hints a question can still reveal: blur/zoom stages, or clue cards. */
+export function hintStages(q: Question): number {
+  if (["IMAGE_BLUR", "IMAGE_ZOOM"].includes(q.format)) return 3;
+  if (q.format !== "IMAGE_CLUES") return 0;
+  const stages = (q.contentSnapshot?.config as { stageSuggestions?: number[] })
+    ?.stageSuggestions;
+  return stages?.length ?? 0;
+}
+/** The address a charades code opens; the page asks the API for the card (ADR 0019). */
+export function cardUrl(q: Question, token: string): string {
+  const base = new URL(
+    "/act/",
+    process.env.GAMEPLAY_JOIN_BASE_URL ?? "http://localhost:3000/join/",
+  );
+  return new URL(
+    `${q.gameId}/${q.boardPosition}/${q.questionPosition}?t=${token}`,
+    base,
+  ).href;
 }
 export function local(ar: unknown, franco: unknown, language: string): string {
   return String(language === "franco" && franco ? franco : ar);
@@ -181,7 +217,20 @@ export function questionView(
       stageIndex: q.stageIndex,
       stageSuggestions: cfg.stageSuggestions,
     });
-  else if (has("prompt_image")) result.image = ref(q, "prompt_image");
+  else if (q.format === "IMAGE_CLUES")
+    Object.assign(result, {
+      image: ref(q, "prompt_image"),
+      ...(q.stageIndex > 0
+        ? { clue: ref(q, "hint_image", q.stageIndex - 1) }
+        : {}),
+      stageIndex: q.stageIndex,
+      stageSuggestions: cfg.stageSuggestions,
+    });
+  else if (q.format === "CHARADES") {
+    // The card itself never reaches a room projection: only its code does.
+    invariant(cfg.cardToken, "CHARADES_CARD_TOKEN");
+    result.cardUrl = cardUrl(q, cfg.cardToken);
+  } else if (has("prompt_image")) result.image = ref(q, "prompt_image");
   if (q.format.startsWith("AUDIO_")) {
     const duration = pins.find(
       (p) => p.mediaRole === "question_audio",
