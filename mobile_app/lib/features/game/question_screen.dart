@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:lucide_icons_flutter/lucide_icons_600.dart';
 
+import '../../core/audio/sound.dart';
 import '../../core/i18n/lang.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/game_button.dart';
@@ -71,6 +72,7 @@ class QuestionScreen extends StatefulWidget {
 class _QuestionScreenState extends State<QuestionScreen> {
   Timer? _tick;
   int _lastSecond = -1;
+  TimerStatus? _lastStatus;
 
   /// After the reveal, the host can look at the question again (7A).
   bool _showQuestion = false;
@@ -84,14 +86,24 @@ class _QuestionScreenState extends State<QuestionScreen> {
       final game = context.game;
       final p = game.progressOf(widget.questionId);
       final secs = (game.remainingMs(p) / 1000).ceil();
-      if (secs != _lastSecond) {
-        if (game.timerStatus(p) == TimerStatus.running &&
-            (secs == 10 || secs == 0)) {
-          HapticFeedback.heavyImpact();
-        }
-        _lastSecond = secs;
-        setState(() {});
+      final status = game.timerStatus(p);
+      if (secs == _lastSecond && status == _lastStatus) return;
+      final sound = context.sound;
+      if (status == TimerStatus.running && secs != _lastSecond) {
+        // The last ten seconds tick out loud.
+        if (secs == 10) HapticFeedback.heavyImpact();
+        final tick = SoundController.forSecond(secs);
+        if (tick != null) sound.play(tick);
       }
+      // The clock ran out just now (not: a question reopened after its
+      // time was already up).
+      if (status == TimerStatus.elapsed && _lastStatus == TimerStatus.running) {
+        HapticFeedback.heavyImpact();
+        sound.play(Sfx.timeUp);
+      }
+      _lastSecond = secs;
+      _lastStatus = status;
+      setState(() {});
     });
   }
 
@@ -126,6 +138,7 @@ class _QuestionScreenState extends State<QuestionScreen> {
     final lang = context.lang;
     final points = game.availablePoints(widget.questionId);
     HapticFeedback.mediumImpact();
+    context.sound.play(team == null ? Sfx.nobody : Sfx.correct);
     game.award(widget.questionId, team);
     final names = game.game!.teamNames;
     final message = team == null
