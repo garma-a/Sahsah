@@ -60,7 +60,7 @@ class SahsahField extends StatelessWidget {
                   text: lang.t(' (اختياري)', ' (e5tyary)'),
                   style: AppText.sans(
                     12,
-                    color: AppColors.ivory.withValues(alpha: 0.5),
+                    color: AppColors.ivory.withValues(alpha: 0.7),
                   ),
                 ),
             ],
@@ -83,7 +83,7 @@ class SahsahField extends StatelessWidget {
             hintTextDirection: ltr ? TextDirection.ltr : null,
             hintStyle: AppText.sans(
               15,
-              color: AppColors.ivory.withValues(alpha: 0.35),
+              color: AppColors.ivory.withValues(alpha: 0.55),
             ),
             counterText: '',
             isDense: true,

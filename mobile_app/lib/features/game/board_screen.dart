@@ -159,8 +159,9 @@ class _TopBar extends StatelessWidget {
     final lang = context.lang;
     return Row(
       children: [
-        RoundIconButton(
+        _BarAction(
           icon: LucideIcons.x,
+          caption: lang.t('خروج', 'Khoroog'),
           label: lang.t('خروج', 'Khoroog'),
           onTap: onExit,
         ),
@@ -172,12 +173,66 @@ class _TopBar extends StatelessWidget {
         ),
         Expanded(child: TeamScore(game: game, team: 1)),
         const SizedBox(width: 8),
-        RoundIconButton(
+        _BarAction(
           icon: LucideIcons.flag,
+          caption: lang.t('إنهاء', 'Enha2'),
           label: lang.t('أنهي اللعبة', 'Anhy el le3ba'),
           onTap: onEnd,
         ),
       ],
+    );
+  }
+}
+
+/// A top-bar button with a word under its icon, so "leave" and "end the
+/// game" can't be mixed up.
+class _BarAction extends StatelessWidget {
+  const _BarAction({
+    required this.icon,
+    required this.caption,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+
+  /// The short word shown under the icon.
+  final String caption;
+
+  /// The full name for screen readers.
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: label,
+      excludeSemantics: true,
+      child: Pressable(
+        onTap: onTap,
+        child: Container(
+          height: 52,
+          constraints: const BoxConstraints(minWidth: 56),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          decoration: glassDecoration(
+            radius: BorderRadius.circular(16),
+            shadow: false,
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 18, color: AppColors.ivory),
+              const SizedBox(height: 2),
+              Text(
+                caption,
+                maxLines: 1,
+                style: AppText.sans(12, weight: FontWeight.w700, height: 1.1),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -803,8 +858,8 @@ class _CategoryCard extends StatelessWidget {
                     top: 8,
                     end: 8,
                     child: _Badge(
-                      color: AppColors.play,
-                      ink: Colors.white,
+                      color: AppColors.gold,
+                      ink: AppColors.deep,
                       icon: LucideIcons600.circlePlay,
                       label: lang.t('سؤال مفتوح', 'So2al maftoo7'),
                     ),
@@ -873,7 +928,7 @@ class _Badge extends StatelessWidget {
           ],
           Text(
             label,
-            style: AppText.sans(11, weight: FontWeight.w700, color: ink),
+            style: AppText.sans(12, weight: FontWeight.w700, color: ink),
           ),
         ],
       ),

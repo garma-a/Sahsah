@@ -346,7 +346,7 @@ class _ScoreCard extends StatelessWidget {
             lang.t('نقطة', 'no2ta'),
             style: AppText.sans(
               12,
-              color: AppColors.ivory.withValues(alpha: 0.55),
+              color: AppColors.ivory.withValues(alpha: 0.72),
             ),
           ),
         ],

@@ -203,7 +203,7 @@ class _NavItem extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.fade,
                 softWrap: false,
-                style: AppText.sans(11, weight: FontWeight.w600, color: color),
+                style: AppText.sans(12, weight: FontWeight.w600, color: color),
               ),
             ],
           ),

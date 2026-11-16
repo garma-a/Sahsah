@@ -279,7 +279,7 @@ class _Row extends StatelessWidget {
                         subtitle!,
                         style: AppText.sans(
                           12,
-                          color: AppColors.ivory.withValues(alpha: 0.55),
+                          color: AppColors.ivory.withValues(alpha: 0.72),
                         ),
                       ),
                   ],
