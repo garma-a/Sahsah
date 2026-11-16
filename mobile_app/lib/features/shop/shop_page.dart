@@ -388,7 +388,7 @@ class _PackCard extends StatelessWidget {
             child: Text(
               lang.t('الأكثر طلبًا', 'El aktar talaban'),
               style: AppText.sans(
-                11,
+                12,
                 weight: FontWeight.w700,
                 color: AppColors.deep,
               ),

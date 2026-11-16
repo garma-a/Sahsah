@@ -415,7 +415,7 @@ class _QuestionCard extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 4),
               decoration: BoxDecoration(
-                color: AppColors.play,
+                color: AppColors.gold,
                 borderRadius: BorderRadius.circular(999),
                 border: Border.all(color: AppColors.deep, width: 2),
               ),
@@ -426,7 +426,7 @@ class _QuestionCard extends StatelessWidget {
                 style: AppText.sans(
                   15,
                   weight: FontWeight.w700,
-                  color: Colors.white,
+                  color: AppColors.deep,
                 ),
               ),
             ),
@@ -722,11 +722,15 @@ class _TimerBar extends StatelessWidget {
         child: Container(
           width: 38,
           height: 38,
-          decoration: const BoxDecoration(
-            color: AppColors.ivory,
+          decoration: BoxDecoration(
+            color: alert ? AppColors.deep : AppColors.ivory,
             shape: BoxShape.circle,
           ),
-          child: Icon(icon, size: 17, color: AppColors.deep),
+          child: Icon(
+            icon,
+            size: 17,
+            color: alert ? AppColors.ivory : AppColors.deep,
+          ),
         ),
       ),
     );
@@ -738,11 +742,13 @@ class _TimerBar extends StatelessWidget {
         height: 48,
         padding: const EdgeInsets.symmetric(horizontal: 5),
         decoration: BoxDecoration(
-          color: alert ? AppColors.play : AppColors.deep,
+          color: alert ? AppColors.ivory : AppColors.deep,
           borderRadius: BorderRadius.circular(999),
           border: Border.all(
-            color: AppColors.ivory.withValues(alpha: alert ? 0.5 : 0.2),
-            width: 1.5,
+            color: alert
+                ? AppColors.play
+                : AppColors.ivory.withValues(alpha: 0.2),
+            width: alert ? 3 : 1.5,
           ),
         ),
         child: Row(
@@ -766,7 +772,7 @@ class _TimerBar extends StatelessWidget {
                           const Icon(
                             LucideIcons600.alarmClock,
                             size: 20,
-                            color: Colors.white,
+                            color: AppColors.play,
                           ),
                           const SizedBox(width: 8),
                           Flexible(
@@ -777,7 +783,7 @@ class _TimerBar extends StatelessWidget {
                               style: AppText.display(
                                 20,
                                 height: 1.2,
-                                color: Colors.white,
+                                color: AppColors.play,
                               ),
                             ),
                           ),
@@ -793,7 +799,7 @@ class _TimerBar extends StatelessWidget {
                               textAlign: TextAlign.center,
                               style: AppText.num(
                                 28,
-                                color: Colors.white,
+                                color: alert ? AppColors.deep : Colors.white,
                                 height: 1,
                               ),
                             ),
@@ -808,9 +814,13 @@ class _TimerBar extends StatelessWidget {
                                   fit: StackFit.expand,
                                   children: [
                                     ColoredBox(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.16,
-                                      ),
+                                      color: alert
+                                          ? AppColors.deep.withValues(
+                                              alpha: 0.15,
+                                            )
+                                          : Colors.white.withValues(
+                                              alpha: 0.16,
+                                            ),
                                     ),
                                     TweenAnimationBuilder<double>(
                                       tween: Tween(end: left.clamp(0.0, 1.0)),
@@ -825,7 +835,7 @@ class _TimerBar extends StatelessWidget {
                                           heightFactor: 1,
                                           child: ColoredBox(
                                             color: alert
-                                                ? Colors.white
+                                                ? AppColors.play
                                                 : running
                                                 ? AppColors.gold
                                                 : AppColors.ivory.withValues(

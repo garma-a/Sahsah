@@ -285,7 +285,7 @@ class _MiniPack extends StatelessWidget {
                     textAlign: TextAlign.center,
                     overflow: TextOverflow.ellipsis,
                     style: AppText.sans(
-                      11,
+                      12,
                       weight: FontWeight.w700,
                       height: 1.2,
                     ),
