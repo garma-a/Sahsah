@@ -163,7 +163,12 @@ export default function QuestionScreen({
             )}
           </div>
           {shown && (
-            <div className="flex w-full max-w-md shrink-0 flex-col items-center gap-5 lg:w-[26rem]">
+            <div
+              className={cn(
+                "w-full shrink-0",
+                clue ? "grid max-w-3xl grid-cols-[2fr_3fr] items-center gap-4 lg:w-[42rem]" : "flex max-w-md flex-col items-center lg:w-[26rem]",
+              )}
+            >
               <MediaImage
                 url={media.urls.get(mediaKey(shown))}
                 failed={media.failed}
@@ -183,8 +188,8 @@ export default function QuestionScreen({
             </div>
           )}
           {cardUrl && (
-            <div className="flex w-full max-w-sm shrink-0 flex-col items-center gap-4 rounded-[1.6rem] border-4 border-ink bg-white p-5 shadow-[0_8px_0_var(--color-ink)]">
-              <QRCodeSVG value={cardUrl} size={240} level="M" marginSize={1} fgColor="#1d2321" bgColor="#ffffff" role="img" title="كود كارت التمثيل" />
+            <div className="flex w-full max-w-sm shrink-0 flex-col items-center gap-3 rounded-[1.6rem] border-4 border-ink bg-white p-4 shadow-[0_8px_0_var(--color-ink)]">
+              <QRCodeSVG value={cardUrl} size={200} level="M" marginSize={1} fgColor="#1d2321" bgColor="#ffffff" role="img" title="كود كارت التمثيل" />
               <p className="text-center font-heading text-2xl leading-snug">اللي هيمثّل يمسح الكود ويشوف الكارت لوحده</p>
               {hostView && (
                 <a
