@@ -74,13 +74,24 @@ void main() {
     // Board.
     expect(game.hasActiveGame, isTrue);
     expect(game.game!.teamNames, ['النسور', 'الجدعان']);
-    expect(find.text('النسور'), findsOneWidget);
+    // The first team's score, and its name on the turn chip.
+    expect(find.text('النسور'), findsNWidgets(2));
+    expect(game.game!.turn, 0);
+    // The host can hand the pick to the other team and back.
+    await tester.tap(find.byKey(const ValueKey('turn-chip')));
+    await settle(tester);
+    expect(game.game!.turn, 1);
+    expect(find.text('الجدعان'), findsNWidgets(2));
+    await tester.tap(find.byKey(const ValueKey('turn-chip')));
+    await settle(tester);
+    expect(game.game!.turn, 0);
 
     // Board → the "ثقافة عامة" pack → its first 600 question, a picture
     // that gets clearer in stages (template 6C).
     await tester.tap(find.bySemanticsLabel(RegExp('^ثقافة عامة،')).first);
     await settle(tester);
     expect(find.text('اختاروا سؤال'), findsOneWidget);
+    expect(find.text('الدور على النسور'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('question-general-4')));
     await settle(tester);
     expect(game.game!.activeId, 'general-4');
@@ -90,6 +101,9 @@ void main() {
     // playing" stays on the question.
     await tapText(tester, 'رجوع');
     expect(find.text('قبل ما ترجعوا… مين خد النقط؟'), findsOneWidget);
+    // A back press by mistake doesn't spoil the answer.
+    expect(find.byKey(const ValueKey('leave-show-answer')), findsOneWidget);
+    expect(find.textContaining('الإجابة: '), findsNothing);
     await tester.tap(find.byKey(const ValueKey('leave-stay')));
     await settle(tester);
     await tester.binding.handlePopRoute();
@@ -119,23 +133,46 @@ void main() {
     );
     await settle(tester);
 
-    // Back on the pack screen with the points; then back to the board.
+    // Back on the pack screen with the points, and the pick moves on.
     expect(game.game!.scores, [400, 0]);
     expect(game.game!.results['general-4']!.team, 0);
+    expect(game.game!.turn, 1);
     expect(find.text('إظهار الإجابة'), findsNothing);
     expect(find.text('اختاروا سؤال'), findsOneWidget);
+    expect(find.text('الدور على الجدعان'), findsOneWidget);
+
+    // Wrong team? "Undo" takes the points back and reopens the question
+    // on its answer, ready to pick again.
+    await tapText(tester, 'تراجع');
+    expect(game.game!.scores, [0, 0]);
+    expect(game.game!.results, isEmpty);
+    expect(game.game!.turn, 0);
+    expect(game.game!.activeId, 'general-4');
+    expect(find.text('مين جاوب صح؟'), findsOneWidget);
+    await tester.tap(
+      find.ancestor(of: find.text('النسور'), matching: find.byType(GameButton)),
+    );
+    await settle(tester);
+    expect(game.game!.scores, [400, 0]);
+    expect(game.game!.turn, 1);
 
     // Leaving a question settles it: back → the second team took it.
     // (Let the award confirmation slide away first.)
-    await tester.pump(const Duration(seconds: 3));
+    await tester.pump(const Duration(seconds: 5));
     await settle(tester);
     await tester.tap(find.byKey(const ValueKey('question-general-0')));
     await settle(tester);
     await tapText(tester, 'رجوع');
+    // The host may look at the answer before deciding.
+    await tester.tap(find.byKey(const ValueKey('leave-show-answer')));
+    await settle(tester);
+    expect(find.textContaining('الإجابة: '), findsOneWidget);
+    expect(game.progressOf('general-0').revealed, isTrue);
     await tester.tap(find.byKey(const ValueKey('leave-team-1')));
     await settle(tester);
     expect(game.game!.results['general-0']!.team, 1);
     expect(game.game!.scores, [400, 200]);
+    expect(game.game!.turn, 0);
     expect(find.text('اختاروا سؤال'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('pack-back')));
     await settle(tester);

@@ -168,24 +168,7 @@ class _TopBar extends StatelessWidget {
         Expanded(child: TeamScore(game: game, team: 0)),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                lang.toAr('${game.resolvedCount}/${game.totalQuestions}'),
-                textDirection: TextDirection.ltr,
-                style: AppText.num(18, color: AppColors.ivory, height: 1.1),
-              ),
-              Text(
-                lang.t('سؤال', 'so2al'),
-                style: AppText.sans(
-                  11,
-                  color: AppColors.ivory.withValues(alpha: 0.6),
-                  height: 1.2,
-                ),
-              ),
-            ],
-          ),
+          child: TurnChip(game: game),
         ),
         Expanded(child: TeamScore(game: game, team: 1)),
         const SizedBox(width: 8),
@@ -263,16 +246,118 @@ class TeamScore extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              TweenAnimationBuilder<double>(
-                tween: Tween(end: game.scores[team].toDouble()),
-                duration: const Duration(milliseconds: 600),
-                curve: Curves.easeOutCubic,
-                builder: (context, v, _) => Text(
-                  lang.toAr(v.round()),
-                  textDirection: TextDirection.ltr,
-                  style: AppText.num(compact ? 22 : 30, color: ink, height: 1),
+              // The unit sits under the score so it takes no width from the
+              // name.
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  TweenAnimationBuilder<double>(
+                    tween: Tween(end: game.scores[team].toDouble()),
+                    duration: const Duration(milliseconds: 600),
+                    curve: Curves.easeOutCubic,
+                    // A lone Arabic zero is a small dot, so say it.
+                    builder: (context, v, _) => Text(
+                      v.round() == 0 && lang.ar ? 'صفر' : lang.toAr(v.round()),
+                      textDirection: TextDirection.ltr,
+                      // The word is wider and has a tail, so it's set smaller.
+                      style: AppText.num(
+                        v.round() == 0 && lang.ar
+                            ? (compact ? 16 : 21)
+                            : (compact ? 20 : 26),
+                        color: ink,
+                        height: 1.05,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    lang.t('نقطة', 'no2ta'),
+                    style: AppText.sans(
+                      12,
+                      weight: FontWeight.w700,
+                      color: ink.withValues(alpha: 0.85),
+                      height: 1.1,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Whose turn it is to pick a question, with an arrow towards that team's
+/// score. The turn passes by itself after every settled question; tapping
+/// hands it to the other team.
+class TurnChip extends StatelessWidget {
+  const TurnChip({super.key, required this.game});
+
+  final Game game;
+
+  @override
+  Widget build(BuildContext context) {
+    final lang = context.lang;
+    final controller = context.game;
+    final team = game.turn;
+    final color = teamColors[team];
+    final name = game.teamNames[team];
+    // Team 0's score sits at the start of the bar, team 1's at the end.
+    final rtl = Directionality.of(context) == TextDirection.rtl;
+    final arrow = Icon(
+      (team == 0) == rtl ? LucideIcons.chevronsRight : LucideIcons.chevronsLeft,
+      size: 20,
+      color: color,
+    );
+
+    return Semantics(
+      button: !game.finished,
+      label: lang.t(
+        'الدور على $name، اضغط عشان تبدّل الدور',
+        'El door 3ala $name, edghat 3ashan tebaddel el door',
+      ),
+      excludeSemantics: true,
+      child: Pressable(
+        key: const ValueKey('turn-chip'),
+        onTap: game.finished ? null : controller.switchTurn,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          height: 52,
+          constraints: const BoxConstraints(maxWidth: 170),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          decoration: BoxDecoration(
+            color: AppColors.deep,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: color, width: 2),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (team == 0) ...[arrow, const SizedBox(width: 4)],
+              Flexible(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      lang.t('الدور على', 'El door 3ala'),
+                      maxLines: 1,
+                      style: AppText.sans(
+                        12,
+                        color: AppColors.ivory.withValues(alpha: 0.8),
+                        height: 1.2,
+                      ),
+                    ),
+                    Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppText.display(16, height: 1.25),
+                    ),
+                  ],
                 ),
               ),
+              if (team == 1) ...[const SizedBox(width: 4), arrow],
             ],
           ),
         ),
