@@ -7,7 +7,7 @@
       "key": "pack1",
       "name": "الكورة المصرية",
       "description": "أسئلة عن تاريخ ونجوم الكورة المصرية",
-      "cover": "generated/covers/pack1.png",
+      "cover": "generated/covers-classic/pack1.png",
       "packs": [
         {
           "number": 1,
@@ -116,7 +116,7 @@
       "key": "pack2",
       "name": "نوستالجيا التسعينات",
       "description": "كرتون وأغاني ومسلسلات التسعينات",
-      "cover": "generated/covers/pack2.png",
+      "cover": "generated/covers-classic/pack2.png",
       "packs": [
         {
           "number": 1,
@@ -225,7 +225,7 @@
       "key": "pack3",
       "name": "خمّن الكلمة من الإيموجي",
       "description": "اقروا الإيموجي وخمّنوا الكلمة",
-      "cover": "generated/covers/pack3.png",
+      "cover": "generated/covers-classic/pack3.png",
       "packs": [
         {
           "number": 1,
@@ -304,7 +304,7 @@
       "key": "pack4",
       "name": "تمثيل: أفلام الألفينات",
       "description": "مثّلوا أفلام الألفينات من غير ولا كلمة",
-      "cover": "generated/covers/pack4.png",
+      "cover": "generated/covers-classic/pack4.png",
       "packs": [
         {
           "number": 1,
@@ -389,7 +389,7 @@
       "key": "pack5",
       "name": "العد التنازلي: حساب",
       "description": "احفظوا الأرقام ووصّلوا للرقم المطلوب",
-      "cover": "generated/covers/pack5.png",
+      "cover": "generated/covers-classic/pack5.png",
       "packs": [
         {
           "number": 1,
@@ -492,7 +492,7 @@
       "key": "pack6",
       "name": "خمّن المكان",
       "description": "أماكن مشهورة في مصر",
-      "cover": "generated/covers/pack6.png",
+      "cover": "generated/covers-classic/pack6.png",
       "packs": [
         {
           "number": 1,
@@ -608,7 +608,7 @@
       "key": "pack7",
       "name": "موسيقى مصرية",
       "description": "أغاني ومطربين وملحنين مصريين",
-      "cover": "generated/covers/pack7.png",
+      "cover": "generated/covers-classic/pack7.png",
       "packs": [
         {
           "number": 1,
