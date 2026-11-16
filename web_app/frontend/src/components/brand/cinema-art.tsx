@@ -29,7 +29,11 @@ function TitleBars({ color, y = 112 }: { color: string; y?: number }) {
 // Rotations that fan a thin wedge pointing left across the sky above the horizon.
 const rays = Array.from({ length: 12 }, (_, i) => i * 15 + 4);
 
-// Eight text-free one-sheets in the manner of 1950s-60s Egyptian cinema posters: flat shapes, bold grounds.
+// Text-free one-sheets in the manner of 1950s-60s Egyptian cinema posters: flat shapes, bold grounds.
+// Painted skin and hair for the portraits.
+const skin = "#e2a77c";
+const hair = "#2a1a14";
+
 export const motifs: Array<() => React.ReactNode> = [
   // Sunrise over the Nile.
   () => (
@@ -141,6 +145,72 @@ export const motifs: Array<() => React.ReactNode> = [
         <rect x="52" y="104" width="38" height="2" rx="1" />
       </g>
       <TitleBars color={c.mustard} y={114} />
+    </>
+  ),
+  // A star's painted portrait (her): red one-sheet, cream inset, dark waved hair, an earring.
+  () => (
+    <>
+      <rect width="100" height="140" style={f(c.red)} />
+      <g style={f(c.cream)}>
+        <rect x="14" y="6" width="72" height="9" rx="2" />
+      </g>
+      <rect x="10" y="20" width="80" height="80" style={f(c.cream)} />
+      <rect x="13" y="23" width="74" height="74" style={f(c.teal, 0.35)} />
+      <path d="M26 96 C26 80 36 74 50 74 C64 74 74 80 74 96 Z" style={f(c.crimson)} />
+      <rect x="45" y="62" width="10" height="14" style={f(skin)} />
+      <path d="M30 56 C24 30 40 24 52 26 C70 26 76 40 72 58 C70 70 64 72 62 64 C66 48 58 40 50 40 C40 40 34 50 36 66 C32 66 30 62 30 56 Z" style={f(hair)} />
+      <ellipse cx="50" cy="52" rx="13" ry="16" style={f(skin)} />
+      <path d="M37 50 C36 36 48 32 60 38 C54 38 46 40 42 50 Z" style={f(hair)} />
+      <path d="M44 50 h5 M53 50 h5" stroke={hair} strokeWidth="1.6" strokeLinecap="round" />
+      <ellipse cx="51" cy="60" rx="3.2" ry="1.6" style={f(c.crimson)} />
+      <circle cx="37.5" cy="58" r="2.2" style={f(c.mustard)} />
+      <path d="M58 46 C62 50 62 58 58 64" stroke="#000" strokeOpacity="0.12" strokeWidth="5" fill="none" />
+      <TitleBars color={c.cream} y={108} />
+    </>
+  ),
+  // A leading man's portrait (him): mustard ground, teal panel, side-parted hair, suit and tie.
+  () => (
+    <>
+      <rect width="100" height="140" style={f(c.mustard)} />
+      <rect x="8" y="8" width="84" height="88" style={f(c.teal)} />
+      <circle cx="74" cy="28" r="12" style={f(c.cream, 0.5)} />
+      <path d="M20 96 C20 78 34 72 50 72 C66 72 80 78 80 96 Z" style={f(c.ink)} />
+      <path d="M42 72 L50 92 L58 72 Z" style={f(c.cream)} />
+      <path d="M48 76 L50 92 L52 76 Z" style={f(c.red)} />
+      <rect x="44" y="58" width="12" height="16" style={f(skin)} />
+      <ellipse cx="50" cy="48" rx="14" ry="17" style={f(skin)} />
+      <path d="M35 46 C33 30 44 26 54 27 C64 28 68 36 65 46 C62 38 54 34 44 37 C40 39 37 42 35 46 Z" style={f(hair)} />
+      <path d="M43 48 h5 M53 48 h5" stroke={hair} strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M46 58 h8" stroke={c.crimson} strokeWidth="1.6" strokeLinecap="round" />
+      <path d="M58 40 C64 46 63 56 58 62" stroke="#000" strokeOpacity="0.14" strokeWidth="6" fill="none" />
+      <TitleBars color={c.crimson} y={106} />
+    </>
+  ),
+  // A travel poster: pyramids and palms under a pale sky, teal border.
+  () => (
+    <>
+      <rect width="100" height="140" style={f(c.teal)} />
+      <rect x="7" y="7" width="86" height="96" style={f(c.cream)} />
+      <circle cx="68" cy="30" r="10" style={f(c.orange, 0.85)} />
+      <path d="M22 84 L48 44 L74 84 Z" style={f(c.mustard)} />
+      <path d="M48 44 L74 84 L56 84 Z" style={f(c.orange)} />
+      <path d="M60 84 L76 60 L92 84 Z" style={f(c.mustard, 0.85)} />
+      <path d="M76 60 L92 84 L82 84 Z" style={f(c.orange, 0.9)} />
+      <rect x="7" y="84" width="86" height="19" style={f(c.olive)} />
+      <g stroke={c.ink} strokeWidth="2.4" fill="none" strokeLinecap="round">
+        <path d="M24 100 C22 86 22 72 26 58" />
+        <path d="M84 100 C86 90 86 80 83 70" />
+      </g>
+      <g style={f(c.olive)} stroke={c.ink} strokeWidth="1">
+        <path d="M26 58 C18 54 12 58 10 64 C16 60 22 60 26 58 Z" />
+        <path d="M26 58 C30 50 38 50 42 54 C36 54 30 56 26 58 Z" />
+        <path d="M26 58 C22 50 24 44 30 42 C28 48 28 54 26 58 Z" />
+        <path d="M26 58 C34 58 38 64 38 70 C34 64 30 60 26 58 Z" />
+        <path d="M83 70 C77 66 72 68 70 72 C75 70 80 70 83 70 Z" />
+        <path d="M83 70 C87 64 93 64 96 68 C91 68 86 69 83 70 Z" />
+        <path d="M83 70 C82 64 84 60 88 58 C86 62 85 66 83 70 Z" />
+      </g>
+      <TitleBars color={c.crimson} y={110} />
     </>
   ),
 ];

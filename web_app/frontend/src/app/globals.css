@@ -213,6 +213,11 @@
   .grille {
     background-image: repeating-linear-gradient(90deg, var(--color-night) 0 5px, transparent 5px 10px);
   }
+  /* Print halftone: a fine dot screen laid over the poster art. */
+  .halftone {
+    background-image: radial-gradient(rgb(42 26 20 / 0.32) 0.8px, transparent 1.3px);
+    background-size: 4px 4px;
+  }
   /* A worn poster: paper grain, a fold across each axis and light rubbed off the edges. */
   .poster-wear {
     background-image:

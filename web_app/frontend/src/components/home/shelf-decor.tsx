@@ -78,7 +78,7 @@ export function GutterDecor() {
         <div
           key={String(flip)}
           className={cn(
-            "absolute bottom-40 top-56 flex w-[calc((100%-1200px)/2)] max-w-72 flex-col items-center justify-between px-4",
+            "absolute bottom-40 top-56 flex w-[calc((100%-1200px)/2)] max-w-72 flex-col items-center justify-between px-4 drop-shadow-[0_6px_8px_rgb(0_0_0/0.5)]",
             flip ? "end-0" : "start-0",
           )}
         >

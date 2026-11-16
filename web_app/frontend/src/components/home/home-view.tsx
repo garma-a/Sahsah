@@ -7,6 +7,7 @@ import Logo from "@/components/brand/logo";
 import Hero from "@/components/home/hero";
 import SelectionBar from "@/components/home/selection-bar";
 import { GutterDecor } from "@/components/home/shelf-decor";
+import CinemaWall from "@/components/room/cinema-wall";
 import Shelves from "@/components/home/shelves";
 import SessionDialog from "@/components/setup/session-dialog";
 import Button from "@/components/ui/button";
@@ -107,6 +108,7 @@ export default function HomeView() {
         tabIndex={-1}
         className={cn("arch paper relative z-10 scroll-mt-4 outline-none lg:-mt-32", selected.length > 0 ? "pb-56 sm:pb-40" : "pb-24")}
       >
+        <CinemaWall variant="home" className="hidden md:block" />
         <GutterDecor />
         <div className="absolute inset-x-0 top-0 z-20 hidden justify-center lg:flex">
           <Button onClick={play} size="xl" className="h-[4.75rem] min-w-[19rem] -translate-y-[58%] text-5xl ring-[5px] active:translate-y-[calc(-58%+3px)]">
@@ -114,22 +116,25 @@ export default function HomeView() {
           </Button>
         </div>
 
-        <div className="mx-auto max-w-[1200px] px-5 pt-10 sm:px-8 lg:px-12 lg:pt-28">
-          {openRoom && (
-            <div className="mb-10 flex flex-wrap items-center justify-between gap-4 rounded-2xl border-[3px] border-ink bg-sun px-5 py-4 shadow-[0_5px_0_var(--color-ink)]">
-              <p className="font-heading text-2xl">عندك غرفة مفتوحة</p>
-              <Button asChild variant="dark" size="sm">
-                <Link href={`/room/${openRoom.roomId}`}>كمّل الغرفة</Link>
-              </Button>
+        <div className="relative mx-auto max-w-[1200px] px-5 pt-10 sm:px-8 lg:px-12 lg:pt-28">
+          {/* From tablets up the shelves sit on a paper panel pinned over the poster wall. */}
+          <div className="md:rounded-[2rem] md:border-4 md:border-ink md:bg-[#f7ecd3] md:p-8 md:shadow-[0_10px_0_var(--color-ink)] md:[background-image:var(--grain)] lg:p-10">
+            {openRoom && (
+              <div className="mb-10 flex flex-wrap items-center justify-between gap-4 rounded-2xl border-[3px] border-ink bg-sun px-5 py-4 shadow-[0_5px_0_var(--color-ink)]">
+                <p className="font-heading text-2xl">عندك غرفة مفتوحة</p>
+                <Button asChild variant="dark" size="sm">
+                  <Link href={`/room/${openRoom.roomId}`}>كمّل الغرفة</Link>
+                </Button>
+              </div>
+            )}
+            <div className="mb-8 flex items-center gap-3 lg:hidden">
+              <span className="inline-block -rotate-1 rounded-lg bg-night px-6 py-1 font-heading text-4xl text-cream shadow-[3px_3px_0_var(--color-cyan)]">
+                الفئات
+              </span>
+              <span aria-hidden className="h-[3px] flex-1 bg-press" />
             </div>
-          )}
-          <div className="mb-8 flex items-center gap-3 lg:hidden">
-            <span className="inline-block -rotate-1 rounded-lg bg-night px-6 py-1 font-heading text-4xl text-cream shadow-[3px_3px_0_var(--color-cyan)]">
-              الفئات
-            </span>
-            <span aria-hidden className="h-[3px] flex-1 bg-press" />
+            <Shelves state={state} selected={selected} onToggle={toggle} onRetry={retry} />
           </div>
-          <Shelves state={state} selected={selected} onToggle={toggle} onRetry={retry} />
         </div>
       </main>
 
