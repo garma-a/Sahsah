@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import Logo from "@/components/brand/logo";
+import CinemaWall from "@/components/room/cinema-wall";
 import PosterWall from "@/components/room/poster-wall";
+import RetroScreen from "@/components/room/retro-screen";
 import type { ChannelStatus } from "@/lib/realtime/use-room-channel";
 import { cn } from "@/lib/utils";
 
@@ -12,18 +14,21 @@ type RoomShellProps = {
   /** Right-hand slot of the header (start side in RTL). */
   actions?: React.ReactNode;
   children: React.ReactNode;
-  /** Let the content use the full width, as the board does on a TV. */
-  wide?: boolean;
+  /** The live game: full width, on a retro TV in front of the cinema poster wall. */
+  stage?: boolean;
   /** Visually hidden page heading, for screens that have no visible one. */
   heading?: string;
 };
 
-/** The room frame: poster wall behind a red header bar with the logo, the connection light and actions. */
-export default function RoomShell({ covers, status, actions, children, wide, heading }: RoomShellProps) {
+/**
+ * The room frame: a poster wall behind a red header bar with the logo, the connection light and actions. The game
+ * itself (board, question, result) is staged on a retro TV in front of a wall of old cinema posters.
+ */
+export default function RoomShell({ covers, status, actions, children, stage, heading }: RoomShellProps) {
   return (
     <div className="relative min-h-dvh">
-      <PosterWall covers={covers} />
-      <div className={cn("mx-auto flex min-h-dvh flex-col px-3 pb-6 pt-3 sm:px-5", wide ? "max-w-[1760px]" : "max-w-[1200px]")}>
+      {stage ? <CinemaWall /> : <PosterWall covers={covers} />}
+      <div className={cn("mx-auto flex min-h-dvh flex-col px-3 pb-6 pt-3 sm:px-5", stage ? "max-w-[1760px]" : "max-w-[1200px]")}>
         <header className="relative z-10 mb-4 flex items-center justify-between gap-3 rounded-2xl border-4 border-ink bg-press px-3 py-2 text-white shadow-[0_6px_0_var(--color-ink)] sm:px-5">
           <div className="flex min-w-0 flex-1 items-center gap-3">{actions}</div>
           <Link href="/" aria-label="صحصح، الصفحة الرئيسية" className="shrink-0 rounded-lg">
@@ -39,7 +44,7 @@ export default function RoomShell({ covers, status, actions, children, wide, hea
               {heading}
             </h1>
           )}
-          {children}
+          {stage ? <RetroScreen>{children}</RetroScreen> : children}
         </main>
       </div>
     </div>
