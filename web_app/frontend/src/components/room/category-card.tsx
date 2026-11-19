@@ -74,7 +74,7 @@ export default function CategoryCard({ column, entry, toneIndex, flipped, onFlip
           aria-label={`${column.name}، ${finished ? "خلصت" : `${formatDigits(left)} من ${formatDigits(tiles.length)} باقي`}. اقلب الكارت`}
           onClick={(event) => flip(true, event)}
           className={cn(
-            "flip-face flip-front cursor-pointer overflow-hidden border-4 bg-[#fff8ea] text-start shadow-poster",
+            "@container flip-face flip-front cursor-pointer overflow-hidden border-4 bg-[#fff8ea] text-start shadow-poster",
             tone.border,
           )}
         >
@@ -86,7 +86,7 @@ export default function CategoryCard({ column, entry, toneIndex, flipped, onFlip
             sizes="(min-width: 1024px) 16vw, 45vw"
           />
           {!finished && (
-            <span className="tabular absolute bottom-1.5 start-1.5 rounded-full border-2 border-ink bg-cream px-2 py-0.5 text-sm font-extrabold text-ink">
+            <span className="tabular absolute start-1.5 top-1.5 rounded-full @max-[160px]:top-auto @max-[160px]:bottom-1.5 border-2 border-ink bg-cream px-2 py-0.5 text-sm font-extrabold text-ink">
               {count}
             </span>
           )}

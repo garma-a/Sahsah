@@ -1,8 +1,9 @@
 import { cn } from "@/lib/utils";
 
 export type PropName =
-  | "matchbox" | "cards" | "tea" | "cassette" | "reel" | "radio"
-  | "seeds" | "tickets" | "fez" | "dice" | "phone" | "glasses";
+  | "matchbox" | "cards" | "tea" | "reel" | "seeds" | "phone"
+  // Larger photographed groups (tea and seeds, cards and matches, radio and film cans, tawla and coffee).
+  | "still-tea" | "still-cards" | "still-radio" | "still-tawla";
 
 type PropProps = { name: PropName; className?: string; style?: React.CSSProperties };
 

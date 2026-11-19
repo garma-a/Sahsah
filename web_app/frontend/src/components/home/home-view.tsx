@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Logo from "@/components/brand/logo";
 import Hero from "@/components/home/hero";
 import SelectionBar from "@/components/home/selection-bar";
-import { GutterDecor } from "@/components/home/shelf-decor";
+import { DisplayLedge, GutterDecor } from "@/components/home/shelf-decor";
 import CinemaWall from "@/components/room/cinema-wall";
 import Shelves from "@/components/home/shelves";
 import SessionDialog from "@/components/setup/session-dialog";
@@ -117,13 +117,14 @@ export default function HomeView() {
         </div>
 
         <div className="relative mx-auto max-w-[1200px] px-3 pt-10 sm:px-8 lg:px-12 lg:pt-28">
-          {/* The shelves sit in the lobby's showcase: cream paper in a dark wood frame, screwed to the poster wall. */}
-          <div className="relative rounded-2xl border-[7px] border-[#4a2e1c] bg-[#f3e6c8] p-4 shadow-[0_0_0_2px_var(--color-ink),0_18px_40px_rgb(0_0_0/0.6),inset_0_0_0_2px_rgb(201_150_60/0.55),inset_0_0_40px_rgb(120_80_30/0.25)] [background-image:var(--grain)] sm:p-6 md:p-8 lg:p-10">
+          {/* The shelves are the lobby's display case: crimson velvet behind brass trim in a walnut frame, screwed to the poster wall. */}
+          <div className="relative rounded-xl bg-[#3b2414] bg-[url(/cinema/walnut.webp)] bg-[length:900px_auto] p-2.5 shadow-[0_0_0_2px_#140b06,0_30px_60px_rgb(0_0_0/0.7),inset_0_1px_0_rgb(255_235_200/0.25)] sm:p-4">
+          <div className="relative rounded-[5px] bg-[#4d0f16] bg-[url(/cinema/velvet.webp)] bg-[length:1100px_auto] px-4 pt-8 pb-0 shadow-[inset_0_0_0_2px_rgb(201_150_60/0.7),inset_0_14px_40px_rgb(0_0_0/0.75),inset_0_0_140px_rgb(0_0_0/0.55)] sm:px-6 md:px-10 md:pt-12">
             {["start-2 top-2", "end-2 top-2", "start-2 bottom-2", "end-2 bottom-2"].map((spot) => (
               <span
                 key={spot}
                 aria-hidden
-                className={`absolute ${spot} size-3 rounded-full border border-ink/60 bg-[radial-gradient(circle_at_35%_35%,#f3d68a,#a8782a_60%,#5a3d12)] after:absolute after:inset-x-0.5 after:top-1/2 after:h-px after:-rotate-45 after:bg-ink/60`}
+                className={`absolute ${spot} z-10 size-3 rounded-full border border-ink/60 bg-[radial-gradient(circle_at_35%_35%,#f3d68a,#a8782a_60%,#5a3d12)] after:absolute after:inset-x-0.5 after:top-1/2 after:h-px after:-rotate-45 after:bg-ink/60`}
               />
             ))}
             {openRoom && (
@@ -134,13 +135,9 @@ export default function HomeView() {
                 </Button>
               </div>
             )}
-            <div className="mb-8 flex items-center gap-3 lg:hidden">
-              <span className="inline-block -rotate-1 rounded-lg bg-night px-6 py-1 font-heading text-4xl text-cream shadow-[3px_3px_0_var(--color-cyan)]">
-                الفئات
-              </span>
-              <span aria-hidden className="h-[3px] flex-1 bg-press" />
-            </div>
             <Shelves state={state} selected={selected} onToggle={toggle} onRetry={retry} />
+            <DisplayLedge />
+          </div>
           </div>
         </div>
       </main>
