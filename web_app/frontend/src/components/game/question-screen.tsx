@@ -195,7 +195,9 @@ export default function QuestionScreen({
           )}
           {cardUrl && (
             <div className="flex w-full max-w-sm shrink-0 flex-col items-center gap-3 rounded-[1.6rem] border-4 border-ink bg-white p-4 shadow-[0_8px_0_var(--color-ink)] sm:w-auto short:flex-row short:p-2">
-              <QRCodeSVG value={cardUrl} size={160} level="M" marginSize={1} fgColor="#1d2321" bgColor="#ffffff" role="img" title="كود كارت التمثيل" />
+              <div className="w-44 max-w-full shrink-0 [&_svg]:block [&_svg]:h-auto [&_svg]:w-full short:w-28">
+                <QRCodeSVG value={cardUrl} size={176} level="M" marginSize={1} fgColor="#1d2321" bgColor="#ffffff" role="img" title="كود كارت التمثيل" />
+              </div>
               <p className="text-center font-heading text-2xl leading-snug">اللي هيمثّل يمسح الكود ويشوف الكارت لوحده</p>
               {hostView && (
                 <a

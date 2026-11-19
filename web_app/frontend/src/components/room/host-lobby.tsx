@@ -96,7 +96,8 @@ export default function HostLobby({ roomId, view, roomVersion, auth, categories,
         </h2>
         {invitation ? (
           <>
-            <div className="mt-4 rounded-2xl border-4 border-ink bg-white p-3 shadow-[0_5px_0_var(--color-ink)] short:mt-1.5 short:border-[3px] short:p-1 short:[&_svg]:size-28">
+            {/* The QR scales with its column (never wider than drawn), so it is never cropped. */}
+            <div className="mt-4 w-full max-w-[17rem] rounded-2xl border-4 border-ink bg-white p-3 shadow-[0_5px_0_var(--color-ink)] [&_svg]:block [&_svg]:h-auto [&_svg]:w-full short:mt-1.5 short:max-w-32 short:border-[3px] short:p-1">
               <QRCodeSVG value={invitation.joinUrl} size={240} level="M" marginSize={1} fgColor="#1d2321" bgColor="#ffffff" role="img" title="كود QR للانضمام للغرفة" />
             </div>
             <p className="mt-4 text-base font-semibold short:mt-1 short:text-xs" dir="ltr">
