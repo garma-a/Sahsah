@@ -108,7 +108,7 @@ export default function HomeView() {
         tabIndex={-1}
         className={cn("arch paper relative z-10 scroll-mt-4 outline-none lg:-mt-32", selected.length > 0 ? "pb-56 sm:pb-40" : "pb-24")}
       >
-        <CinemaWall variant="home" className="hidden md:block" />
+        <CinemaWall variant="home" />
         <GutterDecor />
         <div className="absolute inset-x-0 top-0 z-20 hidden justify-center lg:flex">
           <Button onClick={play} size="xl" className="h-[4.75rem] min-w-[19rem] -translate-y-[58%] text-5xl ring-[5px] active:translate-y-[calc(-58%+3px)]">
@@ -116,9 +116,16 @@ export default function HomeView() {
           </Button>
         </div>
 
-        <div className="relative mx-auto max-w-[1200px] px-5 pt-10 sm:px-8 lg:px-12 lg:pt-28">
-          {/* From tablets up the shelves sit on a paper panel pinned over the poster wall. */}
-          <div className="md:rounded-[2rem] md:border-4 md:border-ink md:bg-[#f7ecd3] md:p-8 md:shadow-[0_10px_0_var(--color-ink)] md:[background-image:var(--grain)] lg:p-10">
+        <div className="relative mx-auto max-w-[1200px] px-3 pt-10 sm:px-8 lg:px-12 lg:pt-28">
+          {/* The shelves sit in the lobby's showcase: cream paper in a dark wood frame, screwed to the poster wall. */}
+          <div className="relative rounded-2xl border-[7px] border-[#4a2e1c] bg-[#f3e6c8] p-4 shadow-[0_0_0_2px_var(--color-ink),0_18px_40px_rgb(0_0_0/0.6),inset_0_0_0_2px_rgb(201_150_60/0.55),inset_0_0_40px_rgb(120_80_30/0.25)] [background-image:var(--grain)] sm:p-6 md:p-8 lg:p-10">
+            {["start-2 top-2", "end-2 top-2", "start-2 bottom-2", "end-2 bottom-2"].map((spot) => (
+              <span
+                key={spot}
+                aria-hidden
+                className={`absolute ${spot} size-3 rounded-full border border-ink/60 bg-[radial-gradient(circle_at_35%_35%,#f3d68a,#a8782a_60%,#5a3d12)] after:absolute after:inset-x-0.5 after:top-1/2 after:h-px after:-rotate-45 after:bg-ink/60`}
+              />
+            ))}
             {openRoom && (
               <div className="mb-10 flex flex-wrap items-center justify-between gap-4 rounded-2xl border-[3px] border-ink bg-sun px-5 py-4 shadow-[0_5px_0_var(--color-ink)]">
                 <p className="font-heading text-2xl">عندك غرفة مفتوحة</p>

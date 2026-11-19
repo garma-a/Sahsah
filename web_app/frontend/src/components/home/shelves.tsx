@@ -44,7 +44,7 @@ export default function Shelves({ state, selected, onToggle, onRetry }: ShelvesP
     <div className="space-y-14">
       {shelves.map((shelf, shelfIndex) => (
         <section key={shelf.id} aria-labelledby={`shelf-${shelf.id}`}>
-          <h2 id={`shelf-${shelf.id}`} className="font-heading text-4xl leading-tight sm:text-5xl">
+          <h2 id={`shelf-${shelf.id}`} className="font-poster text-4xl leading-tight text-press [text-shadow:2px_2px_0_var(--color-ink)] sm:text-5xl">
             {shelf.name}
           </h2>
           <div aria-hidden className={`mt-2 mb-9 h-[3px] w-full ${toneAt(shelfIndex).rule}`} />

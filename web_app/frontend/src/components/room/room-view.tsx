@@ -34,31 +34,27 @@ export default function RoomView({ roomId }: { roomId: string }) {
     () => new Map((catalog.status === "ready" ? catalog.categories : []).map((category, index) => [category.id, { category, index }])),
     [catalog],
   );
-  const covers = useMemo(
-    () => (catalog.status === "ready" ? catalog.categories.flatMap((c) => (c.coverUrl ? [c.coverUrl] : [])) : []),
-    [catalog],
-  );
 
   if (!hydrated) {
     return (
-      <RoomShell covers={covers}>
+      <RoomShell>
         <StatusCard title="ثانية…" busy />
       </RoomShell>
     );
   }
   if (host && hostRoom) {
     const auth: Auth = { kind: "host", credential: host.credential, controlSecret: hostRoom.controlSecret, generation: hostRoom.generation };
-    return <LiveRoom key={`${roomId}:${hostRoom.controlSecret}`} roomId={roomId} auth={auth} role="host" covers={covers} categories={categories} />;
+    return <LiveRoom key={`${roomId}:${hostRoom.controlSecret}`} roomId={roomId} auth={auth} role="host" categories={categories} />;
   }
   if (seat) {
     const auth: Auth = { kind: "guest", membershipId: seat.membershipId, secret: seat.secret };
-    return <LiveRoom key={roomId} roomId={roomId} auth={auth} role="guest" membershipId={seat.membershipId} covers={covers} categories={categories} />;
+    return <LiveRoom key={roomId} roomId={roomId} auth={auth} role="guest" membershipId={seat.membershipId} categories={categories} />;
   }
-  return <Claim roomId={roomId} covers={covers} signedIn={Boolean(host)} />;
+  return <Claim roomId={roomId} signedIn={Boolean(host)} />;
 }
 
 /** A signed-in host opening a room this browser holds no control proof for: take control explicitly. */
-function Claim({ roomId, covers, signedIn }: { roomId: string; covers: string[]; signedIn: boolean }) {
+function Claim({ roomId, signedIn }: { roomId: string; signedIn: boolean }) {
   const identity = useIdentityApi();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -98,7 +94,7 @@ function Claim({ roomId, covers, signedIn }: { roomId: string; covers: string[];
   }
 
   return (
-    <RoomShell covers={covers}>
+    <RoomShell>
       {signedIn ? (
         <StatusCard title="الغرفة دي مفتوحة من جهاز تاني" text="لو دي غرفتك، كمّل منها هنا. الجهاز التاني هيفقد التحكم.">
           <Button onClick={claim} disabled={busy}>
@@ -125,11 +121,10 @@ type LiveRoomProps = {
   auth: Auth;
   role: "host" | "guest";
   membershipId?: string;
-  covers: string[];
   categories: CategoryIndex;
 };
 
-function LiveRoom({ roomId, auth, role, membershipId, covers, categories }: LiveRoomProps) {
+function LiveRoom({ roomId, auth, role, membershipId, categories }: LiveRoomProps) {
   const router = useRouter();
   const identity = useIdentityApi();
   const isHost = role === "host";
@@ -201,7 +196,7 @@ function LiveRoom({ roomId, auth, role, membershipId, covers, categories }: Live
   ) : null;
 
   const shell = (children: React.ReactNode, stage?: boolean, heading?: string) => (
-    <RoomShell covers={covers} status={status} actions={actions} stage={stage} heading={heading}>
+    <RoomShell status={status} actions={actions} stage={stage} heading={heading}>
       {closeError && <ErrorBanner className="mb-3">{closeError}</ErrorBanner>}
       {children}
     </RoomShell>

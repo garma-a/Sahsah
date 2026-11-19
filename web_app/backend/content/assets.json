@@ -6,13 +6,13 @@
   },
   "assets": {
     "pack1/cover": {
-      "id": "3c2be347-8501-438e-8557-b941f0742905",
+      "id": "49384c5a-2383-4855-8862-4452985b44c0",
       "scope": "public",
       "kind": "image",
-      "key": "covers/591d4f975aa36c40b7a66275b4fa86fa536eb66234db17e1d669886e025364fe.webp",
+      "key": "covers/9fb2c66a9457648cd6356e4fee09bc66f51f52d968df1a8355551dd143640822.webp",
       "contentType": "image/webp",
-      "byteSize": 222762,
-      "sha256": "591d4f975aa36c40b7a66275b4fa86fa536eb66234db17e1d669886e025364fe",
+      "byteSize": 79922,
+      "sha256": "9fb2c66a9457648cd6356e4fee09bc66f51f52d968df1a8355551dd143640822",
       "width": 800,
       "height": 1000
     },
@@ -149,13 +149,13 @@
       "height": 377
     },
     "pack2/cover": {
-      "id": "48fd5fb9-625e-4f66-8d8d-aa56ce7ea937",
+      "id": "bf4dd0c7-25e5-4372-8b80-dcbd1e0d7bc4",
       "scope": "public",
       "kind": "image",
-      "key": "covers/342afa8b8140cca182960d261c715b2d6c18b18237efd0252db2b21f6fa78f87.webp",
+      "key": "covers/798f1b77ee66a2eafc2f6829a7dfa1578111213c64f9c0c999e5b664c599ae09.webp",
       "contentType": "image/webp",
-      "byteSize": 247068,
-      "sha256": "342afa8b8140cca182960d261c715b2d6c18b18237efd0252db2b21f6fa78f87",
+      "byteSize": 114936,
+      "sha256": "798f1b77ee66a2eafc2f6829a7dfa1578111213c64f9c0c999e5b664c599ae09",
       "width": 800,
       "height": 1000
     },
@@ -349,13 +349,13 @@
       "height": 900
     },
     "pack3/cover": {
-      "id": "5ef329db-7316-46e7-82b8-271540a145d1",
+      "id": "ca4bb57f-ae7f-46b4-8961-d173c1ef9cd3",
       "scope": "public",
       "kind": "image",
-      "key": "covers/b2c2f2d65c124fd0839cf83466cf81a7e54ebd3d8449a352e7c0a8c482846708.webp",
+      "key": "covers/68a301d44166298205224919073ba48f81f118c6abeb3aa436437c095bf24713.webp",
       "contentType": "image/webp",
-      "byteSize": 233738,
-      "sha256": "b2c2f2d65c124fd0839cf83466cf81a7e54ebd3d8449a352e7c0a8c482846708",
+      "byteSize": 79082,
+      "sha256": "68a301d44166298205224919073ba48f81f118c6abeb3aa436437c095bf24713",
       "width": 800,
       "height": 1000
     },
@@ -426,13 +426,13 @@
       "height": 900
     },
     "pack4/cover": {
-      "id": "29132f0a-1da7-4ca5-8c47-929420ddf02a",
+      "id": "3e0cfde1-6839-40f6-8058-87b55926d9d6",
       "scope": "public",
       "kind": "image",
-      "key": "covers/48dbb5676d76a6f411c6f3a362b5218c7f18843b56cb1dc7e6f542b12ee167f1.webp",
+      "key": "covers/edff40bd5c5f4b26d85dccc0fdabb2b0a7d600219e68d57eda3d8c93ed9fec85.webp",
       "contentType": "image/webp",
-      "byteSize": 244616,
-      "sha256": "48dbb5676d76a6f411c6f3a362b5218c7f18843b56cb1dc7e6f542b12ee167f1",
+      "byteSize": 66830,
+      "sha256": "edff40bd5c5f4b26d85dccc0fdabb2b0a7d600219e68d57eda3d8c93ed9fec85",
       "width": 800,
       "height": 1000
     },
@@ -569,13 +569,13 @@
       "height": 900
     },
     "pack5/cover": {
-      "id": "ab8f4d05-9a31-4912-86b7-263807e67f87",
+      "id": "c3fae463-89db-42e6-88e5-28d739ac9304",
       "scope": "public",
       "kind": "image",
-      "key": "covers/e3316ef773f4d6057afd4c5af970721f12a7020213497f567914d46798019f4d.webp",
+      "key": "covers/460434332ee7016432337a593df2f7f080bc318c52ca662b9f05ceb59230f61c.webp",
       "contentType": "image/webp",
-      "byteSize": 219310,
-      "sha256": "e3316ef773f4d6057afd4c5af970721f12a7020213497f567914d46798019f4d",
+      "byteSize": 105110,
+      "sha256": "460434332ee7016432337a593df2f7f080bc318c52ca662b9f05ceb59230f61c",
       "width": 800,
       "height": 1000
     },
@@ -712,13 +712,13 @@
       "height": 900
     },
     "pack6/cover": {
-      "id": "082d402b-ed95-4fbd-86b8-4923e23306ca",
+      "id": "fd1576fd-8072-45dd-80eb-c3bef7a87582",
       "scope": "public",
       "kind": "image",
-      "key": "covers/1e0c2d60fb1556bd251b9d2313159f747a81169d96092d0faf3fdeae06639b39.webp",
+      "key": "covers/a7a0bfc2cda126fa982d2c59c3069153fad3a5e7c6579ad65aa675de2ab35468.webp",
       "contentType": "image/webp",
-      "byteSize": 239014,
-      "sha256": "1e0c2d60fb1556bd251b9d2313159f747a81169d96092d0faf3fdeae06639b39",
+      "byteSize": 78944,
+      "sha256": "a7a0bfc2cda126fa982d2c59c3069153fad3a5e7c6579ad65aa675de2ab35468",
       "width": 800,
       "height": 1000
     },
@@ -984,13 +984,13 @@
       "height": 900
     },
     "pack7/cover": {
-      "id": "70c7c229-6b58-428a-8bd2-c798765e3ef1",
+      "id": "55377283-2683-444a-8014-768efcb594a6",
       "scope": "public",
       "kind": "image",
-      "key": "covers/ad388fc0779915a388ff745ff69f9f398291495573caf819e8ca7d842afac803.webp",
+      "key": "covers/28d7e3cfb3e27f3ea6c8087778b364ef9731eb41d7ce89fd565cbe964f10d332.webp",
       "contentType": "image/webp",
-      "byteSize": 247628,
-      "sha256": "ad388fc0779915a388ff745ff69f9f398291495573caf819e8ca7d842afac803",
+      "byteSize": 95468,
+      "sha256": "28d7e3cfb3e27f3ea6c8087778b364ef9731eb41d7ce89fd565cbe964f10d332",
       "width": 800,
       "height": 1000
     },

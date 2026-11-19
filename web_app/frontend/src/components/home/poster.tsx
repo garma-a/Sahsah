@@ -16,7 +16,7 @@ type PosterProps = {
   onToggle: (category: Category) => void;
 };
 
-/** A category poster on the shelf: a printed card with a coloured border, a name ribbon and the "؟" badge. */
+/** A category poster on the shelf: a printed card with a coloured border and the "؟" badge. The name is lettered on the poster. */
 export default function Poster({ category, toneIndex, selected, full, eager, onToggle }: PosterProps) {
   const tone = toneAt(toneIndex);
   const unavailable = category.publishedPackCount < 1;
@@ -30,7 +30,7 @@ export default function Poster({ category, toneIndex, selected, full, eager, onT
       disabled={unavailable}
       onClick={() => onToggle(category)}
       className={cn(
-        "group relative block w-full rounded-sm pb-4 text-start transition-[transform,opacity,filter] duration-200",
+        "group relative block w-full rounded-sm text-start transition-[transform,opacity,filter] duration-200",
         !unavailable && "cursor-pointer hover:-translate-y-1",
         selected && "-translate-y-2 -rotate-1 hover:-translate-y-2",
         resting && "opacity-70",
@@ -44,7 +44,7 @@ export default function Poster({ category, toneIndex, selected, full, eager, onT
           selected && "shadow-[7px_7px_0_var(--color-ink)]",
         )}
       >
-        <Cover src={category.coverUrl} name={category.name} eager={eager} />
+        <Cover src={category.coverUrl} name={category.name} tone={toneIndex} eager={eager} />
         {selected && <span aria-hidden className="pointer-events-none absolute inset-0 border-[3px] border-ink/80" />}
         {unavailable && (
           <span aria-hidden className="absolute inset-0 grid place-items-center bg-ink/55">
@@ -63,15 +63,7 @@ export default function Poster({ category, toneIndex, selected, full, eager, onT
         {selected ? <Check strokeWidth={4} className="size-6" /> : "؟"}
       </span>
 
-      <span
-        className={cn(
-          "relative -mt-3 mx-1.5 block -rotate-2 truncate rounded-md px-3 py-1.5 text-center font-heading text-xl leading-snug shadow-[0_3px_0_rgb(29_35_33/0.35)]",
-          unavailable ? "bg-charcoal/70 text-cream" : tone.ribbon,
-        )}
-      >
-        {category.name}
-        {unavailable && <span className="sr-only"> (قريبًا)</span>}
-      </span>
+      {unavailable && <span className="sr-only"> (قريبًا)</span>}
       {category.description && <span className="sr-only">{category.description}</span>}
     </button>
   );

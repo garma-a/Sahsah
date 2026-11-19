@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Alexandria, Lalezar } from "next/font/google";
+import { Alexandria, Lalezar, Rakkas } from "next/font/google";
 import SessionKeeper from "@/components/setup/session-keeper";
 import GameStoreProvider from "@/providers/game-store-provider";
 import "./globals.css";
@@ -7,6 +7,8 @@ import "./globals.css";
 // Lalezar stands in for the client's "Beirut" heading face, which has no web licence.
 // Swap the face here and in --font-heading (globals.css) and nothing else changes.
 const heading = Lalezar({ subsets: ["arabic", "latin"], weight: "400", variable: "--font-lalezar", display: "swap" });
+// Rakkas letters the poster titles: a 1960s Egyptian cinema hand-lettering style.
+const poster = Rakkas({ subsets: ["arabic", "latin"], weight: "400", variable: "--font-rakkas", display: "swap" });
 const body = Alexandria({ subsets: ["arabic", "latin"], variable: "--font-alexandria", display: "swap" });
 
 export const metadata: Metadata = {
@@ -22,7 +24,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="ar" dir="rtl" className={`${heading.variable} ${body.variable}`}>
+    <html lang="ar" dir="rtl" className={`${heading.variable} ${poster.variable} ${body.variable}`}>
       <body>
         <GameStoreProvider>
           <SessionKeeper />

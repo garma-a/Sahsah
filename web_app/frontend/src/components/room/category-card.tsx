@@ -81,15 +81,16 @@ export default function CategoryCard({ column, entry, toneIndex, flipped, onFlip
           <Cover
             src={entry?.category.coverUrl}
             name={column.name}
+            tone={toneIndex}
             className={cn("absolute inset-0 aspect-auto h-full", finished && "opacity-45 grayscale-[0.6]")}
             sizes="(min-width: 1024px) 16vw, 45vw"
           />
           {!finished && (
-            <span className="tabular absolute start-1.5 top-1.5 rounded-full border-2 border-ink bg-cream px-2 py-0.5 text-sm font-extrabold text-ink">
+            <span className="tabular absolute bottom-1.5 start-1.5 rounded-full border-2 border-ink bg-cream px-2 py-0.5 text-sm font-extrabold text-ink">
               {count}
             </span>
           )}
-          <h3 className={cn("absolute inset-x-0 bottom-0 truncate px-2 py-1.5 text-center font-heading text-xl leading-tight sm:text-2xl", tone.ribbon)}>
+          <h3 className="sr-only">
             {column.name}
           </h3>
           {finished && (

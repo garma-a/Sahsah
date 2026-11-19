@@ -48,6 +48,7 @@
   --color-shelf: #4a2e22;
 
   --font-heading: var(--font-lalezar), "Lalezar", "Noto Naskh Arabic", system-ui, sans-serif;
+  --font-poster: var(--font-rakkas), "Rakkas", var(--font-heading);
   --font-sans: var(--font-alexandria), "Alexandria", system-ui, sans-serif;
 
   --shadow-poster: 0 10px 18px -8px rgb(29 35 33 / 0.55), 0 2px 0 rgb(29 35 33 / 0.25);
@@ -212,6 +213,29 @@
   /* Speaker slots in the TV's chin. */
   .grille {
     background-image: repeating-linear-gradient(90deg, var(--color-night) 0 5px, transparent 5px 10px);
+  }
+  /* Ticket stock: a perforated stub line near the top with a punched notch at each end. */
+  .ticket {
+    position: relative;
+  }
+  .ticket::before {
+    content: "";
+    position: absolute;
+    inset-inline: 1.5rem;
+    top: 0.9rem;
+    border-top: 2px dashed rgb(29 35 33 / 0.3);
+    pointer-events: none;
+  }
+  .ticket::after {
+    content: "";
+    position: absolute;
+    inset-inline: -4px;
+    top: calc(0.9rem - 9px);
+    height: 18px;
+    background:
+      radial-gradient(circle at 0 50%, var(--color-ink) 0 8px, transparent 9px),
+      radial-gradient(circle at 100% 50%, var(--color-ink) 0 8px, transparent 9px);
+    pointer-events: none;
   }
   /* Print halftone: a fine dot screen laid over the poster art. */
   .halftone {

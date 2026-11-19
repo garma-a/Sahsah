@@ -1,34 +1,30 @@
-import { c, Cassette, FilmReel, Fez, Matchbox, MiniPoster, Sparkle, Squiggle, TeaGlass, Ticket } from "@/components/brand/cinema-art";
+import Prop from "@/components/brand/props";
 import { cn } from "@/lib/utils";
 
-// Four small cinema collages, each sized to one empty poster slot (a 4:5 box) and laid out in percentages.
-const collages: Array<(flip: boolean) => React.ReactNode> = [
+// Still lifes lying on the paper in an empty poster slot (a 4:5 box), laid out in percentages.
+const stills: Array<(flip: boolean) => React.ReactNode> = [
   (flip) => (
     <>
-      <MiniPoster motif={0} className="absolute start-[12%] top-[6%] w-[58%]" style={{ rotate: flip ? "6deg" : "-6deg" }} />
-      <Ticket className="absolute bottom-[10%] end-0 w-[70%]" style={{ rotate: flip ? "-9deg" : "9deg" }} />
-      <Sparkle className="absolute end-[6%] top-0 w-[18%]" />
+      <Prop name="cards" className="absolute start-[4%] top-[6%] w-[78%]" style={{ rotate: flip ? "8deg" : "-8deg" }} />
+      <Prop name="matchbox" className="absolute bottom-[2%] end-[2%] w-[62%]" style={{ rotate: flip ? "-12deg" : "10deg" }} />
     </>
   ),
   (flip) => (
     <>
-      <FilmReel className="absolute start-[2%] top-[8%] w-[84%]" style={{ rotate: flip ? "10deg" : "-8deg" }} />
-      <TeaGlass className="absolute bottom-[4%] end-[8%] w-[36%]" />
-      <Sparkle tone={c.teal} className="absolute bottom-[30%] start-[6%] w-[14%]" />
+      <Prop name="tea" className="absolute end-[10%] top-[4%] w-[56%]" />
+      <Prop name="seeds" className="absolute bottom-[4%] start-[2%] w-[64%]" style={{ rotate: flip ? "14deg" : "-10deg" }} />
     </>
   ),
   (flip) => (
     <>
-      <Squiggle tone={c.red} className="absolute start-0 top-[4%] w-[62%]" />
-      <Fez className="absolute end-[8%] top-[14%] w-[54%]" style={{ rotate: flip ? "-7deg" : "7deg" }} />
-      <Cassette className="absolute bottom-[10%] start-[2%] w-[78%]" style={{ rotate: flip ? "6deg" : "-7deg" }} />
+      <Prop name="tickets" className="absolute start-[6%] top-[10%] w-[74%]" style={{ rotate: flip ? "-6deg" : "7deg" }} />
+      <Prop name="dice" className="absolute bottom-[8%] end-[8%] w-[46%]" />
     </>
   ),
   (flip) => (
     <>
-      <MiniPoster motif={7} className="absolute end-[10%] top-[4%] w-[56%]" style={{ rotate: flip ? "-5deg" : "5deg" }} />
-      <Matchbox className="absolute bottom-[8%] start-[4%] w-[66%]" style={{ rotate: flip ? "4deg" : "-4deg" }} />
-      <Sparkle tone={c.pink} className="absolute start-[8%] top-[18%] w-[16%]" />
+      <Prop name="cassette" className="absolute end-[4%] top-[8%] w-[70%]" style={{ rotate: flip ? "9deg" : "-9deg" }} />
+      <Prop name="glasses" className="absolute bottom-[6%] start-[4%] w-[66%]" style={{ rotate: flip ? "-5deg" : "6deg" }} />
     </>
   ),
 ];
@@ -43,8 +39,8 @@ const steps = [
 ];
 
 /**
- * Collages in the empty slots either side of a shelf's last row. A row is centred, so when it holds at least
- * two fewer posters than fit, there is a whole free slot on each side; the collages appear only at those
+ * Still lifes in the empty slots either side of a shelf's last row. A row is centred, so when it holds at
+ * least two fewer posters than fit, there is a whole free slot on each side; the props appear only at those
  * breakpoints and never sit over a poster. Purely decorative.
  */
 export function RowEnds({ count, variant }: { count: number; variant: number }) {
@@ -54,49 +50,57 @@ export function RowEnds({ count, variant }: { count: number; variant: number }) 
   });
   if (visibility.every((v) => v.endsWith("hidden"))) return null;
   return (
-    <div aria-hidden className={cn("pointer-events-none absolute inset-x-0 bottom-0", visibility)}>
+    <div aria-hidden className={cn("pointer-events-none absolute inset-x-0 bottom-0 max-sm:hidden", visibility)}>
       {[false, true].map((flip) => (
         <div
           key={String(flip)}
           className={cn("absolute bottom-0 aspect-[4/5] w-[calc((100%-(var(--cols)-1)*var(--gap))/var(--cols))]", flip ? "end-0" : "start-0")}
         >
-          {collages[(variant * 2 + (flip ? 1 : 0)) % collages.length](flip)}
+          {stills[(variant * 2 + (flip ? 1 : 0)) % stills.length](flip)}
         </div>
       ))}
     </div>
   );
 }
 
+/** A small wooden ledge screwed to the wall, holding one or two props. */
+function Ledge({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div className={cn("relative flex w-full items-end justify-center gap-1 px-3", className)}>
+      {children}
+      <span className="absolute inset-x-0 -bottom-3 h-3.5 rounded-[3px] border-2 border-ink bg-shelf shadow-[0_14px_18px_rgb(0_0_0/0.55),inset_0_2px_0_rgb(255_255_255/0.15)]" />
+      <span className="absolute -bottom-9 start-6 h-7 w-2 bg-ink/80 [clip-path:polygon(0_0,100%_0,100%_100%)]" />
+      <span className="absolute -bottom-9 end-6 h-7 w-2 bg-ink/80 [clip-path:polygon(0_0,100%_0,0_100%)]" />
+    </div>
+  );
+}
+
 /**
- * Props pinned in the cream margins outside the shelves on wide screens: a column on each side, spaced down
- * the page. Hidden wherever the margins are too narrow to hold them.
+ * Wall ledges in the margins outside the shelves on wide screens, each holding a piece of the lobby's
+ * clutter. Hidden wherever the margins are too narrow to hold them.
  */
 export function GutterDecor() {
   return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 hidden min-[1360px]:block">
+    <div aria-hidden className="pointer-events-none absolute inset-0 hidden min-[1500px]:block">
       {[false, true].map((flip) => (
         <div
           key={String(flip)}
           className={cn(
-            "absolute bottom-40 top-56 flex w-[calc((100%-1200px)/2)] max-w-72 flex-col items-center justify-between px-4 drop-shadow-[0_6px_8px_rgb(0_0_0/0.5)]",
+            "absolute bottom-48 top-64 flex w-[calc((100%-1200px)/2)] max-w-72 flex-col items-center justify-around px-5",
             flip ? "end-0" : "start-0",
           )}
         >
           {flip ? (
             <>
-              <FilmReel className="w-[78%] max-w-40" style={{ rotate: "12deg" }} />
-              <Sparkle className="me-[30%] w-8" tone={c.teal} />
-              <MiniPoster motif={2} className="w-[62%] max-w-32" style={{ rotate: "5deg" }} />
-              <Ticket className="w-[82%] max-w-44" tone={c.teal} style={{ rotate: "-10deg" }} />
-              <TeaGlass className="w-[42%] max-w-20" />
+              <Ledge><Prop name="radio" className="w-[80%] max-w-48" /></Ledge>
+              <Ledge><Prop name="reel" className="w-[78%] max-w-44" /></Ledge>
+              <Ledge><Prop name="tea" className="w-[40%] max-w-24" /><Prop name="matchbox" className="w-[52%] max-w-28" /></Ledge>
             </>
           ) : (
             <>
-              <MiniPoster motif={4} className="w-[62%] max-w-32" style={{ rotate: "-6deg" }} />
-              <Squiggle className="w-[70%] max-w-36" />
-              <Fez className="w-[56%] max-w-28" style={{ rotate: "-8deg" }} />
-              <Sparkle className="ms-[30%] w-9" tone={c.pink} />
-              <Cassette className="w-[86%] max-w-44" style={{ rotate: "8deg" }} />
+              <Ledge><Prop name="phone" className="w-[80%] max-w-48" /></Ledge>
+              <Ledge><Prop name="fez" className="w-[64%] max-w-36" /></Ledge>
+              <Ledge><Prop name="cassette" className="w-[52%] max-w-28" style={{ rotate: "-8deg" }} /><Prop name="cards" className="w-[54%] max-w-28" /></Ledge>
             </>
           )}
         </div>

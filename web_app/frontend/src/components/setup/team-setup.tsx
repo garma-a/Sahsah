@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useMemo, useState, type FormEvent } from "react";
 import Cover from "@/components/brand/cover";
+import CinemaWall from "@/components/room/cinema-wall";
 import Logo from "@/components/brand/logo";
 import { toneAt } from "@/components/brand/tones";
 import SessionForm from "@/components/setup/session-form";
@@ -184,9 +185,9 @@ export default function TeamSetup() {
               return (
                 <li key={id} className="min-w-0">
                   <div className={`border-4 bg-[#fff8ea] shadow-poster ${tone.border}`}>
-                    <Cover src={entry?.category.coverUrl} name={entry?.category.name ?? "فئة"} sizes="(min-width: 640px) 12vw, 30vw" />
+                    <Cover src={entry?.category.coverUrl} name={entry?.category.name ?? "فئة"} tone={entry?.index ?? i} sizes="(min-width: 640px) 12vw, 30vw" />
                   </div>
-                  <p className="mt-2 truncate text-center font-heading text-lg">{entry?.category.name ?? "فئة"}</p>
+                  <p className="sr-only">{entry?.category.name ?? "فئة"}</p>
                 </li>
               );
             })}
@@ -242,8 +243,9 @@ function ProblemNotice({
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="paper min-h-dvh">
-      <div className="mx-auto max-w-[1000px] px-5 pb-10 pt-6 sm:px-8">
+    <div className="relative min-h-dvh">
+      <CinemaWall />
+      <div className="paper ticket mx-auto min-h-dvh max-w-[1000px] px-5 pb-10 pt-9 shadow-[0_0_60px_rgb(0_0_0/0.6)] sm:px-8 lg:my-8 lg:min-h-0 lg:rounded-[2rem] lg:border-4 lg:border-ink">
         <div className="mb-8 flex items-center justify-between">
           <Link href="/" aria-label="صحصح، الصفحة الرئيسية">
             <Logo variant="retro" className="w-14" />

@@ -1,4 +1,4 @@
-import { Cassette, Matchbox, TeaGlass } from "@/components/brand/cinema-art";
+import Prop from "@/components/brand/props";
 
 /**
  * The retro TV the game is played on: a charcoal cabinet with a teal-rimmed glass, and on a laptop or TV a chin
@@ -29,10 +29,13 @@ export default function RetroScreen({ children }: { children: React.ReactNode })
           <span className="h-6 w-14 bg-ink [clip-path:polygon(10%_0,90%_0,100%_100%,0_100%)]" />
         </div>
         <div className="h-3 rounded-sm border-2 border-ink bg-shelf shadow-[0_10px_20px_rgb(0_0_0/0.6)]" />
-        <TeaGlass className="absolute bottom-3 start-6 w-[4.5rem] xl:start-10 xl:w-20" />
-        <div className="absolute bottom-3 end-4 flex items-end gap-1 xl:end-8">
-          <Matchbox className="w-24 xl:w-28" />
-          <Cassette className="w-32 -rotate-6 xl:w-36" />
+        <div className="absolute -bottom-1 start-3 flex items-end gap-1 xl:start-8">
+          <Prop name="matchbox" className="w-20 -rotate-6 xl:w-24" />
+          <Prop name="tea" className="w-12 xl:w-14" />
+        </div>
+        <div className="absolute -bottom-1 end-3 flex items-end gap-1 xl:end-8">
+          <Prop name="seeds" className="w-14 rotate-12 xl:w-16" />
+          <Prop name="cards" className="w-20 rotate-6 xl:w-24" />
         </div>
       </div>
     </div>

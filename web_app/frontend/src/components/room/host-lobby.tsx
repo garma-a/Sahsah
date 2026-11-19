@@ -166,9 +166,9 @@ export default function HostLobby({ roomId, view, roomVersion, auth, categories,
                 return (
                   <li key={selection.boardPosition} className="min-w-0">
                     <div className={cn("border-[3px] bg-[#fff8ea]", toneAt(entry?.index ?? i).border)}>
-                      <Cover src={entry?.category.coverUrl} name={entry?.category.name ?? "فئة"} sizes="12vw" />
+                      <Cover src={entry?.category.coverUrl} name={entry?.category.name ?? "فئة"} tone={entry?.index ?? i} sizes="12vw" />
                     </div>
-                    <p className="mt-1 hidden truncate text-center text-sm font-bold sm:block">{entry?.category.name}</p>
+                    <p className="sr-only">{entry?.category.name}</p>
                   </li>
                 );
               })}
