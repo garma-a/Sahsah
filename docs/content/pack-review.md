@@ -103,4 +103,4 @@ Points: questions 1–2 are 200, 3–4 are 400, 5–6 are 600. Blur and zoom sta
 - **Clue and charades cards** still say `PLACEHOLDER · Pack N · QN` in the corner; they need final art before launch.
 - **Pack 7:** 5 of 6 questions are text until the client provides licensed clips. The Bakar and Nour El Ein clips in Pack 2 are 14.5 s and 11 s; keep or trim to 10 s.
 - **Pack 5 (Countdown):** Q1 and Q2 have one-step answers (5 × 10, 7 × 8), which make them very easy; the hard ones are good. Every target was checked and is reachable with the given numbers.
-- **Category covers** are new vintage-poster illustrations generated for this import (no text; the app prints the name under each card). Replace with designed covers when the client has them.
+- **Category covers** are generated classic Egyptian cinema posters (aged paper, hand-painted, no text; the app prints the name under each card). Replace with designed covers when the client has them.
