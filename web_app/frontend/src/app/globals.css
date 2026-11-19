@@ -357,10 +357,10 @@
   }
 }
 
-/* Game screens never scroll: short windows (a phone held sideways, a small laptop) get compact chrome. */
-@custom-variant short (@media (max-height: 560px));
-/* Laptop-height windows: the TV loses its chin and the score cards tighten. */
+/* Game screens never scroll. Laptop-height windows: the TV loses its chin and the score cards tighten. */
 @custom-variant compact (@media (max-height: 900px));
+/* Short windows (a phone held sideways) get the tightest chrome. Declared after `compact` so it wins where both match. */
+@custom-variant short (@media (max-height: 560px));
 /* Phones and tablets held upright are asked to turn sideways (components/ui/rotate-notice.tsx). */
 @custom-variant portrait-touch (@media (orientation: portrait) and (pointer: coarse) and (max-width: 1024px));
 

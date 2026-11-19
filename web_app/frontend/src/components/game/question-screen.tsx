@@ -130,9 +130,9 @@ export default function QuestionScreen({
             </p>
           </div>
           {answering && (
-            // On a short screen (a phone held sideways) the clock sits here instead of in the rail; the rail copy is hidden then.
-            <div aria-hidden className="hidden short:block">
-              <TimerDial timer={view.timer} clockOffsetMs={clockOffsetMs} />
+            // On a short screen (a phone held sideways) the clock sits here instead of in the rail. Only one copy is ever displayed, so assistive tech sees one timer.
+            <div className="hidden short:block">
+              <TimerDial timer={view.timer} clockOffsetMs={clockOffsetMs} note={clockWaits(question) ? "الوقت بيبدأ لما الصورة تختفي" : undefined} />
             </div>
           )}
         </header>
