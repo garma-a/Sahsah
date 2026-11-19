@@ -61,7 +61,7 @@ export default function CategoryCard({ column, entry, toneIndex, flipped, onFlip
     <article
       aria-label={column.name}
       data-flipped={flipped}
-      className="flip aspect-[3/4] w-full"
+      className="flip aspect-[3/4] max-h-full w-full"
       onKeyDown={(event) => {
         if (event.key === "Escape" && flipped) flip(false, event);
       }}
@@ -74,22 +74,23 @@ export default function CategoryCard({ column, entry, toneIndex, flipped, onFlip
           aria-label={`${column.name}، ${finished ? "خلصت" : `${formatDigits(left)} من ${formatDigits(tiles.length)} باقي`}. اقلب الكارت`}
           onClick={(event) => flip(true, event)}
           className={cn(
-            "flip-face flip-front cursor-pointer overflow-hidden border-4 bg-[#fff8ea] text-start shadow-poster",
+            "@container flip-face flip-front cursor-pointer overflow-hidden border-4 bg-[#fff8ea] text-start shadow-poster",
             tone.border,
           )}
         >
           <Cover
             src={entry?.category.coverUrl}
             name={column.name}
+            tone={toneIndex}
             className={cn("absolute inset-0 aspect-auto h-full", finished && "opacity-45 grayscale-[0.6]")}
             sizes="(min-width: 1024px) 16vw, 45vw"
           />
           {!finished && (
-            <span className="tabular absolute start-1.5 top-1.5 rounded-full border-2 border-ink bg-cream px-2 py-0.5 text-sm font-extrabold text-ink">
+            <span className="tabular absolute start-1.5 top-1.5 rounded-full @max-[160px]:top-auto @max-[160px]:bottom-1.5 border-2 border-ink bg-cream px-2 py-0.5 text-sm font-extrabold text-ink">
               {count}
             </span>
           )}
-          <h3 className={cn("absolute inset-x-0 bottom-0 truncate px-2 py-1.5 text-center font-heading text-xl leading-tight sm:text-2xl", tone.ribbon)}>
+          <h3 className="sr-only">
             {column.name}
           </h3>
           {finished && (
@@ -111,7 +112,7 @@ export default function CategoryCard({ column, entry, toneIndex, flipped, onFlip
             type="button"
             aria-label={`${column.name}. ارجع للغلاف`}
             onClick={(event) => flip(false, event)}
-            className={cn("flex h-9 shrink-0 cursor-pointer items-center justify-between gap-1 rounded-lg px-2 font-heading text-lg leading-none", tone.ribbon)}
+            className={cn("flex h-9 shrink-0 cursor-pointer items-center short:h-7 short:text-base justify-between gap-1 rounded-lg px-2 font-heading text-lg leading-none", tone.ribbon)}
           >
             <span className="truncate">{column.name}</span>
             <Undo2 aria-hidden className="size-4 shrink-0" strokeWidth={2.5} />
@@ -155,7 +156,7 @@ function TileButton({
   onOpen: () => void;
 }) {
   const points = formatNumber(tile.basePoints);
-  const base = "relative flex size-full min-h-11 items-center justify-center rounded-xl border-[3px] font-heading text-[1.7rem] leading-none";
+  const base = "relative flex size-full min-h-11 items-center justify-center rounded-xl border-[3px] font-heading text-[1.7rem] leading-none short:min-h-8 short:rounded-lg short:text-xl";
 
   if (tile.state === "resolved") {
     const winner = tile.winningTeamNumber ?? null;

@@ -6,6 +6,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Logo from "@/components/brand/logo";
 import Hero from "@/components/home/hero";
 import SelectionBar from "@/components/home/selection-bar";
+import { DisplayLedge, GutterDecor } from "@/components/home/shelf-decor";
+import CinemaWall from "@/components/room/cinema-wall";
 import Shelves from "@/components/home/shelves";
 import SessionDialog from "@/components/setup/session-dialog";
 import Button from "@/components/ui/button";
@@ -106,28 +108,37 @@ export default function HomeView() {
         tabIndex={-1}
         className={cn("arch paper relative z-10 scroll-mt-4 outline-none lg:-mt-32", selected.length > 0 ? "pb-56 sm:pb-40" : "pb-24")}
       >
+        <CinemaWall variant="home" shift={7} />
+        <GutterDecor />
         <div className="absolute inset-x-0 top-0 z-20 hidden justify-center lg:flex">
           <Button onClick={play} size="xl" className="h-[4.75rem] min-w-[19rem] -translate-y-[58%] text-5xl ring-[5px] active:translate-y-[calc(-58%+3px)]">
             العب!
           </Button>
         </div>
 
-        <div className="mx-auto max-w-[1200px] px-5 pt-10 sm:px-8 lg:px-12 lg:pt-28">
-          {openRoom && (
-            <div className="mb-10 flex flex-wrap items-center justify-between gap-4 rounded-2xl border-[3px] border-ink bg-sun px-5 py-4 shadow-[0_5px_0_var(--color-ink)]">
-              <p className="font-heading text-2xl">عندك غرفة مفتوحة</p>
-              <Button asChild variant="dark" size="sm">
-                <Link href={`/room/${openRoom.roomId}`}>كمّل الغرفة</Link>
-              </Button>
-            </div>
-          )}
-          <div className="mb-8 flex items-center gap-3 lg:hidden">
-            <span className="inline-block -rotate-1 rounded-lg bg-night px-6 py-1 font-heading text-4xl text-cream shadow-[3px_3px_0_var(--color-cyan)]">
-              الفئات
-            </span>
-            <span aria-hidden className="h-[3px] flex-1 bg-press" />
+        <div className="relative mx-auto max-w-[1200px] px-3 pt-10 sm:px-8 lg:px-12 lg:pt-28">
+          {/* The shelves are the lobby's display case: crimson velvet behind brass trim in a walnut frame, screwed to the poster wall. */}
+          <div className="relative rounded-xl bg-[#3b2414] bg-[url(/cinema/walnut.webp)] bg-[length:900px_auto] p-2.5 shadow-[0_0_0_2px_#140b06,0_30px_60px_rgb(0_0_0/0.7),inset_0_1px_0_rgb(255_235_200/0.25)] sm:p-4">
+          <div className="relative rounded-[5px] bg-[#4d0f16] bg-[url(/cinema/velvet.webp)] bg-[length:1100px_auto] px-4 pt-8 pb-0 shadow-[inset_0_0_0_2px_rgb(201_150_60/0.7),inset_0_14px_40px_rgb(0_0_0/0.75),inset_0_0_140px_rgb(0_0_0/0.55)] sm:px-6 md:px-10 md:pt-12">
+            {["start-2 top-2", "end-2 top-2", "start-2 bottom-2", "end-2 bottom-2"].map((spot) => (
+              <span
+                key={spot}
+                aria-hidden
+                className={`absolute ${spot} z-10 size-3 rounded-full border border-ink/60 bg-[radial-gradient(circle_at_35%_35%,#f3d68a,#a8782a_60%,#5a3d12)] after:absolute after:inset-x-0.5 after:top-1/2 after:h-px after:-rotate-45 after:bg-ink/60`}
+              />
+            ))}
+            {openRoom && (
+              <div className="mb-10 flex flex-wrap items-center justify-between gap-4 rounded-2xl border-[3px] border-ink bg-sun px-5 py-4 shadow-[0_5px_0_var(--color-ink)]">
+                <p className="font-heading text-2xl">عندك غرفة مفتوحة</p>
+                <Button asChild variant="dark" size="sm">
+                  <Link href={`/room/${openRoom.roomId}`}>كمّل الغرفة</Link>
+                </Button>
+              </div>
+            )}
+            <Shelves state={state} selected={selected} onToggle={toggle} onRetry={retry} />
+            <DisplayLedge />
           </div>
-          <Shelves state={state} selected={selected} onToggle={toggle} onRetry={retry} />
+          </div>
         </div>
       </main>
 

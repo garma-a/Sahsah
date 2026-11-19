@@ -15,7 +15,7 @@ type BoardProps = {
 };
 
 /**
- * Six category cards: one row on a laptop or TV, two per row on a phone. At most one card is held flipped
+ * Six category cards in one row (three by two in a narrow window), each 3:4 unless the window is too short. At most one card is held flipped
  * at a time; hovering flips a card as well. The board is drawn only from the server's projection.
  */
 export default function Board({ view, categories, canOpen, pending, onOpen }: BoardProps) {
@@ -24,11 +24,11 @@ export default function Board({ view, categories, canOpen, pending, onOpen }: Bo
   return (
     <section
       aria-label="لوحة الأسئلة"
-      className="paper-card rounded-[1.6rem] border-4 border-ink p-3 shadow-[0_10px_0_var(--color-ink)] sm:p-4 lg:p-5"
+      className="paper-card flex min-h-0 flex-1 flex-col rounded-[1.6rem] border-4 border-ink p-3 shadow-[0_10px_0_var(--color-ink)] sm:p-4 lg:p-5 short:rounded-2xl short:p-2 short:shadow-[0_6px_0_var(--color-ink)]"
     >
-      <ol className="grid grid-cols-2 gap-x-3 gap-y-4 sm:grid-cols-3 lg:grid-cols-6 lg:gap-x-4">
+      <ol className="grid min-h-0 flex-1 grid-cols-3 grid-rows-2 gap-3 sm:grid-cols-6 sm:grid-rows-1 lg:gap-x-4 short:gap-2">
         {columns.map((column, i) => (
-          <li key={column.boardPosition}>
+          <li key={column.boardPosition} className="flex min-h-0 items-center">
             <CategoryCard
               column={column}
               entry={categories.get(column.categoryId)}

@@ -3,13 +3,13 @@
 import Link from "next/link";
 import Logo from "@/components/brand/logo";
 import CinemaWall from "@/components/room/cinema-wall";
-import PosterWall from "@/components/room/poster-wall";
 import RetroScreen from "@/components/room/retro-screen";
+import FitBox from "@/components/ui/fit-box";
+import RotateNotice from "@/components/ui/rotate-notice";
 import type { ChannelStatus } from "@/lib/realtime/use-room-channel";
 import { cn } from "@/lib/utils";
 
 type RoomShellProps = {
-  covers: string[];
   status?: ChannelStatus;
   /** Right-hand slot of the header (start side in RTL). */
   actions?: React.ReactNode;
@@ -21,30 +21,37 @@ type RoomShellProps = {
 };
 
 /**
- * The room frame: a poster wall behind a red header bar with the logo, the connection light and actions. The game
+ * The room frame: the cinema poster wall behind a red header bar with the logo, the connection light and actions. The game
  * itself (board, question, result) is staged on a retro TV in front of a wall of old cinema posters.
  */
-export default function RoomShell({ covers, status, actions, children, stage, heading }: RoomShellProps) {
+export default function RoomShell({ status, actions, children, stage, heading }: RoomShellProps) {
   return (
-    <div className="relative min-h-dvh">
-      {stage ? <CinemaWall /> : <PosterWall covers={covers} />}
-      <div className={cn("mx-auto flex min-h-dvh flex-col px-3 pb-6 pt-3 sm:px-5", stage ? "max-w-[1760px]" : "max-w-[1200px]")}>
-        <header className="relative z-10 mb-4 flex items-center justify-between gap-3 rounded-2xl border-4 border-ink bg-press px-3 py-2 text-white shadow-[0_6px_0_var(--color-ink)] sm:px-5">
+    <div className="relative h-dvh overflow-hidden">
+      <RotateNotice />
+      <CinemaWall />
+      <div className={cn("mx-auto flex h-dvh flex-col px-3 pb-4 pt-3 sm:px-5 short:px-2 short:pb-1.5 short:pt-1.5", stage ? "max-w-[1320px]" : "max-w-[1200px]")}>
+        <header className="relative z-10 mb-4 flex shrink-0 items-center justify-between gap-3 rounded-2xl border-4 border-ink bg-press px-3 py-2 short:mb-1.5 short:rounded-xl short:border-[3px] short:py-0.5 short:shadow-[0_3px_0_var(--color-ink)] short:[&_a]:h-7 short:[&_button]:h-7 short:[&_button]:text-sm text-white shadow-[0_6px_0_var(--color-ink)] sm:px-5">
           <div className="flex min-w-0 flex-1 items-center gap-3">{actions}</div>
           <Link href="/" aria-label="صحصح، الصفحة الرئيسية" className="shrink-0 rounded-lg">
-            <Logo variant="retro" className="-my-3 w-14 -rotate-3 sm:w-16" />
+            <Logo variant="retro" className="-my-3 w-14 -rotate-3 sm:w-16 short:my-0 short:w-9" />
           </Link>
           <div className="flex min-w-0 flex-1 justify-end">
             <ConnectionLight status={status} />
           </div>
         </header>
-        <main className="relative z-10 flex flex-1 flex-col">
+        <main className="relative z-10 flex min-h-0 flex-1 flex-col">
           {heading && (
             <h1 id="page-heading" tabIndex={-1} className="sr-only focus:outline-none">
               {heading}
             </h1>
           )}
-          {stage ? <RetroScreen>{children}</RetroScreen> : children}
+          {stage ? (
+            <RetroScreen>
+              <FitBox>{children}</FitBox>
+            </RetroScreen>
+          ) : (
+            <FitBox>{children}</FitBox>
+          )}
         </main>
       </div>
     </div>

@@ -5,6 +5,7 @@ import Logo from "@/components/brand/logo";
 import { toneAt } from "@/components/brand/tones";
 import Cover from "@/components/brand/cover";
 import Ticker from "@/components/home/ticker";
+import CinemaWall from "@/components/room/cinema-wall";
 import Button from "@/components/ui/button";
 import { formatDigits, formatNumber } from "@/lib/format";
 import type { Category } from "@/lib/api/types";
@@ -39,7 +40,7 @@ function Fan({ categories }: { categories: Category[] }) {
             style={{ left: slot.left, top: slot.top, zIndex: i, ["--r" as string]: `${slot.turn}deg`, ...delay(250 + i * 90) }}
           >
             {category ? (
-              <Cover src={category.coverUrl} name={category.name} eager sizes="(min-width: 1024px) 12vw, 28vw" />
+              <Cover src={category.coverUrl} name={category.name} tone={i} eager sizes="(min-width: 1024px) 12vw, 28vw" />
             ) : (
               <span className="block aspect-[4/5] bg-charcoal/70" />
             )}
@@ -57,18 +58,26 @@ type HeroProps = { categories: Category[]; onPlay: () => void };
 
 export default function Hero({ categories, onPlay }: HeroProps) {
   return (
-    <header className="relative isolate overflow-hidden bg-cream lg:bg-[radial-gradient(ellipse_70%_80%_at_50%_30%,#454f4c_0%,#2b3230_58%,#1d2321_100%)]">
+    <header className="relative isolate overflow-hidden bg-cream lg:bg-night">
       <Ticker />
       <div aria-hidden className="paper pointer-events-none absolute inset-0 -z-10 opacity-90 lg:hidden" />
-      <div aria-hidden className="grain-dark pointer-events-none absolute inset-0 -z-10 hidden opacity-30 lg:block" />
+      {/* Desktop: the lobby at night. The poster wall in the dark, one warm spotlight on the logo. */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 hidden lg:block">
+        <CinemaWall variant="home" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_42%_62%_at_50%_42%,rgb(255_214_140/0.18)_0%,rgb(20_12_8/0.72)_55%,rgb(10_7_5/0.94)_100%)]" />
+        <div className="absolute inset-x-[30%] -top-10 bottom-0 bg-[linear-gradient(180deg,rgb(255_226_170/0.22),transparent_75%)] [clip-path:polygon(40%_0,60%_0,100%_100%,0_100%)]" />
+      </div>
 
       <div className="mx-auto flex max-w-[1400px] items-center justify-between gap-4 px-5 pt-4 sm:px-8 lg:px-12 lg:pt-8">
         <Logo variant="retro" eager className="w-14 lg:hidden" />
-        <div aria-hidden className="hidden items-center gap-3 lg:flex">
-          <span className="h-11 w-32 rounded-full bg-sun" />
-          <span className="h-11 w-24 rounded-full bg-green" />
-          <span className="h-11 w-48 rounded-full bg-cyan" />
-        </div>
+        {/* The lobby's marquee board, ringed with bulbs. */}
+        <p
+          aria-hidden
+          className="relative hidden rounded-xl border-[3px] border-[#f6d64a] bg-[#8b1e2d] px-8 py-2 font-poster text-3xl text-[#f6e7c4] shadow-[0_0_24px_rgb(246_214_74/0.35),inset_0_0_14px_rgb(0_0_0/0.5)] [text-shadow:2px_2px_0_#1d2321] lg:block"
+        >
+          <span className="absolute inset-1 rounded-lg [background:radial-gradient(circle,#fff6c9_0_2px,transparent_3px)_0_0/14px_100%_repeat-x,radial-gradient(circle,#fff6c9_0_2px,transparent_3px)_0_100%/14px_6px_repeat-x] opacity-90" />
+          سينما صحصح
+        </p>
         <Link
           href="/join"
           className="rounded-full border-[3px] border-ink bg-cyan px-4 py-1.5 font-heading text-lg text-ink shadow-[0_3px_0_var(--color-ink)] transition-transform hover:-translate-y-0.5 lg:border-cream/0 lg:bg-transparent lg:text-cyan lg:shadow-none lg:underline lg:decoration-2 lg:underline-offset-8"

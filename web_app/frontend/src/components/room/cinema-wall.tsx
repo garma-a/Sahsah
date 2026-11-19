@@ -1,187 +1,133 @@
-// The brand colours as CSS variables (see globals.css), so the art follows the tokens.
-const c = {
-  cream: "var(--color-poster-cream)",
-  teal: "var(--color-poster-teal)",
-  red: "var(--color-poster-red)",
-  orange: "var(--color-poster-orange)",
-  mustard: "var(--color-poster-mustard)",
-  crimson: "var(--color-poster-crimson)",
-  olive: "var(--color-poster-olive)",
-  pink: "var(--color-poster-pink)",
-  ink: "var(--color-cabinet)",
-};
-const f = (fill: string, opacity?: number): React.CSSProperties => ({ fill, opacity });
+import { cn } from "@/lib/utils";
 
-/** The title block every poster carries, drawn as bars: the wall has no lettering, only the memory of it. */
-function TitleBars({ color, y = 112 }: { color: string; y?: number }) {
+// Fictional films of the wall. The painted artwork leaves a flat band at `title` for the name, which is
+// typeset here (never painted). Studios, writers and directors are invented too.
+type Film = { art: string; title: string; at: "top" | "bottom"; ink: string; shade: string; credit: string };
+const films: Film[] = [
+  { art: "romance", title: "قلبي على الكورنيش", at: "bottom", ink: "#f6d64a", shade: "#1d2321", credit: "قصة وحوار: سامي الشربيني" },
+  { art: "detective", title: "سر الشنطة الحمرا", at: "top", ink: "#f6e7c4", shade: "#d7402a", credit: "إخراج: حلمي عبد الستار" },
+  { art: "comedy", title: "مصيبة يا شوقي", at: "bottom", ink: "#d7402a", shade: "#f6e7c4", credit: "تأليف: عزت أبو المجد" },
+  { art: "desert", title: "فارس الصحرا", at: "top", ink: "#8b1e2d", shade: "#f6e7c4", credit: "إخراج: مراد الدمرداش" },
+  { art: "boxer", title: "الضربة القاضية", at: "bottom", ink: "#f6e7c4", shade: "#d7402a", credit: "قصة وحوار: فؤاد السكري" },
+  { art: "phone", title: "ألو.. مين معايا؟", at: "top", ink: "#f6d64a", shade: "#1d2321", credit: "إخراج: نبيل الشامي" },
+  { art: "vespa", title: "فسحة على الفيسبا", at: "bottom", ink: "#f6d64a", shade: "#1d2321", credit: "تأليف: شريف المنياوي" },
+  { art: "sailor", title: "صياد إسكندرية", at: "top", ink: "#f6e7c4", shade: "#1f8f9a", credit: "إخراج: كمال البحيري" },
+  { art: "oud", title: "ليالي العود", at: "bottom", ink: "#f6d64a", shade: "#8b1e2d", credit: "ألحان: رياض الفيومي" },
+  { art: "dancer", title: "رقصة الوداع", at: "top", ink: "#f6e7c4", shade: "#d13a6e", credit: "قصة وحوار: هدى الجمّال" },
+  { art: "school", title: "الأستاذ والعفاريت", at: "bottom", ink: "#d7402a", shade: "#f6e7c4", credit: "إخراج: صلاح الطوخي" },
+  { art: "cairo", title: "ليلة في وسط البلد", at: "top", ink: "#f6d64a", shade: "#1d2321", credit: "تأليف: منير الحلواني" },
+  { art: "train", title: "آخر قطر للصعيد", at: "bottom", ink: "#f6e7c4", shade: "#d7402a", credit: "إخراج: عادل القليوبي" },
+  { art: "ghost", title: "البيت المسكون", at: "top", ink: "#f6d64a", shade: "#2453a0", credit: "قصة وحوار: رشدي الفخراني" },
+];
+
+const turns = [-2.5, 1.5, -1, 3, -3.5, 1, 2.5, -2, 3.5, -3, 0.5, -1.5];
+const lifts = [0, 18, -14, 8, -20, 12, -6, 22, -16, 6, 10, -8];
+// A few sheets have been half torn away, showing the older paper underneath.
+const torn = [
+  "polygon(0 0, 100% 0, 100% 62%, 86% 67%, 72% 60%, 55% 71%, 36% 63%, 17% 73%, 0 66%)",
+  "polygon(0 0, 100% 0, 100% 100%, 64% 100%, 57% 86%, 48% 94%, 39% 76%, 30% 88%, 18% 72%, 0 80%)",
+  "polygon(24% 0, 100% 0, 100% 100%, 0 100%, 0 40%, 13% 31%, 7% 19%, 19% 10%)",
+];
+const corner = [
+  "polygon(0 0, 100% 0, 100% 100%, 0 100%)",
+  "polygon(0 0, 92% 0, 100% 6%, 100% 100%, 0 100%)",
+  "polygon(0 0, 100% 0, 100% 100%, 9% 100%, 0 93%)",
+  "polygon(5% 0, 100% 0, 100% 100%, 0 100%, 0 4%)",
+];
+
+/** One pasted sheet: the painted artwork, the title typeset in its empty band, a credit line, and its age. */
+function WallPoster({ film, index }: { film: Film; index: number }) {
+  const rip = index % 6 === 4 ? torn[index % torn.length] : corner[index % corner.length];
   return (
-    <g style={f(color)}>
-      <rect x="18" y={y} width="64" height="8" rx="2" />
-      <rect x="30" y={y + 12} width="40" height="4" rx="2" />
-    </g>
+    <div className="@container relative aspect-[2/3] overflow-hidden bg-[#3a2418]" style={{ clipPath: rip }}>
+      {/* eslint-disable-next-line @next/next/no-img-element -- decorative wall artwork */}
+      <img src={`/cinema/films/${film.art}.webp`} alt="" draggable={false} loading="lazy" decoding="async" className="absolute inset-0 size-full object-cover" />
+      <div className={cn("absolute inset-x-[5%] text-center", film.at === "top" ? "top-[3%]" : "bottom-[4%]")}>
+        <p className="font-bold leading-none opacity-85" style={{ fontSize: "3.8cqw", color: film.ink }}>
+          {film.credit}
+        </p>
+        <p
+          className="mt-[2cqw] -rotate-2 font-poster leading-[1] [text-wrap:balance]"
+          style={{ fontSize: "12cqw", color: film.ink, textShadow: `0.5cqw 0 0 #1d2321, -0.5cqw 0 0 #1d2321, 0 0.5cqw 0 #1d2321, 0 -0.5cqw 0 #1d2321, 1.6cqw 1.8cqw 0 ${film.shade}` }}
+        >
+          {film.title}
+        </p>
+      </div>
+      {/* Age: sun-faded unevenly, creased, grained, the edges browned. */}
+      <div
+        className="absolute inset-0 mix-blend-multiply"
+        style={{
+          backgroundImage: `linear-gradient(90deg, transparent ${44 + (index % 4) * 4}%, rgb(0 0 0 / 0.2) ${44.4 + (index % 4) * 4}%, rgb(255 255 255 / 0.16) ${45 + (index % 4) * 4}%, transparent ${45.5 + (index % 4) * 4}%), linear-gradient(0deg, transparent ${38 + (index % 3) * 6}%, rgb(0 0 0 / 0.16) ${38.4 + (index % 3) * 6}%, transparent ${39.2 + (index % 3) * 6}%), var(--grain)`,
+          backgroundSize: "100% 100%, 100% 100%, 160px 160px",
+          boxShadow: "inset 0 0 12cqw rgb(110 70 25 / 0.5)",
+        }}
+      />
+      <div className="absolute inset-0 bg-[#c9a46a] mix-blend-color" style={{ opacity: 0.12 + (index % 4) * 0.05 }} />
+    </div>
   );
 }
 
-// Rotations that fan a thin wedge pointing left across the sky above the horizon.
-const rays = Array.from({ length: 12 }, (_, i) => i * 15 + 4);
-
-// Eight text-free one-sheets in the manner of 1950s-60s Egyptian cinema posters: flat shapes, bold grounds.
-const motifs: Array<() => React.ReactNode> = [
-  // Sunrise over the Nile.
-  () => (
-    <>
-      <rect width="100" height="140" style={f(c.red)} />
-      <g style={f(c.mustard, 0.55)}>
-        {rays.map((angle) => (
-          <path key={angle} d="M50 92 L-60 92 L-60 88 Z" transform={`rotate(${angle} 50 92)`} />
-        ))}
-      </g>
-      <circle cx="50" cy="92" r="20" style={f(c.mustard)} />
-      <rect y="92" width="100" height="48" style={f(c.crimson)} />
-      <TitleBars color={c.cream} />
-    </>
-  ),
-  // Crescent and stars over the dunes.
-  () => (
-    <>
-      <rect width="100" height="140" style={f(c.teal)} />
-      <circle cx="58" cy="40" r="20" style={f(c.cream)} />
-      <circle cx="66" cy="34" r="18" style={f(c.teal)} />
-      <g style={f(c.cream)}>
-        <path d="M24 26 l2 5 5 0 -4 3 2 5 -5 -3 -5 3 2 -5 -4 -3 5 0 z" />
-        <path d="M80 70 l1.5 3.5 3.5 0 -3 2 1.5 3.5 -3.5 -2 -3.5 2 1.5 -3.5 -3 -2 3.5 0 z" />
-      </g>
-      <path d="M0 96 Q30 74 58 92 T100 86 V140 H0 Z" style={f(c.orange)} />
-      <path d="M0 108 Q40 92 100 104 V140 H0 Z" style={f(c.crimson)} />
-      <TitleBars color={c.cream} y={116} />
-    </>
-  ),
-  // Pyramids at sunset.
-  () => (
-    <>
-      <rect width="100" height="140" style={f(c.orange)} />
-      <circle cx="66" cy="44" r="18" style={f(c.crimson)} />
-      <path d="M8 98 L38 50 L68 98 Z" style={f(c.ink)} />
-      <path d="M48 98 L70 64 L92 98 Z" style={f(c.ink, 0.8)} />
-      <rect y="98" width="100" height="42" style={f(c.cream)} />
-      <TitleBars color={c.crimson} y={110} />
-    </>
-  ),
-  // A split diagonal with a spotlight and a star.
-  () => (
-    <>
-      <rect width="100" height="140" style={f(c.mustard)} />
-      <path d="M0 0 H100 V58 L0 96 Z" style={f(c.crimson)} />
-      <circle cx="52" cy="60" r="24" style={f(c.cream)} />
-      <circle cx="52" cy="60" r="11" style={f(c.ink)} />
-      <path d="M22 18 l3 7 7 0 -6 4 3 7 -7 -4 -7 4 3 -7 -6 -4 7 0 z" style={f(c.mustard)} />
-      <TitleBars color={c.ink} />
-    </>
-  ),
-  // Ripples from a dropped stone.
-  () => (
-    <>
-      <rect width="100" height="140" style={f(c.cream)} />
-      {[34, 27, 20, 13, 6].map((r, i) => (
-        <circle key={r} cx="50" cy="56" r={r} style={f([c.teal, c.red, c.mustard, c.teal, c.red][i])} />
-      ))}
-      <TitleBars color={c.olive} y={106} />
-    </>
-  ),
-  // A reel and a strip of film.
-  () => (
-    <>
-      <rect width="100" height="140" style={f(c.olive)} />
-      <g transform="rotate(-18 50 70)">
-        <rect x="-10" y="74" width="130" height="18" style={f(c.ink)} />
-        <g style={f(c.cream)}>
-          {Array.from({ length: 13 }, (_, i) => (
-            <rect key={i} x={-8 + i * 10} y="76" width="5" height="3" />
-          ))}
-        </g>
-      </g>
-      <circle cx="56" cy="44" r="26" style={f(c.cream)} />
-      <g style={f(c.ink)}>
-        <circle cx="56" cy="44" r="4" />
-        {[0, 72, 144, 216, 288].map((a) => (
-          <circle key={a} cx="56" cy="30" r="6" transform={`rotate(${a} 56 44)`} />
-        ))}
-      </g>
-      <TitleBars color={c.mustard} y={114} />
-    </>
-  ),
-  // A romance: a heart on a striped ground.
-  () => (
-    <>
-      <rect width="100" height="140" style={f(c.mustard)} />
-      <g style={f(c.red, 0.85)}>
-        {Array.from({ length: 9 }, (_, i) => (
-          <path key={i} d={`M${-40 + i * 20} 140 L${i * 20 + 10} 0 L${i * 20 + 20} 0 L${-30 + i * 20} 140 Z`} />
-        ))}
-      </g>
-      <path d="M50 88 C20 66 22 36 40 36 C47 36 50 42 50 46 C50 42 53 36 60 36 C78 36 80 66 50 88 Z" style={f(c.pink)} />
-      <rect y="100" width="100" height="40" style={f(c.crimson)} />
-      <TitleBars color={c.cream} />
-    </>
-  ),
-  // A felucca on the river.
-  () => (
-    <>
-      <rect width="100" height="140" style={f(c.teal)} />
-      <circle cx="28" cy="30" r="12" style={f(c.mustard)} />
-      <path d="M52 20 L52 86 L22 86 Z" style={f(c.cream)} />
-      <path d="M55 30 L80 84 L55 84 Z" style={f(c.cream, 0.8)} />
-      <path d="M16 88 H86 L78 98 H26 Z" style={f(c.crimson)} />
-      <g style={f(c.cream, 0.6)}>
-        <rect x="10" y="104" width="30" height="2" rx="1" />
-        <rect x="52" y="104" width="38" height="2" rx="1" />
-      </g>
-      <TitleBars color={c.mustard} y={114} />
-    </>
-  ),
-];
-
-// Torn edges: a few hand-cut outlines, reused around the wall.
-const tears = [
-  "polygon(0 1%, 22% 0, 48% 2%, 76% 0, 100% 1%, 99% 34%, 100% 70%, 98% 100%, 60% 99%, 30% 100%, 1% 98%, 0 60%)",
-  "polygon(1% 0, 100% 0, 100% 62%, 96% 78%, 100% 100%, 0 100%, 2% 70%, 0 30%)",
-  "polygon(0 0, 70% 1%, 84% 6%, 100% 0, 99% 100%, 40% 98%, 0 100%, 1% 50%)",
-  "polygon(2% 2%, 98% 0, 100% 96%, 74% 100%, 70% 94%, 62% 100%, 0 99%)",
-];
-const turns = [-3, 2, -1.5, 3.5, -4, 1.5, 3, -2.5, 4, -3.5, 1, -1];
-const lifts = [0, 12, -8, 6, -12, 10, -4, 14, -10, 4, 8, -6];
+type CinemaWallProps = {
+  /**
+   * "stage" (default) fills the window behind the game, dimmed so the screen glows in front of it.
+   * "home" fills its positioned parent (the home shelves), lit warmer so it sits next to the paper.
+   */
+  variant?: "stage" | "home";
+  /** Starts the wall further along, so two walls on one page (hero and shelves) never repeat each other. */
+  shift?: number;
+  className?: string;
+};
 
 /**
- * The stage behind the game: a wall of worn, text-free cinema posters drawn in SVG, faded and darkened so the
- * screen in front of it stays the brightest thing in the room.
+ * The lobby wall of an old downtown cinema: a photographed wall of layered, torn painted film posters, and
+ * over it one-sheets of fictional films with their titles typeset, pasted crooked, taped, faded and sometimes
+ * torn. Phones get the painted wall only. Purely decorative.
  */
-export default function CinemaWall() {
+export default function CinemaWall({ variant = "stage", shift = 0, className }: CinemaWallProps) {
+  const home = variant === "home";
   return (
-    <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-[#2a211b]">
-      <ul className="absolute -inset-12 grid grid-cols-3 content-start gap-x-2 gap-y-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 2xl:grid-cols-8">
-        {Array.from({ length: 48 }, (_, i) => {
-          const Motif = motifs[(i * 5) % motifs.length];
-          return (
-            <li
-              key={i}
-              className="relative aspect-[5/7] shadow-[0_8px_18px_rgb(0_0_0/0.55)]"
-              style={{ transform: `translateY(${lifts[i % lifts.length]}px) rotate(${turns[i % turns.length]}deg)` }}
-            >
-              <div className="absolute inset-0 overflow-hidden bg-poster-cream p-[5%]" style={{ clipPath: tears[i % tears.length] }}>
-                <svg viewBox="0 0 100 140" preserveAspectRatio="xMidYMid slice" className="size-full">
-                  <Motif />
-                </svg>
-                <div className="poster-wear absolute inset-0 mix-blend-multiply" />
-              </div>
-              {i % 3 === 0 && <span className="absolute -top-1.5 left-1/2 h-4 w-12 -translate-x-1/2 rotate-[-4deg] bg-poster-cream/60" />}
-            </li>
-          );
-        })}
+    <div
+      aria-hidden
+      className={cn(
+        "pointer-events-none isolate overflow-hidden bg-[#3a2418] bg-[url(/cinema/wall-posters-sm.webp)] bg-[length:750px_auto] md:bg-[url(/cinema/wall-posters.webp)] md:bg-[length:1500px_auto]",
+        home ? "absolute inset-0 rounded-[inherit]" : "fixed inset-0 -z-10",
+        className,
+      )}
+      style={shift ? { backgroundPosition: `${-shift * 97}px ${-shift * 131}px` } : undefined}
+    >
+      <ul className="absolute -inset-x-10 -top-10 z-0 hidden grid-cols-5 gap-x-1 gap-y-2 md:grid lg:grid-cols-7 2xl:grid-cols-9">
+        {Array.from({ length: home ? 45 : 36 }, (_, i) =>
+          // Every other slot is left to the painted wall underneath.
+          (i * 3) % 5 > 2 ? (
+            <li key={i} />
+          ) : (
+          <li
+            key={i}
+            className="relative drop-shadow-[0_8px_12px_rgb(0_0_0/0.55)]"
+            style={{
+              transform: `translateY(${lifts[i % lifts.length]}px) rotate(${turns[i % turns.length]}deg) scale(1.14)`,
+              zIndex: (i * 7) % 5,
+            }}
+          >
+            <WallPoster film={films[(i * 5 + shift) % films.length]} index={i + shift} />
+            {i % 3 === 0 && <span className="absolute -top-2 left-1/2 h-5 w-14 -translate-x-1/2 -rotate-3 bg-[#efe2c2]/60" />}
+            {i % 4 === 1 && <span className="absolute end-2 top-2 size-2 rounded-full bg-[#7a6a58] shadow" />}
+          </li>
+          ),
+        )}
       </ul>
-      {/* Age: everything is sun-faded toward sepia, then dimmed at the edges of the room. */}
-      <div className="absolute inset-0 bg-[#3b2a1a] mix-blend-color opacity-35" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_45%,rgb(20_14_10/0.45)_0%,rgb(14_10_8/0.85)_100%)]" />
-      <div className="grain-dark absolute inset-0 opacity-50" />
+      {home ? (
+        <>
+          {/* Warm lobby light pooling in the middle, the corners in shadow. */}
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_40%,transparent_45%,rgb(26_14_8/0.45)_100%)]" />
+          <div className="grain-dark absolute inset-0 opacity-35" />
+        </>
+      ) : (
+        <>
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_45%,rgb(20_14_10/0.2)_0%,rgb(14_10_8/0.75)_100%)]" />
+          <div className="grain-dark absolute inset-0 opacity-45" />
+        </>
+      )}
     </div>
   );
 }
