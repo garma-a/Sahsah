@@ -157,7 +157,7 @@ export default function HostLobby({ roomId, view, roomVersion, auth, categories,
 
         {/* The six categories chosen for this game. */}
         <section aria-label="فئات اللعبة" className="paper-card rounded-[1.6rem] border-4 border-ink p-4 shadow-[0_10px_0_var(--color-ink)]">
-          <ol className="grid grid-cols-6 gap-2 sm:gap-3">
+          <ol className="grid grid-cols-3 gap-2 sm:gap-3 xl:grid-cols-6">
             {view.selections
               .slice()
               .sort((a, b) => a.boardPosition - b.boardPosition)
@@ -168,7 +168,7 @@ export default function HostLobby({ roomId, view, roomVersion, auth, categories,
                     <div className={cn("border-[3px] bg-[#fff8ea]", toneAt(entry?.index ?? i).border)}>
                       <Cover src={entry?.category.coverUrl} name={entry?.category.name ?? "فئة"} tone={entry?.index ?? i} sizes="12vw" />
                     </div>
-                    <p className="sr-only">{entry?.category.name}</p>
+                    <p aria-hidden className="mt-1 truncate text-center text-sm font-bold">{entry?.category.name}</p>
                   </li>
                 );
               })}

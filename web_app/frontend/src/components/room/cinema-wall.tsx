@@ -73,6 +73,8 @@ type CinemaWallProps = {
    * "home" fills its positioned parent (the home shelves), lit warmer so it sits next to the paper.
    */
   variant?: "stage" | "home";
+  /** Starts the wall further along, so two walls on one page (hero and shelves) never repeat each other. */
+  shift?: number;
   className?: string;
 };
 
@@ -81,18 +83,19 @@ type CinemaWallProps = {
  * over it one-sheets of fictional films with their titles typeset, pasted crooked, taped, faded and sometimes
  * torn. Phones get the painted wall only. Purely decorative.
  */
-export default function CinemaWall({ variant = "stage", className }: CinemaWallProps) {
+export default function CinemaWall({ variant = "stage", shift = 0, className }: CinemaWallProps) {
   const home = variant === "home";
   return (
     <div
       aria-hidden
       className={cn(
-        "pointer-events-none isolate overflow-hidden bg-[#3a2418] bg-[url(/cinema/wall-posters.webp)] bg-[length:1500px_auto]",
+        "pointer-events-none isolate overflow-hidden bg-[#3a2418] bg-[url(/cinema/wall-posters-sm.webp)] bg-[length:750px_auto] md:bg-[url(/cinema/wall-posters.webp)] md:bg-[length:1500px_auto]",
         home ? "absolute inset-0 rounded-[inherit]" : "fixed inset-0 -z-10",
         className,
       )}
+      style={shift ? { backgroundPosition: `${-shift * 97}px ${-shift * 131}px` } : undefined}
     >
-      <ul className="absolute -inset-x-10 -top-10 hidden grid-cols-5 gap-x-1 gap-y-2 md:grid lg:grid-cols-7 2xl:grid-cols-9">
+      <ul className="absolute -inset-x-10 -top-10 z-0 hidden grid-cols-5 gap-x-1 gap-y-2 md:grid lg:grid-cols-7 2xl:grid-cols-9">
         {Array.from({ length: home ? 45 : 36 }, (_, i) =>
           // Every other slot is left to the painted wall underneath.
           (i * 3) % 5 > 2 ? (
@@ -106,7 +109,7 @@ export default function CinemaWall({ variant = "stage", className }: CinemaWallP
               zIndex: (i * 7) % 5,
             }}
           >
-            <WallPoster film={films[(i * 5) % films.length]} index={i} />
+            <WallPoster film={films[(i * 5 + shift) % films.length]} index={i + shift} />
             {i % 3 === 0 && <span className="absolute -top-2 left-1/2 h-5 w-14 -translate-x-1/2 -rotate-3 bg-[#efe2c2]/60" />}
             {i % 4 === 1 && <span className="absolute end-2 top-2 size-2 rounded-full bg-[#7a6a58] shadow" />}
           </li>

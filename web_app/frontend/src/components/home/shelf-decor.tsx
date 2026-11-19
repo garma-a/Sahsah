@@ -94,7 +94,7 @@ export function GutterDecor() {
             <>
               <Ledge><Prop name="radio" className="w-[80%] max-w-48" /></Ledge>
               <Ledge><Prop name="reel" className="w-[78%] max-w-44" /></Ledge>
-              <Ledge><Prop name="tea" className="w-[40%] max-w-24" /><Prop name="matchbox" className="w-[52%] max-w-28" /></Ledge>
+              <Ledge><Prop name="tea" className="w-[34%] max-w-20" /><Prop name="matchbox" className="w-[66%] max-w-40 -rotate-3" /></Ledge>
             </>
           ) : (
             <>

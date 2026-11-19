@@ -56,7 +56,7 @@ export default function Poster({ category, toneIndex, selected, full, eager, onT
       <span
         aria-hidden
         className={cn(
-          "absolute -end-3 -top-3 grid size-11 place-items-center rounded-full border-[3px] border-ink font-heading text-2xl leading-none shadow-[0_3px_0_var(--color-ink)] transition-colors duration-200",
+          "absolute -bottom-3 -end-3 grid size-11 place-items-center rounded-full border-[3px] border-ink font-heading text-2xl leading-none shadow-[0_3px_0_var(--color-ink)] transition-colors duration-200",
           selected ? "animate-pop bg-green text-ink" : "bg-sun text-ink",
         )}
       >

@@ -187,7 +187,7 @@ export default function TeamSetup() {
                   <div className={`border-4 bg-[#fff8ea] shadow-poster ${tone.border}`}>
                     <Cover src={entry?.category.coverUrl} name={entry?.category.name ?? "فئة"} tone={entry?.index ?? i} sizes="(min-width: 640px) 12vw, 30vw" />
                   </div>
-                  <p className="sr-only">{entry?.category.name ?? "فئة"}</p>
+                  <p aria-hidden className="mt-2 truncate text-center font-heading text-lg">{entry?.category.name ?? "فئة"}</p>
                 </li>
               );
             })}
@@ -244,7 +244,7 @@ function ProblemNotice({
 function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="relative min-h-dvh">
-      <CinemaWall />
+      <CinemaWall className="max-lg:hidden" />
       <div className="paper ticket mx-auto min-h-dvh max-w-[1000px] px-5 pb-10 pt-9 shadow-[0_0_60px_rgb(0_0_0/0.6)] sm:px-8 lg:my-8 lg:min-h-0 lg:rounded-[2rem] lg:border-4 lg:border-ink">
         <div className="mb-8 flex items-center justify-between">
           <Link href="/" aria-label="صحصح، الصفحة الرئيسية">

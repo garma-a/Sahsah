@@ -75,7 +75,9 @@ export default function Cover({ src, name, tone, credits = ["صحصح تقدّم
     />
   );
 
-  const compact = "@max-[160px]:font-heading @max-[160px]:text-[14cqw]! @max-[160px]:rotate-0 @max-[160px]:[text-shadow:none]!";
+  // Small covers: the name in Lalezar, yellow on the dark slab at the top (11:1), never over a badge.
+  const compact =
+    "@max-[160px]:font-heading @max-[160px]:text-[14cqw]! @max-[160px]:rotate-0 @max-[160px]:[text-shadow:none]! @max-[160px]:bg-[#1d2321]! @max-[160px]:text-[#f6d64a]! @max-[160px]:shadow-none";
 
   return (
     <div className={cn("@container relative isolate aspect-[4/5] w-full overflow-hidden bg-[#f3e6c8]", className)}>
@@ -91,7 +93,7 @@ export default function Cover({ src, name, tone, credits = ["صحصح تقدّم
         />
 
         {layout === "framed" ? (
-          <div className="absolute inset-x-[12%] bottom-[24%] top-[8%] -rotate-2 bg-[#f3e6c8] p-[2.5%] shadow-[0.8cqw_1cqw_0_#1d2321] @max-[160px]:inset-x-[6%] @max-[160px]:bottom-[26%] @max-[160px]:top-[4%]">
+          <div className="absolute inset-x-[12%] bottom-[24%] top-[8%] -rotate-2 bg-[#f3e6c8] p-[2.5%] shadow-[0.8cqw_1cqw_0_#1d2321] @max-[160px]:inset-x-[6%] @max-[160px]:bottom-[4%] @max-[160px]:top-[30%]">
             <div className="relative size-full overflow-hidden bg-[#9aa39d]">{image}</div>
           </div>
         ) : (
@@ -100,10 +102,10 @@ export default function Cover({ src, name, tone, credits = ["صحصح تقدّم
         <div aria-hidden className="halftone pointer-events-none absolute inset-0 mix-blend-multiply opacity-40" />
 
         {layout === "band" && (
-          <div className="absolute inset-x-0 top-0 px-[4%] pb-[3%] pt-[2.5%] text-center" style={{ backgroundColor: ink.slab }}>
+          <div className="absolute inset-x-0 top-0 px-[4%] pb-[3%] pt-[2.5%] text-center @max-[160px]:p-0" style={{ backgroundColor: ink.slab }}>
             <p aria-hidden className="text-[3.3cqw] font-bold leading-none text-[#f3e6c8]/80 @max-[160px]:hidden">{credits[0]}</p>
             <p
-              className={cn("mt-[1.5%] font-poster leading-[1.05] [text-wrap:balance] @max-[160px]:mt-0", compact)}
+              className={cn("mt-[1.5%] font-poster leading-[1.05] [text-wrap:balance] @max-[160px]:mt-0 @max-[160px]:px-[4%] @max-[160px]:py-[3%]", compact)}
               style={{ fontSize: size, color: ink.title, textShadow: lettering(ink.shade, false) }}
             >
               {name}
@@ -130,7 +132,7 @@ export default function Cover({ src, name, tone, credits = ["صحصح تقدّم
           <p
             className={cn(
               "absolute inset-x-[5%] bottom-[10%] rotate-[-2.5deg] px-[3%] py-[2%] text-center font-poster leading-[1] [text-wrap:balance] shadow-[0.8cqw_1cqw_0_#1d2321]",
-              "@max-[160px]:inset-x-0 @max-[160px]:bottom-0 @max-[160px]:shadow-none",
+              "@max-[160px]:inset-x-0 @max-[160px]:top-0 @max-[160px]:bottom-auto @max-[160px]:px-[4%] @max-[160px]:py-[3%]",
               compact,
             )}
             style={{ fontSize: size, backgroundColor: ink.slab, color: ink.slab === "#f6e7c4" ? "#d7402a" : ink.title === ink.slab ? "#f6e7c4" : ink.title, textShadow: lettering(ink.shade, false) }}

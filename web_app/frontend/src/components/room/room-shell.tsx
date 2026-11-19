@@ -26,7 +26,7 @@ export default function RoomShell({ status, actions, children, stage, heading }:
   return (
     <div className="relative min-h-dvh">
       <CinemaWall />
-      <div className={cn("mx-auto flex min-h-dvh flex-col px-3 pb-6 pt-3 sm:px-5", stage ? "max-w-[1560px]" : "max-w-[1200px]")}>
+      <div className={cn("mx-auto flex min-h-dvh flex-col px-3 pb-6 pt-3 sm:px-5", stage ? "max-w-[1320px]" : "max-w-[1200px]")}>
         <header className="relative z-10 mb-4 flex items-center justify-between gap-3 rounded-2xl border-4 border-ink bg-press px-3 py-2 text-white shadow-[0_6px_0_var(--color-ink)] sm:px-5">
           <div className="flex min-w-0 flex-1 items-center gap-3">{actions}</div>
           <Link href="/" aria-label="صحصح، الصفحة الرئيسية" className="shrink-0 rounded-lg">
