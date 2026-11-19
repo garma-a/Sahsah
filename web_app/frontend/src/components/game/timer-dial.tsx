@@ -27,11 +27,11 @@ export default function TimerDial({ timer, clockOffsetMs, note }: { timer: Timer
   const share = Math.min(1, Math.max(0, remainingMs / ANSWER_MS));
 
   return (
-    <div className="flex flex-col items-center gap-2">
+    <div className="flex items-center gap-3">
       <div
         role="timer"
         className={cn(
-          "relative grid size-28 place-items-center rounded-full border-4 border-ink shadow-[0_6px_0_var(--color-ink)] sm:size-32 lg:size-40",
+          "relative grid size-24 shrink-0 place-items-center rounded-full border-4 border-ink shadow-[0_6px_0_var(--color-ink)] lg:size-28 compact:size-20 short:size-16 short:shadow-[0_4px_0_var(--color-ink)]",
           over ? "animate-[beat_0.9s_ease-in-out_3] bg-press text-white" : "bg-white text-ink",
         )}
       >
@@ -55,15 +55,15 @@ export default function TimerDial({ timer, clockOffsetMs, note }: { timer: Timer
           </svg>
         )}
         {over ? (
-          <AlarmClockOff aria-hidden className="relative size-14 lg:size-20" strokeWidth={2.5} />
+          <AlarmClockOff aria-hidden className="relative size-10 lg:size-12 short:size-8" strokeWidth={2.5} />
         ) : (
-          <span dir="ltr" aria-hidden className={cn("tabular relative font-heading text-4xl leading-none sm:text-5xl lg:text-6xl", low && "text-press")}>
+          <span dir="ltr" aria-hidden className={cn("tabular relative font-heading text-3xl leading-none lg:text-4xl short:text-2xl", low && "text-press")}>
             {clock(remainingMs)}
           </span>
         )}
       </div>
       {/* Reserved height: the state label appears without pushing the question down. */}
-      <div className="grid min-h-12 place-items-center">
+      <div className="grid place-items-center empty:hidden">
         {over ? (
           <p className="animate-pop rounded-lg border-[3px] border-ink bg-press px-4 py-0.5 font-heading text-3xl leading-tight text-white">الوقت خلص</p>
         ) : paused ? (

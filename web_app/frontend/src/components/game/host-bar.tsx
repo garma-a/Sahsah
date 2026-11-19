@@ -45,9 +45,9 @@ export default function HostBar({ controls, pending, onAct }: HostBarProps) {
     <div
       role="group"
       aria-label="تحكم المضيف"
-      className="flex flex-wrap items-center gap-3 rounded-[1.4rem] border-4 border-ink bg-ink p-3 text-cream shadow-[0_8px_0_var(--color-night)] sm:px-4"
+      className="grid shrink-0 grid-cols-2 gap-2 rounded-[1.4rem] border-4 border-ink bg-ink p-2.5 text-cream shadow-[0_8px_0_var(--color-night)] short:p-2 short:shadow-[0_5px_0_var(--color-night)]"
     >
-      <p className="me-auto flex items-center gap-2 font-heading text-lg leading-none text-cream/75">
+      <p className="col-span-2 flex items-center gap-2 font-heading text-base leading-none text-cream/75 compact:hidden">
         <MonitorUp aria-hidden className="size-5" strokeWidth={2.5} />
         تحكم المضيف
       </p>
@@ -63,7 +63,7 @@ export default function HostBar({ controls, pending, onAct }: HostBarProps) {
             disabled={pending !== null}
             aria-busy={pending === action.name || undefined}
             onClick={() => onAct(action.name)}
-            className={cn(quiet && "text-cream hover:bg-cream/15")}
+            className={cn("h-auto min-h-10 w-full whitespace-normal px-2 py-1.5 text-base leading-tight short:min-h-8 short:py-1 short:text-sm", primary && "col-span-2 min-h-12 text-xl short:min-h-10 short:text-lg", quiet && "text-cream hover:bg-cream/15")}
           >
             <Icon aria-hidden className="size-5" />
             {pending === action.name ? action.busy : action.label}

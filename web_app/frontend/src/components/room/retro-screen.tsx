@@ -7,10 +7,10 @@ import Prop from "@/components/brand/props";
  */
 export default function RetroScreen({ children }: { children: React.ReactNode }) {
   return (
-    <div className="relative flex flex-1 flex-col lg:pb-9">
-      <div className="cabinet relative flex flex-1 flex-col rounded-[1.4rem] border-4 border-ink p-2.5 sm:rounded-[2rem] sm:p-3.5 lg:rounded-[2.6rem] lg:p-5 lg:pb-0">
-        <div className="screen-glass relative flex flex-1 flex-col rounded-[1rem] p-2 sm:rounded-[1.5rem] sm:p-4 lg:rounded-[2rem] lg:p-6">{children}</div>
-        <div aria-hidden className="hidden h-16 items-center justify-center gap-6 lg:flex">
+    <div className="relative flex min-h-0 flex-1 flex-col lg:pb-9 compact:pb-0">
+      <div className="cabinet relative flex min-h-0 flex-1 flex-col rounded-[1.4rem] border-4 border-ink p-2.5 sm:rounded-[2rem] sm:p-3.5 lg:rounded-[2.6rem] lg:p-5 lg:pb-0 compact:lg:pb-5 short:rounded-xl short:p-1.5 short:lg:pb-1.5">
+        <div className="screen-glass relative flex min-h-0 flex-1 flex-col rounded-[1rem] p-2 sm:rounded-[1.5rem] sm:p-4 lg:rounded-[2rem] lg:p-6 compact:lg:p-4 short:rounded-lg short:p-1.5">{children}</div>
+        <div aria-hidden className="hidden h-16 shrink-0 items-center justify-center gap-6 lg:flex compact:hidden">
           <span className="size-2.5 rounded-full bg-poster-red shadow-[0_0_8px_var(--color-poster-red)]" />
           <span className="grille h-6 w-56 rounded-md border-2 border-ink/80" />
           <span className="flex gap-3">
@@ -23,7 +23,7 @@ export default function RetroScreen({ children }: { children: React.ReactNode })
         </div>
       </div>
 
-      <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 hidden lg:block">
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 hidden lg:block compact:hidden">
         <div className="mx-[12%] flex justify-between">
           <span className="h-6 w-14 bg-ink [clip-path:polygon(10%_0,90%_0,100%_100%,0_100%)]" />
           <span className="h-6 w-14 bg-ink [clip-path:polygon(10%_0,90%_0,100%_100%,0_100%)]" />

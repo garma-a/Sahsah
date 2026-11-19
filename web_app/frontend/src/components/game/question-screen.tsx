@@ -36,6 +36,8 @@ type QuestionScreenProps = {
   problem: string | null;
   onAct: (name: QuestionAction) => void;
   onResolve: (winner: TeamNumber | null, points: number | undefined) => void;
+  /** The scores, shown at the foot of the side rail. */
+  side?: React.ReactNode;
 };
 
 function promptOf(question: QuestionContent): string {
@@ -77,6 +79,7 @@ export default function QuestionScreen({
   problem,
   onAct,
   onResolve,
+  side,
 }: QuestionScreenProps) {
   const answering = view.phase === "question";
   const hostView = isHost && view.audience === "host";
@@ -108,14 +111,14 @@ export default function QuestionScreen({
   const short = prompt.length <= 40 && !shown && !hasSound && !cardUrl;
 
   return (
-    <section aria-labelledby="question-title" className="flex flex-1 flex-col gap-4">
-      <div className="paper-card flex flex-1 flex-col rounded-[2rem] border-4 border-ink p-4 shadow-[0_12px_0_var(--color-ink)] sm:p-6 lg:px-10 lg:py-8">
-        <header className="flex flex-wrap items-center justify-between gap-4">
+    <section aria-labelledby="question-title" className="flex min-h-0 flex-1 flex-col gap-3 sm:flex-row">
+      <div className="paper-card flex flex-1 flex-col rounded-[2rem] border-4 border-ink p-4 shadow-[0_10px_0_var(--color-ink)] sm:px-6 lg:px-8 lg:py-5 short:rounded-2xl short:px-4 short:py-2 short:shadow-[0_6px_0_var(--color-ink)]">
+        <header className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-wrap items-center gap-3">
             {categoryName && (
-              <p className={cn("max-w-full truncate rounded-xl border-[3px] border-ink px-4 py-1 font-heading text-2xl leading-tight lg:text-3xl", tone.ribbon)}>{categoryName}</p>
+              <p className={cn("max-w-full truncate rounded-xl border-[3px] border-ink px-4 py-1 font-heading text-2xl leading-tight lg:text-3xl short:text-xl", tone.ribbon)}>{categoryName}</p>
             )}
-            <p className="tabular flex items-center gap-2 rounded-full border-[3px] border-ink bg-sun px-4 py-1 font-heading text-2xl leading-tight shadow-[0_3px_0_var(--color-ink)] lg:text-3xl">
+            <p className="tabular flex items-center gap-2 rounded-full border-[3px] border-ink bg-sun px-4 py-1 font-heading text-2xl leading-tight shadow-[0_3px_0_var(--color-ink)] lg:text-3xl short:text-xl">
               <span className="sr-only">قيمة السؤال</span>
               {formatNumber(view.suggestedPoints)}
               <span className="text-base font-bold">نقطة</span>
@@ -127,12 +130,15 @@ export default function QuestionScreen({
             </p>
           </div>
           {answering && (
-            <TimerDial timer={view.timer} clockOffsetMs={clockOffsetMs} note={clockWaits(question) ? "الوقت بيبدأ لما الصورة تختفي" : undefined} />
+            // On a short screen (a phone held sideways) the clock sits here instead of in the rail; the rail copy is hidden then.
+            <div aria-hidden className="hidden short:block">
+              <TimerDial timer={view.timer} clockOffsetMs={clockOffsetMs} />
+            </div>
           )}
         </header>
 
-        <div className={cn("flex flex-1 items-center gap-8 py-6 lg:py-8", shown || hasSound || cardUrl ? "flex-col lg:flex-row" : "flex-col justify-center")}>
-          <div className="flex w-full min-w-0 flex-1 flex-col items-center gap-6 text-center">
+        <div className={cn("flex flex-1 items-center gap-6 py-4 short:gap-4 short:py-2", shown || hasSound || cardUrl ? "flex-col sm:flex-row" : "flex-col justify-center")}>
+          <div className="flex w-full min-w-0 flex-1 flex-col items-center gap-4 text-center short:gap-2">
             <h1
               id="question-title"
               tabIndex={-1}
@@ -140,9 +146,9 @@ export default function QuestionScreen({
                 "text-balance break-words font-heading focus:outline-none",
                 answering
                   ? short
-                    ? "text-5xl leading-[1.4] sm:text-6xl lg:text-8xl lg:leading-[1.3]"
-                    : "text-4xl leading-[1.4] sm:text-5xl lg:text-6xl lg:leading-[1.35]"
-                  : "text-2xl leading-snug text-charcoal/70 sm:text-3xl lg:text-4xl",
+                    ? "text-5xl leading-[1.35] lg:text-7xl short:text-4xl"
+                    : "text-3xl leading-[1.35] lg:text-5xl short:text-2xl"
+                  : "text-2xl leading-snug text-charcoal/70 lg:text-3xl short:text-xl",
               )}
             >
               {prompt}
@@ -151,11 +157,11 @@ export default function QuestionScreen({
             {stages && answering && <HintStages stageIndex={stages.stageIndex} suggestions={stages.stageSuggestions} />}
             {answer && (
               <div
-                className="w-full max-w-4xl origin-top animate-[reveal_0.65s_ease-out_both] rounded-[1.6rem] border-4 border-ink bg-sun px-6 py-5 shadow-[0_8px_0_var(--color-ink)]"
+                className="w-full max-w-4xl origin-top animate-[reveal_0.65s_ease-out_both] rounded-[1.6rem] border-4 border-ink bg-sun px-6 py-4 shadow-[0_8px_0_var(--color-ink)] short:rounded-2xl short:py-2"
                 role="status"
               >
                 <p className="font-heading text-xl leading-none text-ink/70">الإجابة</p>
-                <p className="mt-2 flex items-center justify-center gap-4 text-balance font-heading text-5xl leading-[1.35] lg:text-7xl">
+                <p className="mt-2 flex items-center justify-center gap-4 text-balance font-heading text-4xl leading-[1.3] lg:text-6xl short:text-3xl">
                   {swatch && <span aria-hidden className="size-14 shrink-0 rounded-full border-4 border-ink lg:size-20" style={{ backgroundColor: swatch }} />}
                   {answer.text}
                 </p>
@@ -166,7 +172,7 @@ export default function QuestionScreen({
             <div
               className={cn(
                 "w-full shrink-0",
-                clue ? "grid max-w-3xl grid-cols-[2fr_3fr] items-center gap-4 lg:w-[42rem]" : "flex max-w-md flex-col items-center lg:w-[26rem]",
+                clue ? "grid max-w-3xl grid-cols-[2fr_3fr] items-center gap-4 sm:w-[45%] lg:w-[40rem]" : "flex max-w-xl flex-col items-center sm:w-[44%] lg:w-[30rem]",
               )}
             >
               <MediaImage
@@ -188,8 +194,8 @@ export default function QuestionScreen({
             </div>
           )}
           {cardUrl && (
-            <div className="flex w-full max-w-sm shrink-0 flex-col items-center gap-3 rounded-[1.6rem] border-4 border-ink bg-white p-4 shadow-[0_8px_0_var(--color-ink)]">
-              <QRCodeSVG value={cardUrl} size={200} level="M" marginSize={1} fgColor="#1d2321" bgColor="#ffffff" role="img" title="كود كارت التمثيل" />
+            <div className="flex w-full max-w-sm shrink-0 flex-col items-center gap-3 rounded-[1.6rem] border-4 border-ink bg-white p-4 shadow-[0_8px_0_var(--color-ink)] sm:w-auto short:flex-row short:p-2">
+              <QRCodeSVG value={cardUrl} size={160} level="M" marginSize={1} fgColor="#1d2321" bgColor="#ffffff" role="img" title="كود كارت التمثيل" />
               <p className="text-center font-heading text-2xl leading-snug">اللي هيمثّل يمسح الكود ويشوف الكارت لوحده</p>
               {hostView && (
                 <a
@@ -226,6 +232,13 @@ export default function QuestionScreen({
         </div>
       </div>
 
+      {/* The side rail: the clock, the host's controls or award step, and the scores. */}
+      <aside className="flex shrink-0 flex-col gap-3 sm:w-72 lg:w-80 short:w-60 short:gap-2">
+      {answering && (
+        <div className="flex justify-center rounded-[1.4rem] border-4 border-ink bg-cream p-2 shadow-[0_6px_0_var(--color-ink)] short:hidden">
+          <TimerDial timer={view.timer} clockOffsetMs={clockOffsetMs} note={clockWaits(question) ? "الوقت بيبدأ لما الصورة تختفي" : undefined} />
+        </div>
+      )}
       {problem && <ErrorBanner>{problem}</ErrorBanner>}
       {hostView ? (
         answering ? (
@@ -246,6 +259,8 @@ export default function QuestionScreen({
       ) : (
         !answering && <p className="text-center font-heading text-2xl text-cream">المضيف بيختار مين كسب السؤال…</p>
       )}
+      <div className={cn("mt-auto", !answering && hostView && "short:hidden")}>{side}</div>
+      </aside>
     </section>
   );
 }

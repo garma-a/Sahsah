@@ -159,22 +159,28 @@ export default function GameScreen({ channel, roomId, auth, isHost, categories }
   }
 
   const scoreboard = (teams: BoardView["teams"]) => (
-    <>
-      <Scoreboard teams={teams} members={roster} connected={channel.connected} />
-      {hostView && (
-        <HostTools
-          teams={teams}
-          busy={pending !== null}
-          onAdjust={(teamNumber, targetTotal) => track("adjust_score", { name: "adjust_score", expectedGameVersion: gameVersion, teamNumber, targetTotal })}
-          onEnd={() => run("end_game", { name: "end_game", expectedGameVersion: gameVersion })}
-        />
-      )}
-    </>
+    <Scoreboard
+      rail
+      teams={teams}
+      members={roster}
+      connected={channel.connected}
+      tools={
+        hostView && (
+          <HostTools
+            teams={teams}
+            busy={pending !== null}
+            onAdjust={(teamNumber, targetTotal) => track("adjust_score", { name: "adjust_score", expectedGameVersion: gameVersion, teamNumber, targetTotal })}
+            onEnd={() => run("end_game", { name: "end_game", expectedGameVersion: gameVersion })}
+          />
+        )
+      }
+    />
   );
 
   if (view.phase === "board") {
     return (
-      <div className="flex flex-1 flex-col">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 sm:flex-row">
+        <div className="flex min-h-0 flex-1 flex-col">
         {problem && <ErrorBanner className="mb-3">{problem}</ErrorBanner>}
         <Board
           view={view}
@@ -185,7 +191,8 @@ export default function GameScreen({ channel, roomId, auth, isHost, categories }
             run(`${boardPosition}:${questionPosition}`, { name: "open_question", expectedGameVersion: gameVersion, boardPosition, questionPosition })
           }
         />
-        {scoreboard(view.teams)}
+        </div>
+        <div className="flex shrink-0 flex-col justify-end sm:w-72 lg:w-80 short:w-60">{scoreboard(view.teams)}</div>
       </div>
     );
   }
@@ -211,11 +218,11 @@ export default function GameScreen({ channel, roomId, auth, isHost, categories }
         pending={pending}
         problem={problem}
         onAct={(name: QuestionAction) => run(name, { name, ...pointer })}
+        side={scoreboard(question.teams)}
         onResolve={(winner: TeamNumber | null, points) =>
           run("resolve_question", { name: "resolve_question", ...pointer, winningTeamNumber: winner, ...(points === undefined ? {} : { awardedPoints: points }) })
         }
       />
-      {scoreboard(question.teams)}
     </div>
   );
 }

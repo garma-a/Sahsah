@@ -61,7 +61,7 @@ export default function CategoryCard({ column, entry, toneIndex, flipped, onFlip
     <article
       aria-label={column.name}
       data-flipped={flipped}
-      className="flip aspect-[3/4] w-full"
+      className="flip aspect-[3/4] max-h-full w-full"
       onKeyDown={(event) => {
         if (event.key === "Escape" && flipped) flip(false, event);
       }}
@@ -112,7 +112,7 @@ export default function CategoryCard({ column, entry, toneIndex, flipped, onFlip
             type="button"
             aria-label={`${column.name}. ارجع للغلاف`}
             onClick={(event) => flip(false, event)}
-            className={cn("flex h-9 shrink-0 cursor-pointer items-center justify-between gap-1 rounded-lg px-2 font-heading text-lg leading-none", tone.ribbon)}
+            className={cn("flex h-9 shrink-0 cursor-pointer items-center short:h-7 short:text-base justify-between gap-1 rounded-lg px-2 font-heading text-lg leading-none", tone.ribbon)}
           >
             <span className="truncate">{column.name}</span>
             <Undo2 aria-hidden className="size-4 shrink-0" strokeWidth={2.5} />
@@ -156,7 +156,7 @@ function TileButton({
   onOpen: () => void;
 }) {
   const points = formatNumber(tile.basePoints);
-  const base = "relative flex size-full min-h-11 items-center justify-center rounded-xl border-[3px] font-heading text-[1.7rem] leading-none";
+  const base = "relative flex size-full min-h-11 items-center justify-center rounded-xl border-[3px] font-heading text-[1.7rem] leading-none short:min-h-8 short:rounded-lg short:text-xl";
 
   if (tile.state === "resolved") {
     const winner = tile.winningTeamNumber ?? null;
