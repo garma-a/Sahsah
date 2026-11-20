@@ -1,10 +1,10 @@
-import { readFile } from "node:fs/promises";
-import { availableParallelism, totalmem } from "node:os";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { z } from "zod";
 import type { PressureSample, VerifiedAccount } from "./ports.js";
 import { requireState } from "./problem.js";
 import type { GameplayMetrics } from "./metrics.js";
+import type { GameplayScheduler } from "./scheduler.js";
+import { apiMemoryUsed, apiResourceLimits } from "./capacity.js";
 
 export function existingIdentity(
   env: NodeJS.ProcessEnv,
@@ -51,12 +51,7 @@ const dbMetric = z
     sampledAt: z.iso.datetime(),
   })
   .strict();
-const number = (value: string | undefined) => {
-  const n = Number(value);
-  requireState(Number.isFinite(n) && n > 0, "INVALID_RESOURCE_LIMIT", 500);
-  return n;
-};
-/** Fraction of this process's CPU or memory limit in use, whichever is higher. */
+/** Fraction of this container's CPU or memory limit in use, whichever is higher. */
 function apiLoad(env: NodeJS.ProcessEnv, hostFallback = false) {
   let previousCpu = process.cpuUsage(),
     previousAt = performance.now();
@@ -69,62 +64,46 @@ function apiLoad(env: NodeJS.ProcessEnv, hostFallback = false) {
         elapsedUs;
     previousCpu = cpu;
     previousAt = at;
-    const [cpuMax, memoryMax, memoryCurrent] = await Promise.all([
-      readFile("/sys/fs/cgroup/cpu.max", "utf8").catch(() => "max 100000"),
-      readFile("/sys/fs/cgroup/memory.max", "utf8").catch(() => "max"),
-      readFile("/sys/fs/cgroup/memory.current", "utf8").catch(() =>
-        String(process.memoryUsage().rss),
-      ),
+    const [limits, memoryUsed] = await Promise.all([
+      apiResourceLimits(env, hostFallback),
+      apiMemoryUsed(),
     ]);
-    const configured = (value: string | undefined, host: number) =>
-      hostFallback && !value ? host : number(value);
-    const cpuParts = cpuMax.trim().split(/\s+/);
-    const cpuLimit =
-      cpuParts[0] === "max"
-        ? configured(env.GAMEPLAY_API_CPU_LIMIT_CORES, availableParallelism())
-        : Number(cpuParts[0]) / Number(cpuParts[1]);
-    const memoryLimit =
-      memoryMax.trim() === "max"
-        ? configured(env.GAMEPLAY_API_MEMORY_LIMIT_BYTES, totalmem())
-        : Number(memoryMax.trim());
-    requireState(
-      cpuLimit > 0 &&
-        Number.isFinite(cpuLimit) &&
-        memoryLimit > 0 &&
-        Number.isFinite(memoryLimit),
-      "INVALID_RESOURCE_LIMIT",
-      500,
-    );
-    return Math.max(
-      cpuUsed / cpuLimit,
-      Number(memoryCurrent.trim()) / memoryLimit,
-    );
+    return Math.max(cpuUsed / limits.cpuCores, memoryUsed / limits.memoryBytes);
   };
 }
 /**
- * Preview admission: API process pressure only. The preview database has no
- * exporter, so the small fixed room ceiling bounds its load instead.
+ * Application pressure: event-loop p99 against a 200 ms budget, and the share of the last interval
+ * every database work slot was busy. The second is how the API sees its database saturating even
+ * without a database exporter, so the preview's ceiling can follow its resources safely.
  */
+function applicationLoad(metrics: GameplayMetrics, scheduler: GameplayScheduler) {
+  const loop = metrics.loop.percentile(99) / 1000000;
+  metrics.loop.reset();
+  return Math.max(loop / 200, scheduler.saturation());
+}
+/** Preview admission: API process and application pressure (no database exporter, ADR 0017). */
 export function previewPressure(
   env: NodeJS.ProcessEnv,
   metrics: GameplayMetrics,
+  scheduler: GameplayScheduler,
 ): () => Promise<PressureSample> {
   const api = apiLoad(env, true);
-  return async () => {
-    const used = await api(),
-      loop = metrics.loop.percentile(99) / 1000000;
-    metrics.loop.reset();
-    return {
-      api: used,
-      database: 0,
-      sampledAt: Date.now(),
-      application: loop / 200,
-    };
-  };
+  return async () => ({
+    api: await api(),
+    database: 0,
+    sampledAt: Date.now(),
+    application: applicationLoad(metrics, scheduler),
+  });
 }
+/**
+ * Production admission: API, database (from its exporter) and application pressure. Each is a
+ * fraction of the limits reported at that moment, so a database plan change is followed, not
+ * refused.
+ */
 export function resourcePressure(
   env: NodeJS.ProcessEnv,
   metrics: GameplayMetrics,
+  scheduler: GameplayScheduler,
 ): (() => Promise<PressureSample>) | undefined {
   if (!env.GAMEPLAY_DB_PRESSURE_URL) return;
   const url = new URL(env.GAMEPLAY_DB_PRESSURE_URL);
@@ -133,8 +112,6 @@ export function resourcePressure(
     "INVALID_PRESSURE_SOURCE",
     500,
   );
-  const expectedCpu = number(env.GAMEPLAY_DB_CPU_LIMIT_CORES),
-    expectedMemory = number(env.GAMEPLAY_DB_MEMORY_LIMIT_BYTES);
   const api = apiLoad(env);
   let dbSample: z.infer<typeof dbMetric> | undefined,
     dbFetchedAt = 0;
@@ -163,28 +140,20 @@ export function resourcePressure(
       );
       const parsed = dbMetric.safeParse(JSON.parse(text));
       requireState(parsed.success, "PRESSURE_UNAVAILABLE", 503);
-      requireState(
-        parsed.data.cpuLimitCores === expectedCpu &&
-          parsed.data.memoryLimitBytes === expectedMemory,
-        "RESOURCE_PROFILE_CHANGED",
-        503,
-      );
       dbSample = parsed.data;
       dbFetchedAt = now;
     }
     const sourceAt = Date.parse(dbSample.sampledAt);
     requireState(sourceAt <= now + 1000, "INVALID_PRESSURE_TIME", 503);
-    const loop = metrics.loop.percentile(99) / 1000000;
-    metrics.loop.reset();
     return {
       api: apiUsed,
       database: Math.max(
-        dbSample.cpuUsedCores / expectedCpu,
-        dbSample.memoryUsedBytes / expectedMemory,
+        dbSample.cpuUsedCores / dbSample.cpuLimitCores,
+        dbSample.memoryUsedBytes / dbSample.memoryLimitBytes,
       ),
       sampledAt: now,
       databaseSampledAt: sourceAt,
-      application: loop / 200,
+      application: applicationLoad(metrics, scheduler),
     };
   };
 }

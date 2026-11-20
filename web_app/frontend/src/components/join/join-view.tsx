@@ -101,7 +101,7 @@ export default function JoinView({ code }: { code: string }) {
     return (
       <JoinShell>
         <div role="alert" className="space-y-4 text-center">
-          <h1 className="font-heading text-4xl">الكود مش شغال</h1>
+          <h1 className="font-heading text-4xl">{codeProblem(preview.error.code) ? "الكود مش شغال" : "مقدرناش نفتح الغرفة"}</h1>
           <p className="text-lg font-medium">{preview.error.message}</p>
           <Button asChild>
             <Link href="/join">جرّب كود تاني</Link>
@@ -113,7 +113,7 @@ export default function JoinView({ code }: { code: string }) {
 
   const { preview: room } = preview;
   if (!room.joinable) {
-    const text = room.admission === "paused" ? "السيرفر زحمة دلوقتي. جرّب تاني كمان شوية." : room.availableSeats === 0 ? "الغرفة اتملت. بتاخد ٥ لاعبين غير المضيف." : "الغرفة دي مش بتستقبل لاعبين دلوقتي.";
+    const text = room.admission === "paused" ? "السيرفر مش بيستقبل لاعبين جداد دلوقتي. جرّب تاني كمان شوية." : room.availableSeats === 0 ? "الغرفة اتملت. بتاخد ٥ لاعبين غير المضيف." : "الغرفة دي مش بتستقبل لاعبين دلوقتي.";
     return (
       <JoinShell>
         <div role="alert" className="space-y-4 text-center">
@@ -200,4 +200,9 @@ export default function JoinView({ code }: { code: string }) {
       </form>
     </JoinShell>
   );
+}
+
+/** Problems that are about the code itself, as opposed to the network or the server. */
+function codeProblem(code: string): boolean {
+  return ["INVALID_INVITATION", "INVITATION_EXPIRED", "INVITATION_UNAVAILABLE", "NOT_FOUND", "ROOM_CLOSED", "ROOM_EXPIRED"].includes(code);
 }

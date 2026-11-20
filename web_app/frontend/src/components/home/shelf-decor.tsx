@@ -41,16 +41,16 @@ export function RowEnds({ count, variant }: { count: number; variant: number }) 
 }
 
 /**
- * The foot of the display case: a walnut ledge with a brass rail, the house tea on one end and the game-night
- * cards and matches on the other, with the engraved "continuous showing" plaque between them.
+ * The foot of the panel: a bright sun-yellow strip, the house tea on one end and the game-night
+ * cards and matches on the other, with the "continuous showing" sticker between them.
  */
 export function DisplayLedge() {
   return (
     <div aria-hidden className="pointer-events-none relative -mx-4 mt-16 h-36 sm:-mx-6 sm:h-44 md:-mx-10 lg:mt-20 lg:h-56">
-      <div className="absolute inset-x-0 bottom-0 h-7 rounded-b-[5px] bg-[#3b2414] bg-[url(/cinema/walnut.webp)] bg-[length:900px_auto] shadow-[0_-2px_0_#c39a45,0_-6px_14px_rgb(0_0_0/0.55),inset_0_2px_0_rgb(255_235_200/0.25)] sm:h-9" />
+      <div className="absolute inset-x-0 bottom-0 h-7 rounded-b-[1.75rem] border-t-4 border-ink bg-sun sm:h-9" />
       <Prop name="still-tea" className="absolute bottom-3 start-[-2%] w-[52%] max-w-[26rem] sm:bottom-4 sm:w-[44%] lg:w-[36%]" />
       <Prop name="still-cards" className="absolute bottom-3 end-[-3%] w-[56%] max-w-[28rem] sm:bottom-4 sm:w-[46%] lg:w-[38%]" />
-      <p className="absolute bottom-12 left-1/2 hidden -translate-x-1/2 rounded-sm bg-[linear-gradient(135deg,#f8e3a0,#c39a45_35%,#7c5418_60%,#d8b062)] px-6 py-1.5 font-poster text-2xl whitespace-nowrap text-[#3a250c] shadow-[0_6px_10px_rgb(0_0_0/0.6),inset_0_1px_0_rgb(255_255_255/0.6)] [text-shadow:0_1px_0_rgb(255_240_200/0.6)] lg:block">
+      <p className="absolute bottom-12 left-1/2 hidden -translate-x-1/2 -rotate-2 rounded-xl border-[3px] border-ink bg-pink-press px-6 py-1.5 font-poster text-2xl whitespace-nowrap text-white shadow-[0_4px_0_var(--color-ink)] lg:block">
         عرض مستمر
       </p>
     </div>

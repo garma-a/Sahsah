@@ -30,6 +30,21 @@ export interface LogFields {
   invitations?: number;
   waitMs?: number;
   stack?: string;
+  // platform.metrics: one line per interval (GameplayMetrics.drain plus admission state).
+  commands?: number;
+  p95CommandMs?: number;
+  p99CommandMs?: number;
+  p95OutboxDispatchMs?: number;
+  eventLoopP99Ms?: number;
+  rssBytes?: number;
+  projections?: number;
+  refusals?: number;
+  members?: number;
+  admission?: "open" | "paused";
+  // platform.capacity: the admission ceiling and the resources it was derived from.
+  roomCeiling?: number;
+  cpuLimitCores?: number;
+  memoryLimitBytes?: number;
 }
 export const logContext = new AsyncLocalStorage<LogContext>();
 const processId = randomUUID();

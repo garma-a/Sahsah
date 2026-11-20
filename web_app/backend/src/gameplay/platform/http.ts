@@ -1,13 +1,12 @@
 import { GameplayIdentity } from "./identity.js";
 import { GameplayRuntime } from "./runtime.js";
-import { Injectable, type CallHandler, type ExecutionContext, type NestInterceptor, type OnModuleInit } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
+import { Injectable, type CallHandler, type ExecutionContext, type NestInterceptor } from "@nestjs/common";
 import { from, lastValueFrom } from "rxjs";
-import type { Request, Response } from "express";
+import type { Request, RequestHandler, Response } from "express";
 import type { IncomingMessage } from "node:http";
-import { context as loggingContext } from "./logging.js";
-import { GameplayRates } from "./rates.js";
-import { requireState } from "./problem.js";
+import { context as loggingContext, log } from "./logging.js";
+import { GameplayRates, sourceKey } from "./rates.js";
+import { requireState, sendProblem } from "./problem.js";
 
 /** Number of platform proxies in front of the API; 0 trusts no forwarded address. */
 export function trustedProxyHops(env: NodeJS.ProcessEnv) {
@@ -29,46 +28,64 @@ export function clientAddress(
   return [...forwarded, direct].at(-1 - hops) ?? forwarded[0] ?? direct;
 }
 
+/** Validated HTTP rate policy: per source address (edge) and per verified subject (gameplay). */
+export function httpRatePolicy(env: NodeJS.ProcessEnv) {
+  const setting = (name: string, fallback: number) => {
+    const raw = env[name] || String(fallback);
+    const n = Number(raw);
+    requireState(
+      /^\d+$/.test(raw) && Number.isSafeInteger(n) && n >= 1 && n <= 10000,
+      "INVALID_HTTP_RATE_CONFIGURATION",
+      500,
+    );
+    return n;
+  };
+  return {
+    ipRate: setting("GAMEPLAY_HTTP_IP_RATE", 100),
+    ipBurst: setting("GAMEPLAY_HTTP_IP_BURST", 240),
+    subjectRate: setting("GAMEPLAY_HTTP_SUBJECT_RATE", 60),
+    subjectBurst: setting("GAMEPLAY_HTTP_SUBJECT_BURST", 240),
+  };
+}
+
+/**
+ * First middleware after request logging, for every route (API, health, preview, AdminJS, unknown
+ * paths): baseline security headers and one token bucket per source address, refused before any
+ * body parsing, authentication or database work.
+ */
+export function edgeProtection(env: NodeJS.ProcessEnv): RequestHandler {
+  const { ipRate, ipBurst } = httpRatePolicy(env),
+    hops = trustedProxyHops(env),
+    rates = new GameplayRates();
+  return (req, res, next) => {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Referrer-Policy", "no-referrer");
+    res.setHeader("X-Frame-Options", "DENY");
+    try {
+      rates.take(`ip:${sourceKey(clientAddress(req, hops))}`, ipRate, ipBurst);
+    } catch {
+      log.warn("platform.http.edge", { code: "RATE_LIMITED", status: 429 });
+      // A refill of one token at the configured rate: an honest wait, not a guess.
+      return sendProblem(res, 429, "RATE_LIMITED", Math.max(1, Math.ceil(1 / ipRate)));
+    }
+    next();
+  };
+}
+
 @Injectable()
-export class GameplayHttpInterceptor implements NestInterceptor, OnModuleInit {
+export class GameplayHttpInterceptor implements NestInterceptor {
   private rates = new GameplayRates();
   private sources = new Map<string, number>();
-  private policy = {
-    ipRate: 100,
-    ipBurst: 240,
-    subjectRate: 60,
-    subjectBurst: 240,
-  };
+  private policy = httpRatePolicy(process.env);
   constructor(
     readonly runtime: GameplayRuntime,
     readonly identity: GameplayIdentity,
-    private config: ConfigService,
   ) {}
-  onModuleInit() {
-    if (!this.runtime.options.enabled) return;
-    const setting = (name: string, fallback: number) => {
-      const raw = this.config.get<string>(name, String(fallback));
-      const n = Number(raw);
-      requireState(
-        /^\d+$/.test(raw) && Number.isSafeInteger(n) && n >= 1 && n <= 10000,
-        "INVALID_HTTP_RATE_CONFIGURATION",
-        500,
-      );
-      return n;
-    };
-    this.policy = {
-      ipRate: setting("GAMEPLAY_HTTP_IP_RATE", 100),
-      ipBurst: setting("GAMEPLAY_HTTP_IP_BURST", 240),
-      subjectRate: setting("GAMEPLAY_HTTP_SUBJECT_RATE", 60),
-      subjectBurst: setting("GAMEPLAY_HTTP_SUBJECT_BURST", 240),
-    };
-  }
   intercept(context: ExecutionContext, next: CallHandler) {
     const http = context.switchToHttp(),
       req = http.getRequest<Request>(),
       res = http.getResponse<Response>();
     res.setHeader("Cache-Control", "private, no-store");
-    res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("X-Request-ID", loggingContext().requestId);
     return from(this.execute(req, next));
   }
@@ -76,11 +93,6 @@ export class GameplayHttpInterceptor implements NestInterceptor, OnModuleInit {
     const started = performance.now(),
       path = req.path.toLowerCase();
     this.runtime.enabled();
-    this.rates.take(
-      `ip:${req.ip ?? req.socket.remoteAddress}`,
-      this.policy.ipRate,
-      this.policy.ipBurst,
-    );
     const invitation = path.includes("/room-invitations/"),
       anonymousJoin =
         invitation &&

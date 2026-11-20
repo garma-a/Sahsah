@@ -18,6 +18,7 @@ import { frame } from "../realtime-contract.js";
 import { canonical, equalProof, proof } from "../platform/proof.js";
 import { GameplayProblem, requireState } from "../platform/problem.js";
 import { clientAddress } from "../platform/http.js";
+import { sourceKey } from "../platform/rates.js";
 import type { Contract } from "../contract.js";
 import type { RealtimeTypes } from "../contracts/realtime-types.js";
 import type { ServerFrame } from "../realtime-contract.js";
@@ -84,11 +85,23 @@ function timedSnapshot(snapshot: Snapshot, now: string): Snapshot {
 const pendingSources = new Map<string, number>();
 const pendingUpgrades = new WeakMap<IncomingMessage, () => void>();
 let pendingCount = 0;
+/**
+ * Open sockets per client (IPv4 address or IPv6 /64), handshake to close. A room is the host,
+ * a TV and five players, often on one home network, plus reconnect overlap: 32 leaves room for
+ * several parties behind one NAT while one source can no longer hold the 1200 global slots.
+ */
+const liveSources = new Map<string, number>();
+const LIVE_PER_SOURCE = 32;
+const adjust = (counts: Map<string, number>, key: string, by: number) => {
+  const next = (counts.get(key) ?? 0) + by;
+  if (next > 0) counts.set(key, next);
+  else counts.delete(key);
+};
 function verifyUpgrade(info: { origin: string; req: IncomingMessage }) {
   const origins = (process.env.CORS_ORIGINS ?? "http://localhost:3000")
     .split(",")
     .map((v) => v.trim());
-  const source = clientAddress(info.req);
+  const source = sourceKey(clientAddress(info.req));
   if (
     info.req.url !== "/api/v1/realtime" ||
     (info.origin && !origins.includes(info.origin)) ||
@@ -96,16 +109,20 @@ function verifyUpgrade(info: { origin: string; req: IncomingMessage }) {
     (pendingSources.get(source) ?? 0) >= 8
   )
     return false;
+  if ((liveSources.get(source) ?? 0) >= LIVE_PER_SOURCE) {
+    log.warn("realtime.upgrade", { code: "SOURCE_CONNECTION_LIMIT" });
+    return false;
+  }
+  adjust(liveSources, source, 1);
+  info.req.socket.once("close", () => adjust(liveSources, source, -1));
   pendingCount++;
-  pendingSources.set(source, (pendingSources.get(source) ?? 0) + 1);
+  adjust(pendingSources, source, 1);
   let released = false;
   const release = () => {
     if (released) return;
     released = true;
     pendingCount--;
-    const count = (pendingSources.get(source) ?? 1) - 1;
-    if (count) pendingSources.set(source, count);
-    else pendingSources.delete(source);
+    adjust(pendingSources, source, -1);
   };
   pendingUpgrades.set(info.req, release);
   info.req.socket.once("close", release);
@@ -212,7 +229,7 @@ export class GameplayRealtime
     if (
       !this.runtime.options.enabled ||
       [...this.connections].filter((c) => !c.actor).length >= 64 ||
-      this.connections.size >= 1200
+      this.connections.size >= this.runtime.admission.socketLimit()
     ) {
       socket.close(1013, "Capacity");
       return;

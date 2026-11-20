@@ -61,11 +61,7 @@ export async function startGame(
     false,
   );
   operations.identity.host(initialRoom, actor);
-  requireState(
-    operations.runtime.admission.availability().admission === "open",
-    "SERVER_AT_CAPACITY",
-    503,
-  );
+  operations.runtime.admission.admit();
   await operations.preflight(roomId);
   return operations.runtime.admission.allocate(
     `start:${operationId}`,

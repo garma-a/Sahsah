@@ -8,11 +8,12 @@ import { mountAdminDashboard } from "./admin/admin-dashboard.js";
 
 import type { GameplayOptions } from "./gameplay/platform/ports.js";
 import { localMedia, publicMediaBaseUrl, r2Signer } from "./gameplay/media/media.js";
-import { trustedProxyHops } from "./gameplay/platform/http.js";
+import { edgeProtection, trustedProxyHops } from "./gameplay/platform/http.js";
+import { sendProblem } from "./gameplay/platform/problem.js";
 import { GameplayWsAdapter } from "./gameplay/realtime/gateway.js";
 import { json, type ErrorRequestHandler } from "express";
 import { PinoLogger } from "nestjs-pino";
-import { currentRequestId, requestLogging, SafeNestLogger, log } from "./gameplay/platform/logging.js";
+import { requestLogging, SafeNestLogger, log } from "./gameplay/platform/logging.js";
 
 export async function createApplication(
   options: { gameplay?: GameplayOptions } = {},
@@ -20,6 +21,8 @@ export async function createApplication(
   const app = await NestFactory.create(AppModule, { abortOnError: false, logger: false });
   app.useLogger(new SafeNestLogger(await app.resolve(PinoLogger)));
   app.use(requestLogging());
+  // Before AdminJS, body parsing and Nest's handlers: refuse floods while they are still cheap.
+  app.use(edgeProtection(process.env));
   const config = app.get(ConfigService);
   const express = app.getHttpAdapter().getInstance();
   express.disable("x-powered-by");
@@ -79,20 +82,10 @@ export async function createApplication(
     app.use("/api/v1", json({ limit: "16kb", strict: true }));
     const bodyError: ErrorRequestHandler = (error, _req, res, next) => {
       if (!error) return next();
-      const status = error.status === 413 ? 413 : 400;
-      const requestId = currentRequestId();
-      log.warn("platform.http.body", { code: status === 413 ? "BODY_TOO_LARGE" : "INVALID_INPUT", status });
-      res.setHeader("X-Request-ID", requestId);
-      res
-        .status(status)
-        .setHeader("Cache-Control", "private, no-store")
-        .json({
-          type: "urn:sahsah:problem:invalid-input",
-          title: "Invalid request body",
-          status,
-          code: status === 413 ? "BODY_TOO_LARGE" : "INVALID_INPUT",
-          requestId,
-        });
+      const status = error.status === 413 ? 413 : 400,
+        code = status === 413 ? "BODY_TOO_LARGE" : "INVALID_INPUT";
+      log.warn("platform.http.body", { code, status });
+      sendProblem(res, status, code);
     };
     app.use("/api/v1", bodyError);
     await app.init();

@@ -33,6 +33,15 @@ export async function listCategories(signal?: AbortSignal): Promise<Category[]> 
   return items;
 }
 
+/** Whether the category has any playable pack at all, played before or not. */
+export async function hasPlayablePack(categoryId: Id, auth: Auth): Promise<boolean> {
+  const page = await request<Page<Pack>>(`/categories/${categoryId}/packs`, {
+    auth,
+    query: { language: LANGUAGE, limit: 1 },
+  });
+  return page.items.length > 0;
+}
+
 /** The first playable pack this host has not played before, or undefined when none is left. */
 export async function firstFreshPack(categoryId: Id, auth: Auth): Promise<Pack | undefined> {
   const page = await request<Page<Pack>>(`/categories/${categoryId}/packs`, {

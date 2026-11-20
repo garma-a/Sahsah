@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import Button from "@/components/ui/button";
 import Poster from "@/components/home/poster";
+import { toneAt } from "@/components/brand/tones";
 import { RowEnds } from "@/components/home/shelf-decor";
 import type { ApiError } from "@/lib/api/client";
 import type { Category } from "@/lib/api/types";
@@ -33,7 +34,7 @@ export default function Shelves({ state, selected, onToggle, onRetry }: ShelvesP
   if (state.status === "error") return <ShelfError error={state.error} onRetry={onRetry} />;
   if (!shelves.length) {
     return (
-      <p className="rounded-2xl border-[3px] border-dashed border-cream/40 p-8 text-center text-lg font-medium text-cream">
+      <p className="rounded-2xl border-[3px] border-dashed border-ink/40 p-8 text-center text-lg font-medium">
         مفيش فئات متاحة دلوقتي. جرّب تفتح الصفحة تاني بعد شوية.
       </p>
     );
@@ -43,17 +44,10 @@ export default function Shelves({ state, selected, onToggle, onRetry }: ShelvesP
     <div className="space-y-14">
       {shelves.map((shelf, shelfIndex) => (
         <section key={shelf.id} aria-labelledby={`shelf-${shelf.id}`}>
-          {/* The section name on a backlit marquee board ringed with bulbs. */}
-          <div className="mb-12 flex justify-center">
-            <div className="rounded-lg bg-[#1a0f08] bg-[radial-gradient(circle,#ffe9a8_0_2.5px,transparent_3.5px)] bg-[length:18px_18px] bg-[position:9px_9px] p-[13px] shadow-[0_0_0_2px_#c39a45,0_0_0_5px_#1a0f08,0_0_0_7px_#8a6424,0_16px_30px_rgb(0_0_0/0.65),0_0_40px_rgb(255_200_110/0.25)]">
-              <h2
-                id={`shelf-${shelf.id}`}
-                className="rounded-[3px] bg-[#120a05] px-8 pb-2 pt-1 text-center font-poster text-4xl leading-tight text-[#fde8b0] shadow-[0_0_0_1px_#8a6424] [text-shadow:0_0_14px_rgb(255_190_90/0.75),2px_2px_0_#6e1414] sm:px-12 sm:text-5xl"
-              >
-                {shelf.name}
-              </h2>
-            </div>
-          </div>
+          <h2 id={`shelf-${shelf.id}`} className="font-poster text-4xl leading-tight text-press [text-shadow:2px_2px_0_var(--color-ink)] sm:text-5xl">
+            {shelf.name}
+          </h2>
+          <div aria-hidden className={`mt-2 mb-12 h-[3px] w-full ${toneAt(shelfIndex).rule}`} />
           <div className={grid}>
             <RowEnds count={shelf.categories.length} variant={shelfIndex} />
             <ul className={list}>
@@ -82,10 +76,11 @@ function ShelfSkeleton() {
     <div role="status" aria-label="بنحمّل الفئات" className="space-y-14">
       {[0, 1].map((row) => (
         <div key={row}>
-          <div className="mx-auto mb-12 h-16 w-64 rounded-lg bg-black/30" />
+          <div className="h-10 w-48 rounded-md bg-charcoal/15" />
+          <div className="mt-2 mb-12 h-[3px] w-full bg-charcoal/15" />
           <div className={cn(grid, list)}>
             {[0, 1, 2, 3].map((n) => (
-              <div key={n} className={`${item} aspect-[4/5] rounded-[3px] border-[5px] border-[#8a6424]/40 bg-black/25`} />
+              <div key={n} className={`${item} aspect-[4/5] border-[5px] border-charcoal/15 bg-charcoal/10`} />
             ))}
           </div>
         </div>

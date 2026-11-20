@@ -8,6 +8,10 @@ export interface CapacityVector {
   games: number;
 }
 type Allocation = "create" | "join" | "start";
+/** Why admission is paused: real load or capacity, or no fresh pressure reading to judge by. */
+type PauseReason = "overloaded" | "full" | "unmonitored";
+// One spiky second (a GC pause, a cold code path) is not overload: it must last this many samples.
+const OVERLOAD_SAMPLES = 3;
 const capacityKeys: (keyof CapacityVector)[] = ["rooms", "members", "games"];
 const delta: Record<Allocation, CapacityVector> = {
   create: { rooms: 1, members: 1, games: 0 },
@@ -28,6 +32,9 @@ export class Admission {
   private ceiling?: CapacityVector;
   revision = 0;
   private loggedPaused = false;
+  private overSamples = 0;
+  private reason: PauseReason = "unmonitored";
+  /** Sets the ceiling; may be called again as resources change. Returns whether it changed. */
   configure(ceiling: CapacityVector) {
     requireState(
       [ceiling.rooms, ceiling.members, ceiling.games].every(
@@ -36,7 +43,16 @@ export class Admission {
       "INVALID_CAPACITY_PROFILE",
       500,
     );
-    this.ceiling = ceiling;
+    const changed = capacityKeys.some((key) => this.ceiling?.[key] !== ceiling[key]);
+    this.ceiling = { ...ceiling };
+    return changed;
+  }
+  limits(): CapacityVector | undefined {
+    return this.ceiling && { ...this.ceiling };
+  }
+  /** Open sockets the server accepts: two per admitted member covers TV displays and reconnects. */
+  socketLimit() {
+    return (this.ceiling?.members ?? 0) * 2;
   }
   reconcile(counts: CapacityVector, revision: number) {
     if (this.revision === revision) this.occupancy = counts;
@@ -66,8 +82,17 @@ export class Admission {
       this.unavailableSince = 0;
     const load = Math.max(sample.api, sample.database, sample.application ?? 0);
     if (load >= 0.85) {
-      this.closed = true;
       this.healthySince = 0;
+      if (++this.overSamples >= OVERLOAD_SAMPLES) {
+        this.closed = true;
+        this.reason = "overloaded";
+      }
+      return;
+    }
+    this.overSamples = 0;
+    if (this.closed && this.reason === "unmonitored" && this.fresh(now)) {
+      // Monitoring is back and the load is not high: nothing to wait out.
+      this.closed = false;
     } else if (load <= 0.75 && this.fresh(now)) {
       if (!this.healthySince) this.healthySince = now;
       if (now - this.healthySince >= 30000) this.closed = false;
@@ -83,7 +108,7 @@ export class Admission {
   initialize(sample: PressureSample) {
     this.update(sample);
     if (
-      Math.max(sample.api, sample.database, sample.application ?? 0) < 0.75 &&
+      Math.max(sample.api, sample.database, sample.application ?? 0) < 0.85 &&
       this.fresh(Date.now())
     )
       this.closed = false;
@@ -93,8 +118,10 @@ export class Admission {
     if (!this.fresh(now)) {
       if (!this.unavailableSince) this.unavailableSince = now;
       this.healthySince = 0;
-      if (!this.sample || now - this.unavailableSince >= 15000)
+      if (!this.sample || now - this.unavailableSince >= 15000) {
         this.closed = true;
+        this.reason = "unmonitored";
+      }
     }
     const full =
       !this.occupancy ||
@@ -103,12 +130,28 @@ export class Admission {
         (key) => this.occupancy![key] >= Math.floor(this.ceiling![key] * 0.85),
       );
     const paused = this.closed || full;
+    if (!this.closed && full) this.reason = "full";
     if (paused && !this.loggedPaused)
       log.warn("platform.admission.availability", { code: "ADMISSION_PAUSED" });
     this.loggedPaused = paused;
     return paused
       ? { admission: "paused", retryAfterSeconds: 15 }
       : { admission: "open" };
+  }
+  /** Current occupancy for observability; undefined until the first reconciliation. */
+  usage(): CapacityVector | undefined {
+    return this.occupancy && { ...this.occupancy };
+  }
+  /**
+   * Refuses new work while admission is paused, saying why: SERVER_AT_CAPACITY only for real load or a full
+   * server, PRESSURE_UNAVAILABLE when there is no fresh reading to judge the load by.
+   */
+  admit() {
+    if (this.availability().admission === "open") return;
+    throw new GameplayProblem(
+      503,
+      this.reason === "unmonitored" ? "PRESSURE_UNAVAILABLE" : "SERVER_AT_CAPACITY",
+    );
   }
   async allocate<T>(
     key: string,
@@ -146,8 +189,8 @@ export class Admission {
           this.occupancy![k] + reserved[k] + delta[kind][k] >
           Math.floor(this.ceiling![k] * 0.85),
       );
+    this.admit();
     if (
-      this.availability().admission !== "open" ||
       over ||
       this.pending.size >= 2 ||
       (kind === "start" &&

@@ -214,7 +214,7 @@ export function ViewerSound({ durationMs, caption, playback, clockOffsetMs }: Vi
         <div className="h-full bg-sun" style={{ width: `${Math.min(100, (position / Math.max(1, durationMs)) * 100)}%` }} />
       </div>
       <p role="status" className="font-heading text-2xl leading-none">
-        {playing ? "المقطع شغّال" : "المضيف بيشغّل المقطع على جهازه"}
+        {playing ? "المقطع شغّال على جهاز المضيف" : playback ? "المقطع واقف" : "الصوت هيشتغل من جهاز المضيف"}
       </p>
     </Frame>
   );
