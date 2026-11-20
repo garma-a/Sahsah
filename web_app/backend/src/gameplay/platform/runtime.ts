@@ -116,6 +116,8 @@ export class GameplayRuntime implements OnModuleInit, OnModuleDestroy {
     await this.reconcileOccupancy();
     if (this.options.pressure) {
       try {
+        // Boot work (module loading, the first queries) is not load: judge from a clean loop reading.
+        this.metrics.loop.reset();
         this.admission.initialize(await this.options.pressure());
       } catch {
         /* admission remains paused */

@@ -46,11 +46,7 @@ export class RoomLifecycle {
         .where(eq(s.rooms.createRequestId, operationId))
     )[0];
     if (source) return;
-    requireState(
-      this.runtime.admission.availability().admission === "open",
-      "SERVER_AT_CAPACITY",
-      503,
-    );
+    this.runtime.admission.admit();
     const existing = (
       await this.database.db
         .select({ id: s.rooms.id })
@@ -73,11 +69,7 @@ export class RoomLifecycle {
         .where(eq(s.roomMemberships.joinRequestId, operationId))
     )[0];
     if (source) return;
-    requireState(
-      this.runtime.admission.availability().admission === "open",
-      "SERVER_AT_CAPACITY",
-      503,
-    );
+    this.runtime.admission.admit();
     const room = (
       await this.database.db
         .select({ id: s.rooms.id })

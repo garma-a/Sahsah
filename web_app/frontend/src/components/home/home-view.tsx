@@ -117,16 +117,8 @@ export default function HomeView() {
         </div>
 
         <div className="relative mx-auto max-w-[1200px] px-3 pt-10 sm:px-8 lg:px-12 lg:pt-28">
-          {/* The shelves are the lobby's display case: crimson velvet behind brass trim in a walnut frame, screwed to the poster wall. */}
-          <div className="relative rounded-xl bg-[#3b2414] bg-[url(/cinema/walnut.webp)] bg-[length:900px_auto] p-2.5 shadow-[0_0_0_2px_#140b06,0_30px_60px_rgb(0_0_0/0.7),inset_0_1px_0_rgb(255_235_200/0.25)] sm:p-4">
-          <div className="relative rounded-[5px] bg-[#4d0f16] bg-[url(/cinema/velvet.webp)] bg-[length:1100px_auto] px-4 pt-8 pb-0 shadow-[inset_0_0_0_2px_rgb(201_150_60/0.7),inset_0_14px_40px_rgb(0_0_0/0.75),inset_0_0_140px_rgb(0_0_0/0.55)] sm:px-6 md:px-10 md:pt-12">
-            {["start-2 top-2", "end-2 top-2", "start-2 bottom-2", "end-2 bottom-2"].map((spot) => (
-              <span
-                key={spot}
-                aria-hidden
-                className={`absolute ${spot} z-10 size-3 rounded-full border border-ink/60 bg-[radial-gradient(circle_at_35%_35%,#f3d68a,#a8782a_60%,#5a3d12)] after:absolute after:inset-x-0.5 after:top-1/2 after:h-px after:-rotate-45 after:bg-ink/60`}
-              />
-            ))}
+          {/* The shelves sit on a sheet of cream paper pinned to the poster wall: a chunky ink outline and a bright offset shadow, like the game's cards. */}
+          <div className="relative rounded-[2rem] border-4 border-ink bg-[#f3e6c8] px-4 pt-8 pb-0 shadow-[10px_12px_0_var(--color-cyan),0_24px_50px_rgb(0_0_0/0.45)] [background-image:var(--grain)] sm:px-6 md:px-10 md:pt-12">
             {openRoom && (
               <div className="mb-10 flex flex-wrap items-center justify-between gap-4 rounded-2xl border-[3px] border-ink bg-sun px-5 py-4 shadow-[0_5px_0_var(--color-ink)]">
                 <p className="font-heading text-2xl">عندك غرفة مفتوحة</p>
@@ -137,7 +129,6 @@ export default function HomeView() {
             )}
             <Shelves state={state} selected={selected} onToggle={toggle} onRetry={retry} />
             <DisplayLedge />
-          </div>
           </div>
         </div>
       </main>

@@ -231,7 +231,9 @@ test(
     );
     const core = f.app.get(GameplayService);
     f.setPressure(0.9);
-    core.admission.update({ api: 0.9, database: 0.1, sampledAt: Date.now() });
+    // Admission pauses only when high load lasts several samples.
+    for (let i = 0; i < 3; i++)
+      core.admission.update({ api: 0.9, database: 0.1, sampledAt: Date.now() });
     assert.equal(
       (await call("GET", "/gameplay/availability")).body.admission,
       "paused",

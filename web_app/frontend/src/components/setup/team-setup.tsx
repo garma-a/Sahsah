@@ -15,7 +15,7 @@ import ErrorBanner from "@/components/ui/error-banner";
 import Input from "@/components/ui/input";
 import StatusCard from "@/components/ui/status-card";
 import { ApiError } from "@/lib/api/client";
-import { createRoom, firstFreshPack } from "@/lib/api/endpoints";
+import { createRoom, firstFreshPack, hasPlayablePack } from "@/lib/api/endpoints";
 import { messageOf, requireField } from "@/lib/api/errors";
 import { isIdentityRejected } from "@/lib/api/problems";
 import type { Selection } from "@/lib/api/types";
@@ -28,7 +28,8 @@ import { BOARD_SIZE } from "@/stores/draft-store";
 type Problem =
   | { kind: "message"; text: string }
   | { kind: "open-room"; roomId: string }
-  | { kind: "no-pack"; categoryIds: string[] };
+  /** `played`: every pack was played before by this host. `empty`: the category has no playable pack at all. */
+  | { kind: "no-pack"; played: string[]; empty: string[] };
 
 export default function TeamSetup() {
   const router = useRouter();
@@ -71,7 +72,13 @@ export default function TeamSetup() {
       const packs = await Promise.all(selected.map((categoryId) => firstFreshPack(categoryId, auth)));
       const missing = selected.filter((_, i) => !packs[i]);
       if (missing.length) {
-        setProblem({ kind: "no-pack", categoryIds: missing });
+        // No fresh pack means either all were played, or there is no playable pack: ask which, so the text is true.
+        const playable = await Promise.all(missing.map((categoryId) => hasPlayablePack(categoryId, auth)));
+        setProblem({
+          kind: "no-pack",
+          played: missing.filter((_, i) => playable[i]),
+          empty: missing.filter((_, i) => !playable[i]),
+        });
         return;
       }
       const selections: Omit<Selection, "repeatConsentBasis">[] = selected.map((categoryId, i) => ({
@@ -136,7 +143,7 @@ export default function TeamSetup() {
       <Shell>
         <div className="mx-auto max-w-md rounded-[2rem] border-4 border-ink bg-white p-6 shadow-[0_8px_0_var(--color-ink)] sm:p-8">
           <h1 className="mb-1 text-center font-heading text-4xl">قبل ما نبدأ</h1>
-          <p className="mb-6 text-center font-medium">الجلسة خلصت. ادخل الكود السري واسمك تاني.</p>
+          <p className="mb-6 text-center font-medium">ادخل الكود السري واسمك عشان نفتح الغرفة.</p>
           <SessionForm onDone={() => undefined} defaultName="" />
         </div>
       </Shell>
@@ -229,12 +236,23 @@ function ProblemNotice({
     );
   }
   if (problem.kind === "no-pack") {
-    const names = problem.categoryIds.map((id) => byId.get(id)?.category.name ?? "فئة");
+    const names = (ids: string[]) => ids.map((id) => byId.get(id)?.category.name ?? "فئة").join("، ");
     return (
-      <div role="alert" className="rounded-2xl border-[3px] border-ink bg-sun p-5 shadow-[0_5px_0_var(--color-ink)]">
-        <p className="font-heading text-2xl">مفيش أسئلة جديدة في: {names.join("، ")}</p>
-        <p className="mt-1 font-medium">إنت لعبت كل الأسئلة المتاحة فيها. اختار فئة تانية بداله.</p>
-        <Button variant="dark" size="sm" className="mt-3" onClick={() => onDropMissing(problem.categoryIds)}>
+      <div role="alert" className="space-y-3 rounded-2xl border-[3px] border-ink bg-sun p-5 shadow-[0_5px_0_var(--color-ink)]">
+        {problem.played.length > 0 && (
+          <div>
+            <p className="font-heading text-2xl">مفيش أسئلة جديدة في: {names(problem.played)}</p>
+            <p className="mt-1 font-medium">إنت لعبت كل الأسئلة المتاحة فيها.</p>
+          </div>
+        )}
+        {problem.empty.length > 0 && (
+          <div>
+            <p className="font-heading text-2xl">مفيش أسئلة جاهزة في: {names(problem.empty)}</p>
+            <p className="mt-1 font-medium">الفئة دي لسه مش جاهزة للعب.</p>
+          </div>
+        )}
+        <p className="font-medium">اختار فئة تانية بدالها.</p>
+        <Button variant="dark" size="sm" onClick={() => onDropMissing([...problem.played, ...problem.empty])}>
           اختار فئة تانية
         </Button>
       </div>
