@@ -62,7 +62,6 @@ test(
     const port = await freePort();
     Object.assign(process.env, {
       NODE_ENV: "test",
-      ADMIN_ENABLED: "false",
       PORT: String(port),
       DATABASE_URL: pg.url("sahsah_app", "sahsah_preview"),
       GAMEPLAY_ENABLED: "true",

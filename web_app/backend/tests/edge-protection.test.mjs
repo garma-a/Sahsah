@@ -5,7 +5,6 @@ import { sourceKey } from "../dist/gameplay/platform/rates.js";
 
 process.env.DATABASE_URL = "";
 process.env.GAMEPLAY_ENABLED = "false";
-process.env.ADMIN_ENABLED = "false";
 process.env.NODE_ENV = "test";
 
 test("one client is one IPv4 address or one IPv6 /64", () => {
