@@ -91,7 +91,8 @@ class _PlayerBadge extends StatelessWidget {
         onTap: () => ShellNav.of(context).go(AppRoute.account),
         child: Container(
           height: 44,
-          padding: const EdgeInsetsDirectional.fromSTEB(5, 5, 14, 5),
+          // The ink outline takes 3px a side, so the padding is slim.
+          padding: const EdgeInsetsDirectional.fromSTEB(2, 2, 14, 2),
           decoration: glassDecoration(
             radius: BorderRadius.circular(999),
             shadow: false,

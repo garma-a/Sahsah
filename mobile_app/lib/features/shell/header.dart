@@ -110,7 +110,7 @@ class LangToggle extends StatelessWidget {
         child: Container(
           height: 44,
           constraints: const BoxConstraints(minWidth: 44),
-          padding: const EdgeInsets.symmetric(horizontal: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
           decoration: glassDecoration(
             radius: BorderRadius.circular(999),
             shadow: false,
@@ -156,7 +156,7 @@ class TokenWallet extends StatelessWidget {
         onTap: () => ShellNav.of(context).go(AppRoute.shop),
         child: Container(
           height: 44,
-          padding: const EdgeInsets.symmetric(horizontal: 5),
+          padding: const EdgeInsets.symmetric(horizontal: 2),
           decoration: glassDecoration(
             radius: BorderRadius.circular(999),
             shadow: false,
@@ -177,7 +177,7 @@ class TokenWallet extends StatelessWidget {
                   color: AppColors.forest,
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               free
                   ? Text(
                       lang.t('اللعب مجاني', 'El le3b magany'),
@@ -196,7 +196,7 @@ class TokenWallet extends StatelessWidget {
               // "+" (buy more) only when there's a balance to add to; while
               // play is free it would promise something that isn't there.
               if (free)
-                const SizedBox(width: 12)
+                const SizedBox(width: 10)
               else ...[
                 const SizedBox(width: 10),
                 Container(

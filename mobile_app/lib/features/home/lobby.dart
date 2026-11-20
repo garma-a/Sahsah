@@ -93,9 +93,8 @@ class _MenuColumn extends StatelessWidget {
                 width: 84,
                 height: tile,
                 depth: 5,
-                color: Color.lerp(AppColors.ui, accent, 0.12)!,
-                edgeColor: Color.lerp(AppColors.deep, accent, 0.55),
-                borderColor: accent.withValues(alpha: 0.75),
+                color: AppColors.ui,
+                borderColor: accent,
                 onTap: () => nav.go(route),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -131,11 +130,16 @@ class _Stage extends StatelessWidget {
     final featured = categorySections.first;
 
     return Container(
+      // The website's shelf sheet: cream paper pinned to the wall with an
+      // ink outline and a bright cyan offset shadow.
       decoration: BoxDecoration(
         borderRadius: radius,
-        color: AppColors.card,
-        border: Border.all(color: AppColors.ivory.withValues(alpha: 0.14)),
-        boxShadow: [cssShadow(const Color(0x73000000), y: 18, blur: 40)],
+        color: const Color(0xFFF3E6C8),
+        image: grainImage,
+        border: Border.all(color: AppColors.ink, width: 4),
+        boxShadow: const [
+          BoxShadow(color: AppColors.cyan, offset: Offset(7, 8)),
+        ],
       ),
       child: ClipRRect(
         borderRadius: radius,
@@ -161,14 +165,18 @@ class _Stage extends StatelessWidget {
                     children: [
                       Text(
                         lang.t('يلا نلعب؟', 'Yalla nel3ab?'),
-                        style: AppText.display(36, height: 1.1),
+                        style: AppText.display(
+                          36,
+                          height: 1.1,
+                          color: AppColors.ink,
+                        ),
                       ),
                       Text(
                         lang.t('مستنيين مين؟', 'Mestanyeen meen?'),
                         style: AppText.display(
                           20,
                           height: 1.2,
-                          color: AppColors.gold,
+                          color: AppColors.press,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -179,7 +187,7 @@ class _Stage extends StatelessWidget {
                           const Icon(
                             LucideIcons600.sparkles,
                             size: 15,
-                            color: AppColors.gold,
+                            color: AppColors.press,
                           ),
                           const SizedBox(width: 6),
                           Expanded(
@@ -190,7 +198,7 @@ class _Stage extends StatelessWidget {
                               style: AppText.sans(
                                 14,
                                 weight: FontWeight.w700,
-                                color: AppColors.gold,
+                                color: AppColors.press,
                               ),
                             ),
                           ),
@@ -271,7 +279,7 @@ class _MiniPack extends StatelessWidget {
                     gradient: LinearGradient(
                       begin: Alignment.bottomCenter,
                       end: Alignment.center,
-                      colors: [Color(0xF00B0F2E), Color(0x000B0F2E)],
+                      colors: [Color(0xF02B3230), Color(0x002B3230)],
                     ),
                   ),
                 ),
@@ -338,8 +346,10 @@ class _PlayColumn extends StatelessWidget {
                 key: const ValueKey('lobby-main'),
                 color: AppColors.play,
                 radius: 26,
-                depth: 8,
-                borderColor: AppColors.deep,
+                depth: 6,
+                borderColor: AppColors.cyan,
+                borderWidth: 4,
+                edgeColor: AppColors.pressDeep,
                 onTap: game == null ? () => nav.go(AppRoute.play) : resume,
                 child: Padding(
                   padding: const EdgeInsets.all(8),
@@ -394,8 +404,8 @@ class _PlayColumn extends StatelessWidget {
             key: const ValueKey('lobby-new'),
             height: 46,
             depth: 4,
-            color: AppColors.ui,
-            borderColor: AppColors.ivory.withValues(alpha: 0.3),
+            color: AppColors.ink,
+            borderColor: AppColors.cyan.withValues(alpha: 0.7),
             onTap: () => nav.go(AppRoute.play),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -422,7 +432,6 @@ class _PlayColumn extends StatelessWidget {
         GameButton(
           height: 54,
           color: AppColors.gold,
-          borderColor: AppColors.deep,
           onTap: nav.openJoin,
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -514,7 +523,8 @@ class _HelpChip extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(999),
             color: AppColors.gold,
-            border: Border.all(color: AppColors.deep, width: 1.5),
+            border: Border.all(color: AppColors.ink, width: 2.5),
+            boxShadow: [inkDrop(3)],
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -564,13 +574,13 @@ class _SeeAll extends StatelessWidget {
                 style: AppText.sans(
                   13,
                   weight: FontWeight.w700,
-                  color: AppColors.ivory.withValues(alpha: 0.8),
+                  color: AppColors.ink,
                 ),
               ),
               Icon(
                 lang.ar ? LucideIcons.chevronLeft : LucideIcons.chevronRight,
                 size: 16,
-                color: AppColors.ivory.withValues(alpha: 0.8),
+                color: AppColors.ink,
               ),
             ],
           ),

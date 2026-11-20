@@ -146,8 +146,8 @@ class _PlayCard extends StatelessWidget {
                     end: Alignment.topCenter,
                     colors: [
                       AppColors.card,
-                      Color(0xE6101540),
-                      Color(0x33101540),
+                      Color(0xE622160E),
+                      Color(0x3322160E),
                     ],
                     stops: [0, 0.45, 1],
                   ),
@@ -195,7 +195,6 @@ class _PlayCard extends StatelessWidget {
                         flex: 3,
                         child: PlayButton(
                           height: 60,
-                          sheen: true,
                           onPressed: () => nav.go(AppRoute.play),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,

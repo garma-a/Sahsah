@@ -1,66 +1,96 @@
 import 'package:flutter/material.dart';
 
-/// "Retro night" palette from the brand deck (Canva, slides 23–25 and
-/// 37–40): a navy base for focus, bold retro colours on top. The old names
-/// are kept so every screen picks the palette up.
+/// The website's palette (`web_app/frontend/src/app/globals.css`), taken
+/// from the client's brand sheet: charcoal and cream paper, bold retro
+/// colours on top, and a dark ink for outlines. The old names are kept so
+/// every screen picks the palette up.
 abstract final class AppColors {
-  /// Raised surfaces: dialogs, sheets, bars.
-  static const forest = Color(0xFF161C48);
+  // Brand sheet.
+  static const charcoal = Color(0xFF2B3230);
+  static const cyan = Color(0xFF33C3D6);
+  static const orangeRed = Color(0xFFEE4B2B);
+  static const sun = Color(0xFFFFD233);
+  static const red = Color(0xFFFF3B3B);
+  static const amber = Color(0xFFFFC21A);
+  static const logoBlue = Color(0xFF22529E);
 
-  /// Page background (deep navy).
-  static const deep = Color(0xFF0B0F2E);
+  /// The chunky button face (white on it passes AA, 4.6:1) and its lip.
+  static const press = Color(0xFFD63A19);
+  static const pressDeep = Color(0xFFA52A10);
 
-  /// Tile and button faces.
-  static const ui = Color(0xFF212A66);
+  /// Pink for tiles and ribbons (white on it passes AA, 5.3:1).
+  static const pinkPress = Color(0xFFD1066C);
 
-  /// Primary accent (retro yellow).
-  static const gold = Color(0xFFFFC72C);
-  static const goldBright = Color(0xFFFFD95A);
+  /// Outlines, offset shadows and text on paper.
+  static const ink = Color(0xFF1D2321);
+  static const night = Color(0xFF0E1412);
 
-  /// Text on dark (warm cream white).
-  static const ivory = Color(0xFFFFF6E5);
+  /// Paper: the page cream, the card cream and its shade.
+  static const paper = Color(0xFFFFF8EA);
+  static const paperShade = Color(0xFFECDCB8);
 
-  /// Paper (cards, polaroid frames, torn-paper strips).
-  static const cream = Color(0xFFF3E9D2);
-  static const stroke = Color(0xFFE8DCC0);
+  /// Muted text on paper (AA on [paper]).
+  static const inkMuted = Color(0xFF5B625F);
 
-  /// The red of the play button and the first team. Inside a game solid
-  /// red means the first team and nothing else: badges are gold, and the
-  /// clock's alarm is a light pill with a red edge.
-  static const play = Color(0xFFE63B2E);
-  static const playHover = Color(0xFFC92F24);
+  /// Raised surfaces: dialogs, sheets, bars. Also dark text on light fills.
+  static const forest = ink;
+
+  /// Page background. Charcoal rather than ink, so ink outlines and offset
+  /// shadows show against it.
+  static const deep = charcoal;
+
+  /// Dark tile and button faces (the TV cabinet).
+  static const ui = Color(0xFF262E2C);
+
+  /// Primary accent.
+  static const gold = sun;
+  static const goldBright = Color(0xFFFFE066);
+
+  /// Text on dark.
+  static const ivory = Color(0xFFFFF3DC);
+
+  /// Paper (cards, picture frames, torn-paper strips).
+  static const cream = paper;
+  static const stroke = Color(0xFFD9C7A0);
+
+  /// The main button and alarms. Teams are [cyan] and [sun], so red is
+  /// never a team colour.
+  static const play = press;
+  static const playHover = pressDeep;
 
   /// Behind artwork.
-  static const card = Color(0xFF101540);
+  static const card = Color(0xFF22160E);
 
   /// Poster title strip.
-  static const poster = Color(0xFF0D1238);
+  static const poster = ink;
 
   // Bold retro accents.
-  static const teal = Color(0xFF2EC4D6);
-  static const orange = Color(0xFFF28C28);
-  static const green = Color(0xFF3DAA5C);
-  static const purple = Color(0xFF7B4FD6);
-  static const blue = Color(0xFF2D6BE0);
-  static const pink = Color(0xFFFF2E93);
-  static const maroon = Color(0xFF8E1B3A);
+  static const teal = cyan;
+  static const orange = Color(0xFFF39223);
+  static const green = Color(0xFF3FBF6B);
+  static const purple = pinkPress;
+  static const blue = logoBlue;
+  static const pink = Color(0xFFFF0A84);
+  static const maroon = Color(0xFF8B0029);
 
   /// The rainbow stripe, outside in.
-  static const rainbow = [play, orange, gold, green, teal, blue];
+  static const rainbow = [press, orange, sun, green, cyan, logoBlue];
 
-  /// One bold colour per board slot, for vinyl labels and sleeves.
-  static const categoryColors = [blue, play, gold, green, purple, teal];
+  /// One colour family per board slot, in the website's order
+  /// (`components/brand/tones.ts`). Each clears AA with [inkOn].
+  static const categoryColors = [press, cyan, green, pinkPress, logoBlue, sun];
 
-  /// Text colour that reads on [background]: navy on light, white on dark.
+  /// Text colour that reads on [background]: ink on light, white on dark.
   static Color inkOn(Color background) =>
-      background.computeLuminance() > 0.4 ? deep : const Color(0xFFFFFFFF);
+      background.computeLuminance() > 0.3 ? ink : const Color(0xFFFFFFFF);
 }
 
-/// The three font stacks: `font-display`, `font-sans` and `.num`.
+/// The website's three faces: headings and numbers, body, poster titles.
 abstract final class AppFonts {
   static const display = 'Lalezar';
-  static const sans = 'ReadexPro';
-  static const num = 'ReemKufi';
+  static const sans = 'Alexandria';
+  static const num = 'Lalezar';
+  static const poster = 'Rakkas';
 }
 
 /// Text style helpers. Heights follow Tailwind v4's default line heights so
@@ -105,9 +135,11 @@ abstract final class AppText {
     leadingDistribution: TextLeadingDistribution.even,
   );
 
+  /// Numbers in the heading face, as on the website's scores. Lalezar has
+  /// one weight, so [weight] only matters to fallback fonts.
   static TextStyle num(
     double size, {
-    FontWeight weight = FontWeight.w700,
+    FontWeight weight = FontWeight.w400,
     Color color = AppColors.gold,
     double? height,
   }) => TextStyle(
@@ -119,6 +151,20 @@ abstract final class AppText {
     leadingDistribution: TextLeadingDistribution.even,
     fontFeatures: const [FontFeature.tabularFigures()],
   );
+
+  /// Poster titles, hand-lettered in Rakkas.
+  static TextStyle poster(
+    double size, {
+    Color color = AppColors.ivory,
+    double? height,
+  }) => TextStyle(
+    fontFamily: AppFonts.poster,
+    fontSize: size,
+    fontWeight: FontWeight.w400,
+    color: color,
+    height: height ?? 1.05,
+    leadingDistribution: TextLeadingDistribution.even,
+  );
 }
 
 abstract final class AppTheme {
@@ -129,7 +175,7 @@ abstract final class AppTheme {
       fontFamily: AppFonts.sans,
       colorScheme: const ColorScheme.dark(
         primary: AppColors.gold,
-        onPrimary: AppColors.forest,
+        onPrimary: AppColors.ink,
         secondary: AppColors.play,
         onSecondary: Colors.white,
         surface: AppColors.deep,

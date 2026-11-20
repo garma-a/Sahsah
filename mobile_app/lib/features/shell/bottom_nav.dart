@@ -107,7 +107,7 @@ class _PlayTab extends StatelessWidget {
       width: size,
       height: size,
       radius: size / 2,
-      ringColor: AppColors.deep,
+      ringColor: AppColors.ink,
       ringWidth: 4,
       semanticLabel: lang.t('العب', 'El3ab'),
       onPressed: () => ShellNav.of(context).go(AppRoute.play),
