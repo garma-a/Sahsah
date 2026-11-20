@@ -1,4 +1,4 @@
-import AdminJS, { Router as AdminJSRouter, type PageHandler } from "adminjs";
+import AdminJS, { Router as AdminJSRouter } from "adminjs";
 import AdminJSExpress from "@adminjs/express";
 import express, { type ErrorRequestHandler } from "express";
 import path from "node:path";
@@ -58,15 +58,11 @@ export async function createAdminApplication(env: NodeJS.ProcessEnv = process.en
       next();
     });
 
-    const dashboard: PageHandler = async (_request, _response, context) => ({
-      email: context.currentAdmin?.email,
-      role: context.currentAdmin?.role,
-    });
     const admin = new AdminJS({
       rootPath: ROOT_PATH,
       resources: [],
       componentLoader,
-      dashboard: { component: components.Home, handler: dashboard },
+      dashboard: { component: components.Home },
       pages: buildPages(staff, () => database.db, components),
       branding: { companyName: "Sahsah Admin", logo: false, withMadeWithLove: false, theme },
       locale: { language: "en", availableLanguages: ["en"], translations: { en: { messages: { loginWelcome: "Sign in to Sahsah Admin" } } } },

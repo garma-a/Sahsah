@@ -1,8 +1,9 @@
 import React from "react";
 import { Box, H3, Text } from "@adminjs/design-system";
+import { useSelector } from "react-redux";
 
-const Home = (props) => {
-  const { email, role } = props.data ?? {};
+const Home = () => {
+  const { email, role } = useSelector((state) => state.session) ?? {};
   return (
     <Box variant="white">
       <H3>Welcome to Sahsah Admin</H3>

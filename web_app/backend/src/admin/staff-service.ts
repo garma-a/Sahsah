@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { asc, eq, sql } from "drizzle-orm";
 import type { DatabaseConnection, SahsahDatabase } from "../database/connection.js";
 import { staffAccounts } from "../database/schema/index.js";
+import { log } from "../gameplay/platform/logging.js";
 import { recordAudit } from "./audit.js";
 import { hashPassword, MINIMUM_PASSWORD_LENGTH, temporaryPassword, verifyAgainstDecoy, verifyPassword } from "./passwords.js";
 import { revokeSessions } from "./session-store.js";
@@ -62,7 +63,11 @@ export class StaffService {
   async authenticate(emailInput: unknown, password: unknown): Promise<CurrentStaff | null> {
     const email = normalizeEmail(emailInput);
     if (!email || typeof password !== "string" || !password) return null;
-    if (this.limiter.blocked(email)) throw new StaffError("tooManyRequests", 429);
+    if (this.limiter.blocked(email)) {
+      // Same answer as a wrong password, so the login page renders and the email is not confirmed.
+      log.warn("admin.login", { code: "LOCKED_OUT" });
+      return null;
+    }
     const [account] = await this.db.select().from(staffAccounts).where(eq(staffAccounts.normalizedEmail, email)).limit(1);
     const valid = account ? await verifyPassword(password, account.passwordHash) : (await verifyAgainstDecoy(password), false);
     if (!account || !valid || !account.isActive) {

@@ -29,6 +29,8 @@ const SidebarPages = () => {
     href === ROOT ? location.pathname === ROOT || location.pathname === `${ROOT}/` : location.pathname.startsWith(href);
   return (
     <Box py="lg" px="md" data-css="sidebar-pages">
+      {/* The empty resource section would otherwise take the free space and push this menu down. */}
+      <style>{`[data-css="sidebar-resources"] { flex-grow: 0 !important; }`}</style>
       {GROUPS.map((group) => {
         const items = group.items.filter((item) => !item.superAdminOnly || isSuperAdmin);
         // A group whose only link shares its name is shown as a plain link.

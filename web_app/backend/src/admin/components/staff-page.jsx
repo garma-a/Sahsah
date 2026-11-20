@@ -22,6 +22,7 @@ const StaffPage = () => {
   const [notice, setNotice] = useState(null);
   const [form, setForm] = useState({ email: "", role: "admin" });
   const [busy, setBusy] = useState(false);
+  const [forbidden, setForbidden] = useState(false);
   // One key per intent: a retry after a timeout reuses it, so the change is applied once.
   const keys = useRef({});
 
@@ -31,6 +32,7 @@ const StaffPage = () => {
       setStaff(data.staff);
       setMe(data.me);
     } catch (error) {
+      if (error?.response?.status === 403) setForbidden(true);
       setNotice({ kind: "danger", text: MESSAGES[error?.response?.data?.error] ?? "Staff could not be loaded." });
     }
   }, []);
@@ -73,6 +75,14 @@ const StaffPage = () => {
   };
 
   const field = { padding: "8px", borderRadius: 4, border: "1px solid #c9c2ae", background: "#fff" };
+  if (forbidden) {
+    return (
+      <Box variant="white">
+        <H3>Staff</H3>
+        <Text>{MESSAGES.forbidden}</Text>
+      </Box>
+    );
+  }
   return (
     <Box variant="white">
       <H3>Staff</H3>
@@ -105,9 +115,9 @@ const StaffPage = () => {
               <TableCell>{member.isActive ? "Active" : "Deactivated"}</TableCell>
               <TableCell>
                 <Box flex style={{ gap: 8, flexWrap: "wrap" }}>
-                  <Button size="sm" disabled={busy} onClick={async () => report(await send(`reset:${member.id}`, { op: "reset-password", id: member.id }), "Password reset.")}>Reset password</Button>
+                  <Button size="sm" variant="outlined" disabled={busy} onClick={async () => report(await send(`reset:${member.id}`, { op: "reset-password", id: member.id }), "Password reset.")}>Reset password</Button>
                   {member.id !== me && (
-                    <Button size="sm" disabled={busy} onClick={() => send(`role:${member.id}:${member.role}`, { op: "role", id: member.id, role: member.role === "admin" ? "super_admin" : "admin" })}>
+                    <Button size="sm" variant="outlined" disabled={busy} onClick={() => send(`role:${member.id}:${member.role}`, { op: "role", id: member.id, role: member.role === "admin" ? "super_admin" : "admin" })}>
                       Make {member.role === "admin" ? "Super Admin" : "Admin"}
                     </Button>
                   )}

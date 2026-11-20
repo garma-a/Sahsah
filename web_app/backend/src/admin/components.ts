@@ -13,3 +13,4 @@ export const components = {
 };
 // Replaces AdminJS's flat "Pages" list with the grouped navigation.
 componentLoader.override("SidebarPages", path.join(directory, "sidebar-pages"));
+componentLoader.override("SidebarResourceSection", path.join(directory, "empty"));

@@ -91,8 +91,11 @@ test("repeated wrong passwords lock the account out for a while", { timeout: 120
   const { base } = await start();
   for (let attempt = 0; attempt < 5; attempt++) await login(base, BOOTSTRAP.email, "wrong-password-123");
   const locked = await login(base, BOOTSTRAP.email, BOOTSTRAP.password);
+  // The login page is rendered again (not a JSON error) and no session is issued.
   assert.equal(locked.cookie, undefined);
   assert.notEqual(locked.response.status, 302);
+  assert.match(locked.response.headers.get("content-type") ?? "", /html/);
+  assert.match(await locked.response.text(), /Sahsah Admin/);
 });
 
 test("the first Super Admin is created from the environment on first boot only", { timeout: 120000 }, async (t) => {
