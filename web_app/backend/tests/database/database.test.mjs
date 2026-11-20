@@ -14,6 +14,11 @@ import { grantRuntime } from "../../dist/database/permissions.js";
 import * as schema from "../../dist/database/schema/index.js";
 import { cluster, exec } from "./cluster.mjs";
 
+// The checked-in journal is the source of truth for how many migrations exist.
+const migrationCount = JSON.parse(
+  await readFile(new URL("../../drizzle/meta/_journal.json", import.meta.url), "utf8"),
+).entries.length;
+
 function config(url, extra = {}) {
   return readDatabaseConfig({ NODE_ENV: "test", DATABASE_URL: url, DATABASE_POOL_MAX: "1", ...extra });
 }
@@ -162,7 +167,7 @@ test("PostgreSQL 18 migrations, runtime permissions and transactions", { timeout
 
 
   await t.test("fresh and repeat migrations preserve the complete schema", async () => {
-    assert.equal((await migrationStatus(owner)).filter((entry) => entry.applied).length, 5);
+    assert.equal((await migrationStatus(owner)).filter((entry) => entry.applied).length, migrationCount);
     await applyMigrations(owner);
     const { rows: [counts] } = await owner.query(`SELECT
       (SELECT count(*)::int FROM pg_tables WHERE schemaname='public') AS tables,
@@ -329,7 +334,7 @@ test("PostgreSQL 18 migrations, runtime permissions and transactions", { timeout
     const second = await pg.connect("sahsah_owner", "sahsah_concurrent_migrations");
     try {
       await Promise.all([applyMigrations(first), applyMigrations(second)]);
-      assert.equal((await migrationStatus(first)).filter((entry) => entry.applied).length, 5);
+      assert.equal((await migrationStatus(first)).filter((entry) => entry.applied).length, migrationCount);
     } finally { await first.end(); await second.end(); }
   });
 });
