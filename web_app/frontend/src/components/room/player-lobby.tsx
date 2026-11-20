@@ -78,13 +78,15 @@ export default function PlayerLobby({ roomId, view, auth, membershipId, connecte
     });
 
   return (
-    <div className="mx-auto flex w-full max-w-xl flex-1 flex-col gap-4">
-      <section className="paper-card rounded-[1.6rem] border-4 border-ink p-5 shadow-[0_8px_0_var(--color-ink)]">
-        <h1 className="font-heading text-4xl leading-tight">أهلًا يا {me.displayName}</h1>
-        <p className="mt-1 text-base font-medium">اختار فريقك وبعدين اضغط جاهز.</p>
+    // A phone held sideways has ~300px of height: the lobby turns into two columns (teams | greeting and ready)
+    // with compact sizes, so everything fits one screen without scrolling.
+    <div className="mx-auto flex w-full max-w-xl flex-1 flex-col gap-4 short:grid short:max-w-4xl short:grid-cols-[minmax(0,1fr)_minmax(0,17rem)] short:grid-rows-[auto_1fr] short:gap-x-4 short:gap-y-2">
+      <section className="paper-card rounded-[1.6rem] border-4 border-ink p-5 shadow-[0_8px_0_var(--color-ink)] short:col-start-2 short:row-start-1 short:rounded-xl short:border-[3px] short:p-2.5 short:shadow-[0_4px_0_var(--color-ink)]">
+        <h1 className="truncate font-heading text-4xl leading-tight short:text-2xl">أهلًا يا {me.displayName}</h1>
+        <p className="mt-1 text-base font-medium short:mt-0 short:text-sm">اختار فريقك وبعدين اضغط جاهز.</p>
       </section>
 
-      <section aria-label="الفريقين" className="grid grid-cols-2 gap-3">
+      <section aria-label="الفريقين" className="grid grid-cols-2 gap-3 short:col-start-1 short:row-span-2 short:row-start-1 short:content-start">
         {[
           { number: 1 as const, name: view.teamOneName },
           { number: 2 as const, name: view.teamTwoName },
@@ -99,7 +101,7 @@ export default function PlayerLobby({ roomId, view, auth, membershipId, connecte
                 disabled={busy !== null}
                 onClick={() => !mine && pickTeam(team.number)}
                 className={cn(
-                  "flex min-h-24 w-full flex-col items-center justify-center gap-1 rounded-2xl border-4 border-ink px-2 py-3 font-heading text-2xl leading-tight transition-[transform,box-shadow] disabled:opacity-70",
+                  "flex min-h-24 w-full flex-col items-center justify-center gap-1 rounded-2xl border-4 border-ink px-2 py-3 font-heading text-2xl leading-tight transition-[transform,box-shadow] disabled:opacity-70 short:min-h-14 short:gap-0 short:rounded-xl short:border-[3px] short:py-1.5 short:text-xl",
                   mine
                     ? cn(teamTone(team.number).fill, "-translate-y-1 shadow-[0_8px_0_var(--color-ink)]")
                     : "bg-white shadow-[0_4px_0_var(--color-ink)] active:translate-y-0.5",
@@ -116,9 +118,9 @@ export default function PlayerLobby({ roomId, view, auth, membershipId, connecte
                   )}
                 </span>
               </button>
-              <ul aria-label={`لاعبين ${team.name}`} className="mt-3 space-y-1.5">
+              <ul aria-label={`لاعبين ${team.name}`} className="mt-3 space-y-1.5 short:mt-2 short:space-y-1">
                 {members.map((member) => (
-                  <li key={member.id} className="flex items-center gap-2 rounded-xl border-2 border-ink/80 bg-white px-3 py-1.5 text-base font-bold">
+                  <li key={member.id} className="flex items-center gap-2 rounded-xl border-2 border-ink/80 bg-white px-3 py-1.5 text-base font-bold short:rounded-lg short:py-0.5 short:text-sm">
                     <span aria-hidden className={cn("size-2.5 shrink-0 rounded-full", member.ready ? "bg-green" : connected.has(member.id) ? "bg-amber" : "bg-charcoal/30")} />
                     <span className="min-w-0 truncate">{member.displayName}</span>
                     {member.ready && <span className="ms-auto shrink-0 text-sm font-bold">جاهز</span>}
@@ -130,7 +132,7 @@ export default function PlayerLobby({ roomId, view, auth, membershipId, connecte
         })}
       </section>
 
-      <div className="sticky bottom-3 mt-auto space-y-2 pt-2">
+      <div className="sticky bottom-3 mt-auto space-y-2 pt-2 short:static short:col-start-2 short:row-start-2 short:mt-0 short:self-start short:pt-0">
         {problem && <ErrorBanner>{problem}</ErrorBanner>}
         {me.teamNumber === null && <p className="text-center text-sm font-bold text-cream">اختار فريق الأول.</p>}
         <Button
@@ -139,11 +141,11 @@ export default function PlayerLobby({ roomId, view, auth, membershipId, connecte
           disabled={busy !== null || me.teamNumber === null}
           onClick={toggleReady}
           aria-pressed={me.ready}
-          className="w-full"
+          className="w-full short:h-12 short:px-4 short:text-2xl"
         >
           {me.ready ? "جاهز ✓ (اضغط عشان تلغي)" : "أنا جاهز"}
         </Button>
-        <p role="status" className="flex flex-wrap items-center justify-center gap-x-2 text-center text-base font-bold text-cream">
+        <p role="status" className="flex flex-wrap items-center justify-center gap-x-2 text-center text-base font-bold text-cream short:text-sm">
           <NumberChip value={readyCount} />
           <span>من</span>
           <NumberChip value={players.length} />

@@ -20,6 +20,10 @@ export const viewport: Viewport = {
   themeColor: "#2b3230",
   width: "device-width",
   initialScale: 1,
+  // The game is laid out to fill one screen; pinch and double-tap zoom only push controls out of view.
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
