@@ -133,9 +133,7 @@ Behind a platform proxy set `TRUSTED_PROXY_HOPS` (Railway: 1) so rate limits and
 
 ## Deployment
 
-Production runs on Railway (project `endearing-clarity`, environment `production`): the `api` service at https://api.sa7sa7.cc and a PostgreSQL 18 service. The `api` service follows `main` in GitHub with root directory `/web_app/backend` and watch path `/web_app/backend/**`, and waits for the GitHub checks to pass before it builds. It runs one replica with no deployment overlap, because the gameplay lease admits one process: each deploy stops the old container before the new one serves, so expect a few seconds of downtime.
-
-The API connects as `sahsah_app` to the `sahsah` database over Railway's private network. The migration-owner URL is stored as `SAHSAH_MIGRATION_DATABASE_URL` on the Postgres service, not on the API. Startup refuses an unapplied migration, so apply a new migration **before** merging it: open a temporary TCP proxy on the Postgres service, run `pnpm db:migrate` and `pnpm db:grant-runtime` with `MIGRATION_DATABASE_URL` pointing through it (`?sslmode=no-verify`), then delete the proxy. Re-run `pnpm content:seed` the same way after content changes.
+Production runs on Railway, deploys from `main` through Railway's GitHub integration, and takes migrations by hand before merge. See [docs/deployment](../../docs/deployment/README.md).
 
 ## How to add a feature or a host action
 
