@@ -8,9 +8,6 @@ importers:
 
   .:
     dependencies:
-      '@opennextjs/cloudflare':
-        specifier: 1.20.16
-        version: 1.20.16(next@16.4.6(@babel/core@7.29.7)(@types/node@24.19.2)(babel-plugin-macros@3.1.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(wrangler@4.157.0(@types/node@24.19.2))
       '@radix-ui/react-slot':
         specifier: 1.5.0
         version: 1.5.0(@types/react@19.3.0)(react@19.3.1)
@@ -42,6 +39,9 @@ importers:
         specifier: 5.0.16
         version: 5.0.16(@types/react@19.3.0)(react@19.3.1)(use-sync-external-store@1.7.0(react@19.3.1))
     devDependencies:
+      '@opennextjs/cloudflare':
+        specifier: 1.20.16
+        version: 1.20.16(next@16.4.6(@babel/core@7.29.7)(@types/node@24.19.2)(babel-plugin-macros@3.1.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(wrangler@4.157.0(@types/node@24.19.2))
       '@tailwindcss/postcss':
         specifier: 4.3.3
         version: 4.3.3
