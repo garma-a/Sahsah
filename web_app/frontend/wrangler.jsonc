@@ -1,0 +1,21 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "sahsah-frontend",
+	"main": ".open-next/worker.js",
+	"compatibility_date": "2026-11-01",
+	"compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+	"assets": {
+		"directory": ".open-next/assets",
+		"binding": "ASSETS"
+	},
+	"services": [
+		// Self-reference binding required by OpenNext; must match "name".
+		{ "binding": "WORKER_SELF_REFERENCE", "service": "sahsah-frontend" }
+	],
+	"images": { "binding": "IMAGES" },
+	"routes": [
+		{ "pattern": "sa7sa7.cc", "custom_domain": true },
+		{ "pattern": "www.sa7sa7.cc", "custom_domain": true }
+	],
+	"observability": { "enabled": true }
+}

@@ -12,12 +12,38 @@ on:
 permissions:
   contents: read
 
+# Pull requests cancel superseded runs; pushes to main never cancel a run that may be deploying.
 concurrency:
   group: web-app-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Which applications this push or pull request touched. A missing base (new branch) counts as both.
+  changes:
+    runs-on: ubuntu-24.04
+    outputs:
+      frontend: ${{ steps.diff.outputs.frontend }}
+      backend: ${{ steps.diff.outputs.backend }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - id: diff
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            echo "frontend=true" >> "$GITHUB_OUTPUT"; echo "backend=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          files=$(git diff --name-only "$BASE" HEAD)
+          for app in frontend backend; do
+            if grep -qE "^(web_app/$app/|\.github/workflows/web-app\.yml$)" <<<"$files"; then v=true; else v=false; fi
+            echo "$app=$v" >> "$GITHUB_OUTPUT"
+          done
+
   frontend:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     defaults:
@@ -42,6 +68,8 @@ jobs:
       - run: pnpm audit --prod --audit-level high
 
   backend:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     defaults:
@@ -70,3 +98,41 @@ jobs:
       - run: pnpm run db:check
       - run: pnpm test
       - run: pnpm run test:database
+
+  # Deploys run only for pushes to main, after the application's own checks pass.
+  # The backend is deployed by Railway itself: the api service follows main, rebuilds only for
+  # web_app/backend/** changes and waits for these GitHub checks to pass first ("Wait for CI").
+  deploy-frontend:
+    needs: frontend
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment:
+      name: production-frontend
+      url: https://sa7sa7.cc
+    concurrency:
+      group: deploy-frontend
+      cancel-in-progress: false
+    defaults:
+      run:
+        working-directory: web_app/frontend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: web_app/frontend/package.json
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: web_app/frontend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      # Builds with OpenNext and deploys the sahsah-frontend Worker (wrangler.jsonc) to sa7sa7.cc.
+      - run: pnpm run deploy
+        env:
+          NEXT_PUBLIC_API_URL: https://api.sa7sa7.cc/api
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Smoke test
+        run: curl -fsS --retry 10 --retry-delay 6 --retry-all-errors -o /dev/null https://sa7sa7.cc/
+

@@ -131,6 +131,12 @@ Local `.env` values: the two database URLs shown in `.env.example`, `GAMEPLAY_EN
 
 Behind a platform proxy set `TRUSTED_PROXY_HOPS` (Railway: 1) so rate limits and pending-connection limits apply per player rather than to the proxy.
 
+## Deployment
+
+Production runs on Railway (project `endearing-clarity`, environment `production`): the `api` service at https://api.sa7sa7.cc and a PostgreSQL 18 service. The `api` service follows `main` in GitHub with root directory `/web_app/backend` and watch path `/web_app/backend/**`, and waits for the GitHub checks to pass before it builds. It runs one replica with no deployment overlap, because the gameplay lease admits one process: each deploy stops the old container before the new one serves, so expect a few seconds of downtime.
+
+The API connects as `sahsah_app` to the `sahsah` database over Railway's private network. The migration-owner URL is stored as `SAHSAH_MIGRATION_DATABASE_URL` on the Postgres service, not on the API. Startup refuses an unapplied migration, so apply a new migration **before** merging it: open a temporary TCP proxy on the Postgres service, run `pnpm db:migrate` and `pnpm db:grant-runtime` with `MIGRATION_DATABASE_URL` pointing through it (`?sslmode=no-verify`), then delete the proxy. Re-run `pnpm content:seed` the same way after content changes.
+
 ## How to add a feature or a host action
 
 Gameplay lives in feature folders under `src/gameplay/`: catalog, rooms (including lifecycle), games, realtime, media, preview and maintenance. The platform providers separate runtime configuration/admission (`GameplayRuntime`), identity and credential caches (`GameplayIdentity`), room receipts (`RoomReceipts`), hints and post-commit push (`GameplayOutbox`), and retry/transaction coordination (`GameplayTransactions`). Room creation is `rooms/create.ts`; room reads/membership checks are `rooms/access.ts`. Platform code also owns clocks, scheduling, HTTP helpers and logging. Inject only the focused providers the feature needs. Shared row/actor types live in `platform/types.ts`; contract files remain at the gameplay root. Keep each feature's business rules beside its implementation; avoid sibling application imports and generic repositories. [ADR 0018](../../docs/adr/0018-feature-folders-and-action-pipeline.md) records the accepted structure.
