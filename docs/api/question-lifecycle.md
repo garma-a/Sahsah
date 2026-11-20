@@ -41,6 +41,7 @@ Arabic is required in the frozen source. Optional Franco fields fall back indepe
 | `IMAGE_RIDDLE` | Prompt and illustration | Proverb answer; illustration may remain |
 | `AUDIO_VOICE` | Prompt/optional localized hint; host clip, viewer visual metadata | Identity answer |
 | `IMAGE_MEMORY` | Phase-specific scene/instruction/detail as below | Answer and scene |
+| `COMPOSED` | Staff-defined format (ADR 0022): label, prompt only when the copied definition shows it, base kind, and the current stage's file (stage 0 is the base, hint stage N replaces it). Audio stages follow the audio rule: host reference, viewer duration only. Suggestions fall from the tile value, one per stage; `advance_hint` moves one stage up to the copied stage count | Answer text, optional answer picture; an answer clip for the host only |
 
 Never deliver unopened prompts/answers, future hint references, private sources, original portraits/color images or color swatches before their permitted phase. Viewer schemas omit audio references/URLs/capabilities entirely. Server media authorization independently enforces those rules even for a modified client. A source reused physically as an answer must still have a permitted retained role/pin.
 
