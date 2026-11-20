@@ -71,6 +71,13 @@
       "when": 1795178881217,
       "tag": "0009_admin_commerce_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1795179876693,
+      "tag": "0010_admin_messages",
+      "breakpoints": true
     }
   ]
 }
