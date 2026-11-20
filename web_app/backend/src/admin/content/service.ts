@@ -1,10 +1,12 @@
 import { createHash, randomUUID } from "node:crypto";
 import { and, eq, gt, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 import type { DatabaseConnection, SahsahDatabase } from "../../database/connection.js";
-import { categories, categorySections, mediaAssets, questionMedia, questionPacks, questions } from "../../database/schema/index.js";
+import { categories, categorySections, mediaAssets, questionFormats, questionMedia, questionPacks, questions } from "../../database/schema/index.js";
 import type { JsonObject } from "../../database/schema/types.js";
 import { defaultPointStages, slotPoints } from "../../gameplay/games/rules/points.js";
-import { FORMAT_SLOTS } from "../../gameplay/games/rules/question-content.js";
+import { FORMAT_SLOTS, slotsFor, type SlotSpec } from "../../gameplay/games/rules/question-content.js";
+import type { ComposedDefinition } from "../../gameplay/games/rules/composed-format.js";
+import { FormatService } from "./formats.js";
 import { applyOnce, recordAudit, requestKeySeen } from "../audit.js";
 import { StaffError } from "../staff-service.js";
 import { inspectMedia, MediaRefusal } from "./inspect.js";
@@ -81,12 +83,25 @@ function cleanConfig(format: string, input: unknown): JsonObject {
 }
 
 type MediaItem = { key: string; assetId: string; points?: number };
+type FormatRow = typeof questionFormats.$inferSelect;
+export const definitionOf = (row: FormatRow): ComposedDefinition => ({
+  code: row.code,
+  nameEn: row.nameEn,
+  labelAr: row.labelAr,
+  baseKind: row.baseKind as ComposedDefinition["baseKind"],
+  stageKinds: row.stageKinds as ComposedDefinition["stageKinds"],
+  answerKind: row.answerKind as ComposedDefinition["answerKind"],
+  showPrompt: row.showPrompt,
+});
 
 export class ContentService {
+  readonly formats: FormatService;
   constructor(
     private readonly database: DatabaseConnection,
     readonly media: AdminMedia | undefined,
-  ) {}
+  ) {
+    this.formats = new FormatService(database);
+  }
 
   private get db(): SahsahDatabase {
     return this.database.db;
@@ -197,6 +212,11 @@ export class ContentService {
     };
   }
 
+  private async activeFormats(exclude: string[]) {
+    const rows = await this.db.select().from(questionFormats).where(isNull(questionFormats.archivedAt)).orderBy(questionFormats.nameEn, questionFormats.id).limit(300);
+    return rows.filter((r) => !exclude.includes(r.id));
+  }
+
   async pack(packId: unknown) {
     const key = id(packId);
     const [pack] = await this.db.select().from(questionPacks).where(eq(questionPacks.id, key)).limit(1);
@@ -222,6 +242,7 @@ export class ContentService {
           question: {
             id: q.id,
             format: q.format,
+            composedFormatId: q.composedFormatId,
             promptAr: q.promptAr,
             promptFranco: q.promptFranco,
             answerAr: q.answerAr,
@@ -240,6 +261,11 @@ export class ContentService {
       issues: packIssues(content, pack.id),
       retired: await retiredQuestions(this.db, pack.id),
       formats: FORMAT_SLOTS,
+      // Active formats, plus archived ones this pack's questions still use (they stay valid).
+      composedFormats: content.formats
+        .filter((f) => !f.archivedAt || content.questions.some((q) => q.composedFormatId === f.id))
+        .concat(await this.activeFormats(content.formats.map((f) => f.id)))
+        .map((f) => ({ id: f.id, ...definitionOf(f), archived: f.archivedAt !== null, slots: slotsFor("COMPOSED", definitionOf(f)) })),
       defaultStages: { 200: defaultPointStages(200), 400: defaultPointStages(400), 600: defaultPointStages(600) },
       mediaEnabled: !!this.media,
     };
@@ -520,6 +546,7 @@ export class ContentService {
       mode: unknown;
       questionId: unknown;
       format: unknown;
+      composedFormatId?: unknown;
       promptAr: unknown;
       promptFranco: unknown;
       answerAr: unknown;
@@ -542,23 +569,37 @@ export class ContentService {
       answerFranco: text(input.answerFranco, "answer_required", 4000, false),
     };
     const config = cleanConfig(format, input.config);
-    const specs = FORMAT_SLOTS[format];
-    const items: MediaItem[] = [];
-    for (const raw of Array.isArray(input.media) ? input.media : []) {
-      const item = raw as Record<string, unknown>;
-      const spec = specs.find((s) => s.key === item?.key);
-      if (!spec || spec.role === "answer_audio") throw new ContentError("invalid_media");
-      if (items.some((i) => i.key === spec.key)) throw new ContentError("invalid_media");
-      let points: number | undefined;
-      if (spec.points) {
-        points = Number(item.points);
-        if (!Number.isInteger(points) || points < 1 || points > 600) throw new ContentError("points_required");
-      }
-      items.push({ key: spec.key, assetId: id(item.assetId, "invalid_media"), points });
-    }
+    const composedFormatId = format === "COMPOSED" ? id(input.composedFormatId, "format_required") : null;
+    if (format !== "COMPOSED" && input.composedFormatId) throw new ContentError("invalid_format");
+    const rawItems = Array.isArray(input.media) ? (input.media as Record<string, unknown>[]) : [];
 
     return applyOnce(this.database, async (tx) => {
-      await recordAudit(tx, { staffId: input.actorId, action: `content.question.${mode}`, targetKind: "pack", targetKey: packId, requestKey: input.requestKey, details: { slot, format, mode } });
+      await recordAudit(tx, { staffId: input.actorId, action: `content.question.${mode}`, targetKind: "pack", targetKey: packId, requestKey: input.requestKey, details: { slot, format, mode, ...(composedFormatId ? { composedFormatId } : {}) } });
+      let composed: ComposedDefinition | undefined;
+      if (composedFormatId) {
+        const [row] = await tx.select().from(questionFormats).where(eq(questionFormats.id, composedFormatId)).limit(1).for("share");
+        if (!row) throw new ContentError("format_required", 404);
+        composed = definitionOf(row);
+        // An archived format cannot start new questions; the question that already uses it may still be corrected.
+        if (row.archivedAt) {
+          const [same] = await tx.select({ id: questions.id }).from(questions).where(and(eq(questions.id, String(input.questionId)), eq(questions.composedFormatId, row.id), isNull(questions.retiredAt))).limit(1);
+          if (!same || mode !== "edit") throw new ContentError("format_archived", 409);
+        }
+      }
+      const specs = slotsFor(format, composed);
+      const items: MediaItem[] = [];
+      for (const item of rawItems) {
+        const spec = specs.find((s) => s.key === item?.key);
+        // The forward clip of a reverse question is derived from its source; everything else is uploaded.
+        if (!spec || (spec.role === "answer_audio" && format !== "COMPOSED")) throw new ContentError("invalid_media");
+        if (items.some((i) => i.key === spec.key)) throw new ContentError("invalid_media");
+        let points: number | undefined;
+        if (spec.points) {
+          points = Number(item.points);
+          if (!Number.isInteger(points) || points < 1 || points > 600) throw new ContentError("points_required");
+        }
+        items.push({ key: spec.key, assetId: id(item.assetId, "invalid_media"), points });
+      }
       const pack = await this.lockPack(tx, packId);
       if (pack.publicationState === "published" && input.confirmPublicEdit !== true) throw new ContentError("public_edit_confirmation_required", 409);
       const [current] = await tx.select().from(questions).where(and(eq(questions.packId, packId), eq(questions.slotNumber, slot), isNull(questions.retiredAt))).limit(1).for("update");
@@ -568,13 +609,13 @@ export class ContentService {
         questionId = randomUUID();
       } else {
         if (!current || current.id !== input.questionId) throw new ContentError("question_changed", 409);
-        if (mode === "edit" && current.format !== format) throw new ContentError("format_change_needs_replacement", 409);
+        if (mode === "edit" && (current.format !== format || current.composedFormatId !== composedFormatId)) throw new ContentError("format_change_needs_replacement", 409);
         questionId = mode === "edit" ? current.id : randomUUID();
       }
       if (mode === "replace") await tx.update(questions).set({ retiredAt: sql`now()` }).where(eq(questions.id, current!.id));
       if (mode === "edit") await tx.update(questions).set({ ...fields, formatConfig: config }).where(eq(questions.id, questionId));
-      else await tx.insert(questions).values({ id: questionId, packId, slotNumber: slot, format, formatConfig: config, ...fields });
-      await this.attachMedia(tx, questionId, format, items, config);
+      else await tx.insert(questions).values({ id: questionId, packId, slotNumber: slot, format, composedFormatId, formatConfig: config, ...fields });
+      await this.attachMedia(tx, questionId, format, items, config, specs);
       await tx.update(questionPacks).set({ contentRevision: sql`${questionPacks.contentRevision} + 1`, updatedAt: sql`now()` }).where(eq(questionPacks.id, packId));
       if (pack.publicationState === "published") await this.requireValid(tx, packId);
       return { id: questionId };
@@ -582,8 +623,7 @@ export class ContentService {
   }
 
   /** Writes the question's files; a pending upload becomes ready here, with its lineage when it is a derived slot. */
-  private async attachMedia(tx: SahsahDatabase, questionId: string, format: keyof typeof FORMAT_SLOTS, items: MediaItem[], config: JsonObject) {
-    const specs = FORMAT_SLOTS[format];
+  private async attachMedia(tx: SahsahDatabase, questionId: string, format: keyof typeof FORMAT_SLOTS, items: MediaItem[], config: JsonObject, specs: SlotSpec[]) {
     const ids = [...new Set(items.map((i) => i.assetId))];
     const assets = ids.length ? await tx.select().from(mediaAssets).where(inArray(mediaAssets.id, ids)).for("update") : [];
     const pins: { role: (typeof specs)[number]["role"]; variant: number; assetId: string; points: number | null }[] = [];

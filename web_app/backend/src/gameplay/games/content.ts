@@ -10,6 +10,7 @@ import type { Question } from "../platform/types.js";
 import type { Contract } from "../contract.js";
 import { invariant } from "../platform/invariant.js";
 import * as s from "../../database/schema/index.js";
+import { readSnapshot, stageCount } from "./rules/composed-format.js";
 export type UnionFields<U> = {
   [K in U extends unknown ? keyof U : never]?: U extends unknown
     ? K extends keyof U
@@ -25,6 +26,7 @@ export type AnswerPresentation = Omit<
     | Contract<"StandardHostAnswer">
     | Contract<"AudioReverseHostAnswer">
     | Contract<"ImageColorHostAnswer">
+    | Contract<"ComposedHostAnswer">
   >,
   "format"
 > & { format: Question["format"]; text: string };
@@ -83,7 +85,8 @@ export function settings(
     );
     return { ...config, stageSuggestions: suggestions };
   }
-  if (format === "IMAGE_CLUES")
+  // Composed formats carry suggestions only when they have hint stages.
+  if (format === "IMAGE_CLUES" || (format === "COMPOSED" && config.stageSuggestions))
     requireState(
       config.stageSuggestions !== undefined &&
         validPointStages(config.stageSuggestions, cap),
@@ -95,6 +98,11 @@ export function settings(
 }
 /** Hints a question can still reveal: blur/zoom stages, or clue cards. */
 export function hintStages(q: Question): number {
+  if (q.format === "COMPOSED") {
+    const composed = readSnapshot(q.contentSnapshot?.composed);
+    invariant(composed, "COMPOSED_SNAPSHOT");
+    return stageCount(composed);
+  }
   if (["IMAGE_BLUR", "IMAGE_ZOOM"].includes(q.format)) return 3;
   if (q.format !== "IMAGE_CLUES") return 0;
   const stages = (q.contentSnapshot?.config as { stageSuggestions?: number[] })
@@ -152,8 +160,8 @@ export function timer(q: Question, now: Date): Contract<"Timer"> {
 }
 export function ref(
   q: Question,
-  role: "question_audio" | "answer_audio",
-  variantNumber?: 0,
+  role: "question_audio" | "answer_audio" | "hint_audio",
+  variantNumber?: number,
 ): Contract<"AudioRef">;
 export function ref(
   q: Question,
@@ -169,8 +177,8 @@ export function ref(
     boardPosition: q.boardPosition,
     questionPosition: q.questionPosition,
   };
-  if (role === "question_audio" || role === "answer_audio") {
-    invariant(variantNumber === 0, "AUDIO_VARIANT");
+  if (role === "question_audio" || role === "answer_audio" || role === "hint_audio") {
+    invariant(role === "hint_audio" ? variantNumber <= 3 : variantNumber === 0, "AUDIO_VARIANT");
     return { kind: "audio", ...positions, role, variantNumber };
   }
   return { kind: "image", ...positions, role, variantNumber };
@@ -226,6 +234,7 @@ export function questionView(
       stageIndex: q.stageIndex,
       stageSuggestions: cfg.stageSuggestions,
     });
+  else if (q.format === "COMPOSED") return composedView(q, pins, host, language);
   else if (q.format === "CHARADES") {
     // The card itself never reaches a room projection: only its code does.
     invariant(cfg.cardToken, "CHARADES_CARD_TOKEN");
@@ -243,6 +252,43 @@ export function questionView(
   }
   return result;
 }
+/** The one shape every staff-defined format uses: label, the current stage's file and the suggestions. */
+function composedView(
+  q: Question,
+  pins: Pin[],
+  host: boolean,
+  language: string,
+): QuestionPresentation {
+  const c = q.contentSnapshot!;
+  const composed = readSnapshot(c.composed);
+  invariant(composed, "COMPOSED_SNAPSHOT");
+  const cfg = c.config as z.output<typeof configSchema>;
+  const stage = q.stageIndex;
+  const kind = stage === 0 ? (composed.baseKind === "text" ? "none" : composed.baseKind) : composed.stageKinds[stage - 1];
+  invariant(kind, "COMPOSED_STAGE");
+  const result: QuestionPresentation = {
+    format: "COMPOSED",
+    label: composed.labelAr,
+    baseKind: composed.baseKind,
+    stageIndex: stage,
+    mediaKind: kind,
+    ...(composed.showPrompt ? { prompt: local(c.promptAr, c.promptFranco, language) } : {}),
+    ...(cfg.stageSuggestions ? { stageSuggestions: cfg.stageSuggestions } : {}),
+  };
+  if (kind === "image")
+    result.image = stage === 0 ? ref(q, "prompt_image") : ref(q, "hint_image", stage - 1);
+  if (kind === "audio") {
+    const role = stage === 0 ? "question_audio" : "hint_audio";
+    const duration = pins.find(
+      (p) => p.mediaRole === role && p.variantNumber === Math.max(0, stage - 1),
+    )?.durationMs;
+    invariant(duration != null, "AUDIO_DURATION");
+    result.durationMs = duration;
+    // Like every audio question, only the host's device plays the clip.
+    if (host) result.audio = ref(q, role, Math.max(0, stage - 1));
+  }
+  return result;
+}
 export function answerView(
   q: Question,
   pins: Pin[],
@@ -252,6 +298,22 @@ export function answerView(
   const c = q.contentSnapshot!,
     // Copied configuration comes from settings() before the snapshot is persisted.
     cfg = c.config as z.output<typeof configSchema>;
+  if (q.format === "COMPOSED") {
+    const answerAudio = pins.find((p) => p.mediaRole === "answer_audio");
+    return {
+      format: q.format,
+      text: local(c.answerAr, c.answerFranco, language),
+      ...(pins.some((p) => p.mediaRole === "answer_image")
+        ? { image: ref(q, "answer_image") }
+        : {}),
+      ...(host && answerAudio?.durationMs
+        ? {
+            audio: ref(q, "answer_audio"),
+            durationMs: answerAudio.durationMs,
+          }
+        : {}),
+    };
+  }
   return {
     format: q.format,
     text: local(c.answerAr, c.answerFranco, language),

@@ -1,6 +1,6 @@
 import { and, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import type { SahsahDatabase } from "../../database/connection.js";
-import { mediaAssets, gameQuestions, questionMedia, questions } from "../../database/schema/index.js";
+import { mediaAssets, gameQuestions, questionFormats, questionMedia, questions } from "../../database/schema/index.js";
 import { questionContentIssues, type ContentIssue } from "../../gameplay/games/rules/question-content.js";
 
 export type PackIssue = ContentIssue & { slot: number };
@@ -10,11 +10,13 @@ export type PackContent = {
   questions: Question[];
   media: (typeof questionMedia.$inferSelect)[];
   assets: (typeof mediaAssets.$inferSelect)[];
+  /** The composed formats the questions use, whether or not they are archived. */
+  formats: (typeof questionFormats.$inferSelect)[];
 };
 
 /** The current (not retired) questions of the packs, with their media pins and files. */
 export async function loadPackContent(db: SahsahDatabase, packIds: string[], lock = false): Promise<PackContent> {
-  if (!packIds.length) return { questions: [], media: [], assets: [] };
+  if (!packIds.length) return { questions: [], media: [], assets: [], formats: [] };
   const base = db
     .select()
     .from(questions)
@@ -25,7 +27,9 @@ export async function loadPackContent(db: SahsahDatabase, packIds: string[], loc
   const media = ids.length ? await db.select().from(questionMedia).where(inArray(questionMedia.questionId, ids)) : [];
   const assetIds = [...new Set(media.map((m) => m.mediaAssetId))];
   const assets = assetIds.length ? await db.select().from(mediaAssets).where(inArray(mediaAssets.id, assetIds)) : [];
-  return { questions: current, media, assets };
+  const formatIds = [...new Set(current.flatMap((q) => (q.composedFormatId ? [q.composedFormatId] : [])))];
+  const formats = formatIds.length ? await db.select().from(questionFormats).where(inArray(questionFormats.id, formatIds)) : [];
+  return { questions: current, media, assets, formats };
 }
 
 /** Problems that keep one pack from being published or started, per slot. Empty means it is playable. */
@@ -40,7 +44,9 @@ export function packIssues(content: PackContent, packId: string): PackIssue[] {
     }
     const pins = content.media.filter((m) => m.questionId === question.id);
     const files = content.assets.filter((a) => pins.some((p) => p.mediaAssetId === a.id));
-    for (const issue of questionContentIssues(question, pins, files)) issues.push({ ...issue, slot });
+    const row = content.formats.find((f) => f.id === question.composedFormatId);
+    const composed = row && { code: row.code, nameEn: row.nameEn, labelAr: row.labelAr, baseKind: row.baseKind as "text", stageKinds: row.stageKinds as ("image" | "audio")[], answerKind: row.answerKind as "none", showPrompt: row.showPrompt };
+    for (const issue of questionContentIssues(question, pins, files, composed)) issues.push({ ...issue, slot });
   }
   return issues;
 }

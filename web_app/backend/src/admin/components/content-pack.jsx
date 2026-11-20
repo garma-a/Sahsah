@@ -3,17 +3,24 @@ import { Box, H3, Text } from "@adminjs/design-system";
 import { FORMAT_LABELS, Field, Notice, button, card, colors, get, input, useSend } from "./content-ui";
 
 const PAGE = "/admin/pages/content";
-const FORMATS = Object.keys(FORMAT_LABELS);
+const FORMATS = Object.keys(FORMAT_LABELS).filter((f) => f !== "COMPOSED");
 const STATES = { draft: "Draft", published: "Published", archived: "Archived" };
 
 // ---- preview as a player ---------------------------------------------------------------------
 
 /** The stages a player sees, in order: each hint stage, then the answer. Simplified, not the real screen. */
-function stagesFor(q, slotPoints) {
+function stagesFor(q, slotPoints, composed) {
   const url = (role, variant = 0) => q.media.find((m) => m.role === role && m.variant === variant)?.url ?? null;
   const pts = (variant) => q.media.find((m) => m.role === "hint_image" && m.variant === variant)?.points ?? null;
   const answer = { name: "Answer revealed", answerText: true, image: url("answer_image"), color: q.config.colorHex };
   switch (q.format) {
+    case "COMPOSED": {
+      const kinds = composed?.stageKinds ?? [];
+      const media = (role, variant) => ({ [role.endsWith("audio") ? "audio" : "image"]: url(role, variant) });
+      const stages = [{ name: "Stage 1 (start)", points: slotPoints, prompt: composed?.showPrompt, ...(composed?.baseKind === "image" ? media("prompt_image", 0) : composed?.baseKind === "audio" ? media("question_audio", 0) : {}) }];
+      kinds.forEach((kind, i) => stages.push({ name: `Stage ${i + 2} (hint ${i + 1})`, points: q.media.find((m) => m.role === `hint_${kind}` && m.variant === i)?.points ?? null, prompt: composed?.showPrompt, ...media(`hint_${kind}`, i) }));
+      return stages.concat({ name: "Answer revealed", answerText: true, image: url("answer_image"), audio: url("answer_audio") });
+    }
     case "IMAGE_BLUR":
     case "IMAGE_ZOOM":
       return [0, 1, 2].map((i) => ({ name: `Hint stage ${i + 1}`, points: pts(i), image: url("hint_image", i), prompt: true })).concat(answer);
@@ -46,8 +53,8 @@ function stagesFor(q, slotPoints) {
   }
 }
 
-const Preview = ({ question, slotPoints }) => {
-  const stages = stagesFor(question, slotPoints);
+const Preview = ({ question, slotPoints, composed }) => {
+  const stages = stagesFor(question, slotPoints, composed);
   const [index, setIndex] = useState(0);
   const [lang, setLang] = useState("ar");
   const stage = stages[Math.min(index, stages.length - 1)];
@@ -94,6 +101,7 @@ const toForm = (slot, defaultFormat = "STANDARD") => {
   for (const m of q?.media ?? []) media[`${m.role}:${m.variant}`] = m;
   return {
     format: q?.format ?? defaultFormat,
+    composedFormatId: q?.composedFormatId ?? null,
     promptAr: q?.promptAr ?? "",
     promptFranco: q?.promptFranco ?? "",
     answerAr: q?.answerAr ?? "",
@@ -110,7 +118,8 @@ const SlotEditor = ({ data, slot, published, onDone, setNotice }) => {
   const [confirm, setConfirm] = useState(false);
   const { send, busy } = useSend(setNotice);
   const [uploading, setUploading] = useState(null);
-  const specs = data.formats[form.format].filter((s) => s.role !== "answer_audio");
+  const composed = form.format === "COMPOSED" ? data.composedFormats.find((f) => f.id === form.composedFormatId) : null;
+  const specs = (composed ? composed.slots : data.formats[form.format]).filter((s) => composed || s.role !== "answer_audio");
   const set = (key) => (e) => setForm({ ...form, [key]: e.target.value });
   const setConfig = (key, value) => setForm({ ...form, config: { ...form.config, [key]: value } });
   const stageDefaults = data.defaultStages[slot.points];
@@ -128,7 +137,9 @@ const SlotEditor = ({ data, slot, published, onDone, setNotice }) => {
     const asset = done?.asset;
     if (!asset) return;
     const id = `${spec.role}:${spec.variant}`;
-    const points = form.media[id]?.points ?? (spec.points ? (form.format === "IMAGE_CLUES" ? null : stageDefaults?.[spec.variant]) : null);
+    const hintCount = composed?.stageKinds.length ?? 0;
+    const composedDefault = Math.max(10, Math.round((slot.points * (hintCount - spec.variant)) / (hintCount + 1) / 10) * 10);
+    const points = form.media[id]?.points ?? (spec.points ? (form.format === "IMAGE_CLUES" ? null : composed ? composedDefault : stageDefaults?.[spec.variant]) : null);
     setForm((f) => ({ ...f, media: { ...f.media, [id]: { role: spec.role, variant: spec.variant, points, asset, url: asset.url } } }));
   };
 
@@ -139,7 +150,7 @@ const SlotEditor = ({ data, slot, published, onDone, setNotice }) => {
       return m ? [{ key: spec.key, assetId: m.asset.id, ...(spec.points ? { points: Number(m.points) } : {}) }] : [];
     });
     const done = await send({
-      op: "question.save", packId: data.pack.id, slot: slot.slot, mode, questionId: q?.id, format: form.format,
+      op: "question.save", packId: data.pack.id, slot: slot.slot, mode, questionId: q?.id, format: form.format, composedFormatId: form.format === "COMPOSED" ? form.composedFormatId : undefined,
       promptAr: form.promptAr, promptFranco: form.promptFranco, answerAr: form.answerAr, answerFranco: form.answerFranco,
       config: form.config, media, confirmPublicEdit: published ? confirm : undefined,
     }, { success: mode === "replace" ? "Question replaced." : mode === "edit" ? "Correction saved." : "Question added." });
@@ -164,8 +175,9 @@ const SlotEditor = ({ data, slot, published, onDone, setNotice }) => {
       {mode === "replace" && <Notice notice={{ kind: "danger", text: "Replacing retires the current question and puts a brand new one in this slot. Players who saw the old one will see the new one as unseen, and a pack they completed is shown as Updated. Upload the new files below." }} />}
       {published && <Notice notice={{ kind: "danger", text: "This pack is published: players can start games with it right now. Your change goes live as soon as you save, and the whole pack must stay valid." }} />}
       <Field label="Format">
-        <select style={input} value={form.format} disabled={mode === "edit"} onChange={(e) => setForm({ ...form, format: e.target.value, media: {}, config: {} })}>
+        <select aria-label="Format" style={input} value={form.format === "COMPOSED" ? `composed:${form.composedFormatId}` : form.format} disabled={mode === "edit"} onChange={(e) => { const v = e.target.value; setForm({ ...form, format: v.startsWith("composed:") ? "COMPOSED" : v, composedFormatId: v.startsWith("composed:") ? v.slice(9) : null, media: {}, config: {} }); }}>
           {FORMATS.map((f) => <option key={f} value={f}>{FORMAT_LABELS[f]}</option>)}
+          {data.composedFormats.filter((f) => !f.archived || f.id === form.composedFormatId).map((f) => <option key={f.id} value={`composed:${f.id}`}>{f.nameEn}{f.archived ? " (archived)" : ""} · staff-defined</option>)}
         </select>
       </Field>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
@@ -194,6 +206,7 @@ const SlotEditor = ({ data, slot, published, onDone, setNotice }) => {
       {form.format === "IMAGE_COLOR" && (
         <Field label="Colour swatch (optional, like #c0392b)"><input style={{ ...input, width: 160 }} value={form.config.colorHex ?? ""} onChange={(e) => setConfig("colorHex", e.target.value)} /></Field>
       )}
+      {composed && <Notice notice={{ kind: "ok", text: `${composed.nameEn}: ${composed.stageKinds.length + 1} stage${composed.stageKinds.length ? "s" : ""}. Upload every file below as a finished file; the game shows them in order. Staff-defined formats play on the website; the mobile app cannot draw them yet.` }} />}
       <Text fontWeight="bold" mb="sm">Files</Text>
       <Text fontSize="sm" color="grey60" mb="md">Upload finished files prepared elsewhere: Sahsah does not edit pictures or audio. Pictures: PNG, JPEG or WebP up to 10 MB. Audio: MP3 up to 25 MB and 10 minutes.</Text>
       {!data.mediaEnabled && <Notice notice={{ kind: "danger", text: "File storage is not configured, so files cannot be uploaded." }} />}
@@ -223,6 +236,7 @@ const SlotEditor = ({ data, slot, published, onDone, setNotice }) => {
         );
       })}
       {["IMAGE_BLUR", "IMAGE_ZOOM"].includes(form.format) && <Text fontSize="sm" color="grey60" mt="sm">Points must start at {slot.points} and keep falling (default {stageDefaults?.join(" → ")}). Uploading a new original means uploading the hint stages again.</Text>}
+      {composed && composed.stageKinds.length > 0 && <Text fontSize="sm" color="grey60" mt="sm">Hint stage points must be below {slot.points} and keep falling from one stage to the next.</Text>}
       {form.format === "IMAGE_CLUES" && <Text fontSize="sm" color="grey60" mt="sm">Each clue lowers the suggested points below {slot.points}. Add clue cards in order, without gaps.</Text>}
       {published && <label style={{ display: "block", margin: "12px 0" }}><input type="checkbox" checked={confirm} onChange={(e) => setConfirm(e.target.checked)} /> I understand this pack is public and this change goes live immediately.</label>}
       <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
@@ -281,7 +295,7 @@ const PackView = ({ id, navigate, setNotice }) => {
               <strong>Slot {slot.slot} · {slot.points} pts</strong>
               {q ? (
                 <>
-                  <div style={{ fontSize: 12, color: colors.muted }}>{FORMAT_LABELS[q.format]}</div>
+                  <div style={{ fontSize: 12, color: colors.muted }}>{q.format === "COMPOSED" ? (data.composedFormats.find((f) => f.id === q.composedFormatId)?.nameEn ?? "Staff-defined format") : FORMAT_LABELS[q.format]}</div>
                   <p dir="rtl" style={{ margin: "8px 0" }}>{q.promptAr}</p>
                   <p dir="rtl" style={{ margin: 0, color: colors.muted }}>{q.answerAr}</p>
                   <p style={{ margin: "8px 0", fontSize: 13 }} title="Games that copied this question">
@@ -307,7 +321,7 @@ const PackView = ({ id, navigate, setNotice }) => {
             <H3>Preview · slot {previewing}</H3>
             <button style={button("secondary")} onClick={load}>Refresh links</button>
           </Box>
-          <Preview key={previewing} question={data.slots[previewing - 1].question} slotPoints={data.slots[previewing - 1].points} />
+          <Preview key={previewing} question={data.slots[previewing - 1].question} slotPoints={data.slots[previewing - 1].points} composed={data.composedFormats.find((f) => f.id === data.slots[previewing - 1].question.composedFormatId)} />
         </div>
       )}
       {data.retired.length > 0 && (

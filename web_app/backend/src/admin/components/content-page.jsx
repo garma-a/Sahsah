@@ -3,6 +3,7 @@ import { Box, H3, Text } from "@adminjs/design-system";
 import { useLocation, useNavigate } from "react-router";
 import { Field, Notice, button, card, colors, get, input, useSend } from "./content-ui";
 import PackView from "./content-pack";
+import FormatsView from "./content-formats";
 
 const PAGE = "/admin/pages/content";
 const Arrows = ({ onMove, first, last, busy }) => (
@@ -299,9 +300,15 @@ const ContentPage = () => {
   return (
     <Box variant="white">
       <H3>Content</H3>
+      {(view === "home" || view === "formats") && (
+        <div role="tablist" style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+          <button type="button" role="tab" aria-selected={view === "home"} style={button(view === "home" ? "primary" : "secondary")} onClick={() => navigate(PAGE)}>Categories</button>
+          <button type="button" role="tab" aria-selected={view === "formats"} style={button(view === "formats" ? "primary" : "secondary")} onClick={() => navigate(`${PAGE}?view=formats`)}>Formats</button>
+        </div>
+      )}
       {(view === "drafts" || view === "disliked") && <p><a href={PAGE} onClick={(e) => { e.preventDefault(); navigate(PAGE); }}>← All categories</a></p>}
       <Notice notice={notice} />
-      {view === "category" ? <CategoryView key={params.get("id")} id={params.get("id")} navigate={navigate} setNotice={setNotice} /> : view === "pack" ? <PackView key={params.get("id")} id={params.get("id")} navigate={navigate} setNotice={setNotice} /> : view === "drafts" ? <DraftsView navigate={navigate} setNotice={setNotice} /> : view === "disliked" ? <DislikedView navigate={navigate} setNotice={setNotice} /> : <HomeView navigate={navigate} setNotice={setNotice} />}
+      {view === "category" ? <CategoryView key={params.get("id")} id={params.get("id")} navigate={navigate} setNotice={setNotice} /> : view === "pack" ? <PackView key={params.get("id")} id={params.get("id")} navigate={navigate} setNotice={setNotice} /> : view === "formats" ? <FormatsView setNotice={setNotice} /> : view === "drafts" ? <DraftsView navigate={navigate} setNotice={setNotice} /> : view === "disliked" ? <DislikedView navigate={navigate} setNotice={setNotice} /> : <HomeView navigate={navigate} setNotice={setNotice} />}
     </Box>
   );
 };

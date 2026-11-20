@@ -36,6 +36,15 @@ const categoryFields = (body: Record<string, unknown>) => ({
   sectionId: body.sectionId,
 });
 
+const formatFields = (body: Record<string, unknown>) => ({
+  nameEn: body.nameEn,
+  labelAr: body.labelAr,
+  baseKind: body.baseKind,
+  stageKinds: body.stageKinds,
+  answerKind: body.answerKind,
+  showPrompt: body.showPrompt,
+});
+
 /** The multipart middleware wrote the file to a temporary path; read it once and remove it. */
 async function readUpload(file: UploadedFile) {
   try {
@@ -96,6 +105,8 @@ export function buildPages(staff: StaffService, db: () => SahsahDatabase, conten
             return await content.category(query.id);
           case "pack":
             return await content.pack(query.id);
+          case "formats":
+            return await content.formats.list();
           // The lists behind the Home "needs attention" counts.
           case "drafts":
             return await incompleteDrafts(db(), text(query.cursor));
@@ -133,8 +144,15 @@ export function buildPages(staff: StaffService, db: () => SahsahDatabase, conten
         case "pack.archive":
         case "pack.unarchive":
           return await content.setPackArchived({ ...base, packId: body.id, archived: body.op === "pack.archive" });
+        case "format.create":
+          return await content.formats.create({ ...base, ...formatFields(body) });
+        case "format.update":
+          return await content.formats.update({ ...base, ...formatFields(body), formatId: body.id });
+        case "format.archive":
+        case "format.unarchive":
+          return await content.formats.setArchived({ ...base, formatId: body.id, archived: body.op === "format.archive" });
         case "question.save":
-          return await content.saveQuestion({ ...base, packId: body.packId, slot: body.slot, mode: body.mode, questionId: body.questionId, format: body.format, promptAr: body.promptAr, promptFranco: body.promptFranco, answerAr: body.answerAr, answerFranco: body.answerFranco, config: body.config, media: body.media, confirmPublicEdit: body.confirmPublicEdit });
+          return await content.saveQuestion({ ...base, packId: body.packId, slot: body.slot, mode: body.mode, questionId: body.questionId, format: body.format, composedFormatId: body.composedFormatId, promptAr: body.promptAr, promptFranco: body.promptFranco, answerAr: body.answerAr, answerFranco: body.answerFranco, config: body.config, media: body.media, confirmPublicEdit: body.confirmPublicEdit });
         case "question.retire":
           return await content.retireQuestion({ ...base, packId: body.packId, slot: body.slot, questionId: body.questionId });
         case "media.upload":

@@ -30,6 +30,11 @@ export async function lockStartContent(db: Tx, selections: Selections) {
     )
     .orderBy(s.questions.id)
     .for("share");
+  // Format rows are locked in the same step so an edit cannot land between the check and the copy.
+  const formatIds = [...new Set(questions.flatMap((q) => (q.composedFormatId ? [q.composedFormatId] : [])))].sort();
+  const formats = formatIds.length
+    ? await db.select().from(s.questionFormats).where(inArray(s.questionFormats.id, formatIds)).orderBy(s.questionFormats.id).for("share")
+    : [];
   const media = await db
     .select()
     .from(s.questionMedia)
@@ -59,5 +64,5 @@ export async function lockStartContent(db: Tx, selections: Selections) {
         .for("share")
     : [];
 
-  return { categories, packs, questions, media, assets };
+  return { categories, packs, questions, formats, media, assets };
 }

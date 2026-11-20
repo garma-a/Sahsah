@@ -46,8 +46,16 @@ function viewerSnapshot(snapshot: Snapshot): Snapshot {
     result.question = question;
   }
   if ("answer" in view) {
-    const { forwardAudio: _forward, ...answer } = {
+    // Composed answers carry a host-only clip and its length; viewers never get either.
+    const {
+      forwardAudio: _forward,
+      audio: _clip,
+      durationMs: _length,
+      ...answer
+    } = {
       forwardAudio: undefined,
+      audio: undefined,
+      durationMs: undefined,
       ...view.answer,
     };
     result.answer = answer;
@@ -565,7 +573,12 @@ export class GameplayRealtime
         const recipients = [...this.members.values()].filter(
           (c) => c.roomId === roomId && this.current(c),
         );
-        if (!recipients.length) break;
+        if (!recipients.length) {
+          // Nobody to send to is a finished publish. Leaving the generation unmarked made the pump
+          // requeue the room forever (a promise-only loop that starved the event loop).
+          stream.published = generation;
+          break;
+        }
         log.debug("realtime.publish", { count: recipients.length });
         const groups = new Map<
           string,
@@ -759,6 +772,9 @@ export class GameplayRealtime
       "answer" in view && "forwardAudio" in view.answer
         ? view.answer.forwardAudio
         : undefined,
+      "answer" in view && "audio" in view.answer
+        ? view.answer.audio
+        : undefined,
     ].filter(Boolean);
     requireState(
       permitted.some((r) => canonical(r) === canonical(data.media)),
@@ -782,7 +798,7 @@ export class GameplayRealtime
             Number(media.questionPosition),
           ),
           eq(s.gameQuestionMedia.mediaRole, media.role),
-          eq(s.gameQuestionMedia.variantNumber, 0),
+          eq(s.gameQuestionMedia.variantNumber, Number(media.variantNumber)),
         ),
       );
     const duration = metadata[0]?.duration;
