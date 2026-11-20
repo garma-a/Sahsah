@@ -107,6 +107,11 @@ export const questionPacks = t.pgTable(
     t
       .uniqueIndex("question_packs_category_number")
       .on(table.categoryId, table.packNumber),
+    // Dashboard queue and list of draft packs that are not finished.
+    t
+      .index("question_packs_open_drafts")
+      .on(table.createdAt, table.id)
+      .where(sql`publication_state = 'draft' AND archived_at IS NULL`),
     t
       .foreignKey({
         name: "packs_category",

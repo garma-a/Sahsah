@@ -5,6 +5,7 @@ import type { SahsahDatabase } from "../database/connection.js";
 import { auditActions, AuditFilterError, listAudit } from "./audit.js";
 import { ContentError, type ContentService } from "./content/service.js";
 import type { CommerceService } from "./commerce/service.js";
+import { dislikedQuestions, incompleteDrafts } from "./home/lists.js";
 import type { MessagesService } from "./messages/service.js";
 import type { PlayersService } from "./players/service.js";
 import type { PublicSiteService } from "./public-site/service.js";
@@ -95,6 +96,11 @@ export function buildPages(staff: StaffService, db: () => SahsahDatabase, conten
             return await content.category(query.id);
           case "pack":
             return await content.pack(query.id);
+          // The lists behind the Home "needs attention" counts.
+          case "drafts":
+            return await incompleteDrafts(db(), text(query.cursor));
+          case "disliked":
+            return await dislikedQuestions(db(), text(query.cursor));
           default:
             return await content.home({ section: text(query.section), status: text(query.status), cursor: text(query.cursor) });
         }
