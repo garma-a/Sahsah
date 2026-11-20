@@ -4,6 +4,7 @@ import { readFile, rm } from "node:fs/promises";
 import type { SahsahDatabase } from "../database/connection.js";
 import { auditActions, AuditFilterError, listAudit } from "./audit.js";
 import { ContentError, type ContentService } from "./content/service.js";
+import type { ImportService } from "./content/import-service.js";
 import type { CommerceService } from "./commerce/service.js";
 import { dislikedQuestions, incompleteDrafts } from "./home/lists.js";
 import type { MessagesService } from "./messages/service.js";
@@ -11,6 +12,7 @@ import type { PlayersService } from "./players/service.js";
 import type { PublicSiteService } from "./public-site/service.js";
 import { StaffError, type StaffService } from "./staff-service.js";
 
+const SINGLE_FILE_BYTES = 26 * 1024 * 1024;
 type Reply = { status: (code: number) => unknown };
 type UploadedFile = { path: string; size: number };
 type PageRequest = {
@@ -46,8 +48,10 @@ const formatFields = (body: Record<string, unknown>) => ({
 });
 
 /** The multipart middleware wrote the file to a temporary path; read it once and remove it. */
-async function readUpload(file: UploadedFile) {
+async function readUpload(file: UploadedFile, maxBytes = SINGLE_FILE_BYTES) {
   try {
+    // The multipart limit allows a bulk-import ZIP; single files stay small enough to hold in memory.
+    if (file.size > maxBytes) throw new ContentError("file_too_large", 413);
     return await readFile(file.path);
   } finally {
     await rm(file.path, { force: true });
@@ -66,7 +70,7 @@ function refuse(response: Reply, error: unknown) {
   throw error;
 }
 
-export function buildPages(staff: StaffService, db: () => SahsahDatabase, content: ContentService, players: PlayersService, commerce: CommerceService, messages: MessagesService, publicSite: PublicSiteService, components: { PublicSitePage: string; MessagesPage: string; ShopPage: string; AuditLog: string; StaffPage: string; ContentPage: string; PlayersPage: string }) {
+export function buildPages(staff: StaffService, db: () => SahsahDatabase, content: ContentService, imports: ImportService, players: PlayersService, commerce: CommerceService, messages: MessagesService, publicSite: PublicSiteService, components: { PublicSitePage: string; MessagesPage: string; ShopPage: string; AuditLog: string; StaffPage: string; ContentPage: string; PlayersPage: string }) {
   const staffPage: PageHandler = async (request, response, context) => {
     const req = request as unknown as PageRequest, actorId = (context as Context).currentAdmin?.id;
     try {
@@ -107,6 +111,10 @@ export function buildPages(staff: StaffService, db: () => SahsahDatabase, conten
             return await content.pack(query.id);
           case "formats":
             return await content.formats.list();
+          case "import":
+            return await imports.choices(query.id);
+          case "import-template":
+            return await imports.template(query.format);
           // The lists behind the Home "needs attention" counts.
           case "drafts":
             return await incompleteDrafts(db(), text(query.cursor));
@@ -155,6 +163,16 @@ export function buildPages(staff: StaffService, db: () => SahsahDatabase, conten
           return await content.saveQuestion({ ...base, packId: body.packId, slot: body.slot, mode: body.mode, questionId: body.questionId, format: body.format, composedFormatId: body.composedFormatId, promptAr: body.promptAr, promptFranco: body.promptFranco, answerAr: body.answerAr, answerFranco: body.answerFranco, config: body.config, media: body.media, confirmPublicEdit: body.confirmPublicEdit });
         case "question.retire":
           return await content.retireQuestion({ ...base, packId: body.packId, slot: body.slot, questionId: body.questionId });
+        case "import.check":
+          // The dry run: stages the ZIP and reports; nothing is written to the database or storage.
+          try {
+            return await imports.check({ actorId: actorId!, sessionId: req.sessionID ?? req.session?.id ?? "", categoryId: body.categoryId, file: body.file });
+          } catch (error) {
+            if (body.file) await rm(body.file.path, { force: true });
+            throw error;
+          }
+        case "import.run":
+          return await imports.run({ ...base, sessionId: req.sessionID ?? req.session?.id ?? "", id: body.id });
         case "media.upload":
           return await content.uploadQuestionMedia({ ...base, purpose: body.purpose, body: await bytes() });
         default:
