@@ -8,6 +8,8 @@ import { edgeProtection } from "../gameplay/platform/http.js";
 import { errorStack, log } from "../gameplay/platform/logging.js";
 import { components, componentLoader } from "./components.js";
 import { readAdminConfig } from "./config.js";
+import { dashboardHandler } from "./home/dashboard.js";
+import { HomeStats } from "./home/stats.js";
 import { buildPages } from "./pages.js";
 import { SESSION_LIFETIME_MS, StaffSessionStore } from "./session-store.js";
 import { ContentService } from "./content/service.js";
@@ -55,6 +57,9 @@ export async function createAdminApplication(env: NodeJS.ProcessEnv = process.en
     const commerce = new CommerceService(database);
     const messages = new MessagesService(database, createMailer(env));
     const publicSite = new PublicSiteService(database, media, config.cloudflareAnalyticsUrl);
+    // Home figures: cached for two minutes, dropped after every committed admin change.
+    const stats = new HomeStats(() => database.db, config.cloudflareAnalyticsUrl);
+    database.onCommit = () => stats.invalidate();
     // First boot only: with no staff account the environment creates the first Super Admin.
     if (await staff.bootstrap(config.bootstrapEmail, config.bootstrapPassword)) log.info("admin.bootstrap", { outcome: "super_admin_created" });
 
@@ -79,7 +84,7 @@ export async function createAdminApplication(env: NodeJS.ProcessEnv = process.en
       rootPath: ROOT_PATH,
       resources: [],
       componentLoader,
-      dashboard: { component: components.Home },
+      dashboard: { component: components.Home, handler: dashboardHandler(staff, stats) },
       pages: buildPages(staff, () => database.db, content, players, commerce, messages, publicSite, components),
       branding: { companyName: "Sahsah Admin", logo: false, withMadeWithLove: false, theme },
       locale: { language: "en", availableLanguages: ["en"], translations: { en: { messages: { loginWelcome: "Sign in to Sahsah Admin" } } } },
@@ -124,7 +129,7 @@ export async function createAdminApplication(env: NodeJS.ProcessEnv = process.en
       res.status(500).json({ error: "internal_error" });
     };
     app.use(failure);
-    return { app, database, staff, close: () => database.close() };
+    return { app, database, staff, stats, close: () => database.close() };
   } catch (error) {
     await database.close();
     throw error;

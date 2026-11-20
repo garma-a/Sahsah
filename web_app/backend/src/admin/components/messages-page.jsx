@@ -22,7 +22,9 @@ const detailOf = (row) => row.kind === "support" ? REASON[row.supportReason] ?? 
 // ---- inbox -----------------------------------------------------------------------------------------
 
 const Inbox = ({ navigate, setNotice }) => {
-  const [filters, setFilters] = useState({ state: "open", kind: "" });
+  // The Home queue links here with ?state=open, so the page opens on the same list the count came from.
+  const query = new URLSearchParams(useLocation().search);
+  const [filters, setFilters] = useState({ state: query.get("state") ?? "open", kind: query.get("kind") ?? "" });
   const [data, setData] = useState(null);
   const key = JSON.stringify(filters);
   const fetchRows = useCallback(async (cursor) => {
@@ -175,7 +177,7 @@ const MessagesPage = () => {
     <Box variant="white">
       <H3>Messages</H3>
       <Notice notice={notice} />
-      {view === "message" ? <MessageView key={params.get("id")} id={params.get("id")} navigate={navigate} setNotice={setNotice} /> : <Inbox navigate={navigate} setNotice={setNotice} />}
+      {view === "message" ? <MessageView key={params.get("id")} id={params.get("id")} navigate={navigate} setNotice={setNotice} /> : <Inbox key={location.search} navigate={navigate} setNotice={setNotice} />}
     </Box>
   );
 };

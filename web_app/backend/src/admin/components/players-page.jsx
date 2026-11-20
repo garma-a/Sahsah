@@ -28,8 +28,10 @@ const Tabs = ({ view, navigate }) => (
 );
 
 const ListView = ({ navigate, setNotice }) => {
-  const [filters, setFilters] = useState({ q: "", state: "", banned: "", flagged: "" });
-  const [draft, setDraft] = useState("");
+  // The Home queue links here with ?flagged=yes.
+  const query = new URLSearchParams(useLocation().search);
+  const [filters, setFilters] = useState({ q: query.get("q") ?? "", state: query.get("state") ?? "", banned: query.get("banned") ?? "", flagged: query.get("flagged") ?? "" });
+  const [draft, setDraft] = useState(query.get("q") ?? "");
   const [data, setData] = useState(null);
   const fetchRows = useCallback(async (cursor) => {
     try {
@@ -351,7 +353,7 @@ const PlayersPage = () => {
       <H3>Players</H3>
       <Tabs view={view} navigate={navigate} />
       <Notice notice={notice} />
-      {view === "account" ? <AccountView key={params.get("id")} id={params.get("id")} navigate={navigate} setNotice={setNotice} /> : view === "bulk" ? <BulkView navigate={navigate} setNotice={setNotice} /> : view === "deletions" ? <DeletionsView navigate={navigate} setNotice={setNotice} /> : <ListView navigate={navigate} setNotice={setNotice} />}
+      {view === "account" ? <AccountView key={params.get("id")} id={params.get("id")} navigate={navigate} setNotice={setNotice} /> : view === "bulk" ? <BulkView navigate={navigate} setNotice={setNotice} /> : view === "deletions" ? <DeletionsView navigate={navigate} setNotice={setNotice} /> : <ListView key={location.search} navigate={navigate} setNotice={setNotice} />}
     </Box>
   );
 };

@@ -379,7 +379,8 @@ const OrderView = ({ id, navigate, setNotice }) => {
 // ---- payment reviews ---------------------------------------------------------------------------------
 
 const ReviewsView = ({ navigate, setNotice }) => {
-  const [state, setState] = useState("open");
+  // The Home queue links here with &state=open.
+  const [state, setState] = useState(new URLSearchParams(useLocation().search).get("state") === "resolved" ? "resolved" : "open");
   const [data, fetchRows] = usePaged({ view: "reviews", state }, setNotice, "The payment reviews could not be loaded.");
   return (
     <div style={card}>
@@ -468,7 +469,7 @@ const ShopPage = () => {
   const body = view === "promotions" ? <PromotionsView setNotice={setNotice} />
     : view === "orders" ? <OrdersView navigate={navigate} setNotice={setNotice} />
     : view === "order" ? <OrderView key={params.get("id")} id={params.get("id")} navigate={navigate} setNotice={setNotice} />
-    : view === "reviews" ? <ReviewsView navigate={navigate} setNotice={setNotice} />
+    : view === "reviews" ? <ReviewsView key={location.search} navigate={navigate} setNotice={setNotice} />
     : view === "review" ? <ReviewView key={params.get("id")} id={params.get("id")} navigate={navigate} setNotice={setNotice} />
     : view === "products" ? <ProductsView setNotice={setNotice} />
     : <PricingView setNotice={setNotice} />;
