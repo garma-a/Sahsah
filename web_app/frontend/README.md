@@ -13,6 +13,4 @@ This directory owns its dependencies, lockfile and build configuration. It can b
 
 ## Deployment
 
-Production runs on Cloudflare Workers as `sahsah-frontend` at https://sa7sa7.cc and https://www.sa7sa7.cc, built with OpenNext (`wrangler.jsonc`, `open-next.config.ts`). Every push to `main` that touches `web_app/frontend/` deploys after `check` and `build` pass (`deploy-frontend` in `.github/workflows/web-app.yml`, using the `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` repository secrets). The workflow builds against `NEXT_PUBLIC_API_URL=https://api.sa7sa7.cc/api`.
-
-`pnpm preview` runs the production build in the local Workers runtime. To deploy by hand, run `NEXT_PUBLIC_API_URL=https://api.sa7sa7.cc/api pnpm run deploy` after `npx wrangler login` to the client's Cloudflare account.
+Production runs on Cloudflare Workers and deploys from `main` through GitHub Actions. See [docs/deployment](../../docs/deployment/README.md).
