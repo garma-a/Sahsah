@@ -34,6 +34,7 @@ export class Admission {
   private loggedPaused = false;
   private overSamples = 0;
   private reason: PauseReason = "unmonitored";
+  /** Sets the ceiling; may be called again as resources change. Returns whether it changed. */
   configure(ceiling: CapacityVector) {
     requireState(
       [ceiling.rooms, ceiling.members, ceiling.games].every(
@@ -42,7 +43,16 @@ export class Admission {
       "INVALID_CAPACITY_PROFILE",
       500,
     );
-    this.ceiling = ceiling;
+    const changed = capacityKeys.some((key) => this.ceiling?.[key] !== ceiling[key]);
+    this.ceiling = { ...ceiling };
+    return changed;
+  }
+  limits(): CapacityVector | undefined {
+    return this.ceiling && { ...this.ceiling };
+  }
+  /** Open sockets the server accepts: two per admitted member covers TV displays and reconnects. */
+  socketLimit() {
+    return (this.ceiling?.members ?? 0) * 2;
   }
   reconcile(counts: CapacityVector, revision: number) {
     if (this.revision === revision) this.occupancy = counts;

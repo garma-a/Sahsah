@@ -8,7 +8,8 @@ import { ConfigService } from "@nestjs/config";
 import { sql } from "drizzle-orm";
 import { DatabaseService } from "../../database/database.module.js";
 import { Admission } from "./admission.js";
-import { log } from "./logging.js";
+import { errorStack, log } from "./logging.js";
+import { apiResourceLimits, capacityCeiling } from "./capacity.js";
 import { revision } from "../contract.js";
 import { GameplayProblem, requireState } from "./problem.js";
 import type { GameplayOptions } from "./ports.js";
@@ -52,21 +53,8 @@ export class GameplayRuntime implements OnModuleInit, OnModuleDestroy {
       500,
     );
     this.options.pressure ??= preview
-      ? previewPressure(process.env, this.metrics)
-      : resourcePressure(process.env, this.metrics);
-    // Admission closes at 85% of the ceiling: preview admits 20 rooms.
-    const ceiling =
-      options.capacity ??
-      (preview
-        ? { rooms: 24, members: 144, games: 24 }
-        : process.env.NODE_ENV === "production"
-          ? {
-              rooms: Number(process.env.GAMEPLAY_CAPACITY_ROOMS),
-              members: Number(process.env.GAMEPLAY_CAPACITY_MEMBERS),
-              games: Number(process.env.GAMEPLAY_CAPACITY_GAMES),
-            }
-          : { rooms: 200, members: 1200, games: 200 });
-    this.admission.configure(ceiling);
+      ? previewPressure(process.env, this.metrics, this.scheduler)
+      : resourcePressure(process.env, this.metrics, this.scheduler);
     if (process.env.NODE_ENV === "production") {
       requireState(
         this.options.verifyAccount &&
@@ -117,6 +105,7 @@ export class GameplayRuntime implements OnModuleInit, OnModuleDestroy {
       "GAMEPLAY_PROCESS_ALREADY_ACTIVE",
       503,
     );
+    await this.refreshCapacity();
     await this.reconcileOccupancy();
     if (this.options.pressure) {
       try {
@@ -133,14 +122,41 @@ export class GameplayRuntime implements OnModuleInit, OnModuleDestroy {
       }, 1000);
       this.pressureTimer.unref();
     }
-    this.metricsTimer = setInterval(() => this.reportMetrics(), METRICS_INTERVAL_MS);
+    this.metricsTimer = setInterval(() => {
+      this.reportMetrics();
+      void this.refreshCapacity().catch((error: unknown) =>
+        // Keep the last good ceiling; a failed read never widens or drops admission.
+        log.warn("platform.capacity", { code: "CAPACITY_REFRESH_FAILED", stack: errorStack(error) }),
+      );
+    }, METRICS_INTERVAL_MS);
     this.metricsTimer.unref();
+  }
+  /**
+   * Sets the admission ceiling from this container's current CPU and memory (or a measured
+   * envelope), so a plan upgrade or downgrade is followed within a minute, without a restart.
+   */
+  private async refreshCapacity() {
+    if (this.options.capacity) {
+      this.admission.configure(this.options.capacity);
+      return;
+    }
+    const local = Boolean(this.options.preview) || process.env.NODE_ENV !== "production";
+    const limits = await apiResourceLimits(process.env, local);
+    const { ceiling, basis } = capacityCeiling(process.env, limits);
+    if (this.admission.configure(ceiling))
+      log.info("platform.capacity", {
+        code: basis === "measured" ? "CAPACITY_MEASURED" : "CAPACITY_FROM_RESOURCES",
+        roomCeiling: ceiling.rooms,
+        cpuLimitCores: limits.cpuCores,
+        memoryLimitBytes: limits.memoryBytes,
+      });
   }
   /** One structured line per interval: the signal for dashboards and alerts on the log platform. */
   private reportMetrics() {
     log.info("platform.metrics", {
       ...this.metrics.drain(),
       ...this.admission.usage(),
+      roomCeiling: this.admission.limits()?.rooms,
       admission: this.admission.availability().admission,
     });
   }

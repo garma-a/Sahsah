@@ -41,6 +41,10 @@ export interface LogFields {
   refusals?: number;
   members?: number;
   admission?: "open" | "paused";
+  // platform.capacity: the admission ceiling and the resources it was derived from.
+  roomCeiling?: number;
+  cpuLimitCores?: number;
+  memoryLimitBytes?: number;
 }
 export const logContext = new AsyncLocalStorage<LogContext>();
 const processId = randomUUID();

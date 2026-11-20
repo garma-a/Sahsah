@@ -229,7 +229,7 @@ export class GameplayRealtime
     if (
       !this.runtime.options.enabled ||
       [...this.connections].filter((c) => !c.actor).length >= 64 ||
-      this.connections.size >= 1200
+      this.connections.size >= this.runtime.admission.socketLimit()
     ) {
       socket.close(1013, "Capacity");
       return;

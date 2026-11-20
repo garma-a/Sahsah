@@ -13,6 +13,10 @@ export class GameplayScheduler {
   private running = 0;
   private ordinary = 0;
   private queue: Waiting[] = [];
+  /** Time every slot was busy, accumulated since the last saturation() reading. */
+  private fullSince = 0;
+  private fullMs = 0;
+  private sampledAt = performance.now();
   readonly max: number;
   constructor(poolSize = Number(process.env.DATABASE_POOL_MAX ?? 5)) {
     this.max = Math.max(2, poolSize - 1);
@@ -49,12 +53,14 @@ export class GameplayScheduler {
     } else {
       this.running++;
       if (lane !== "protected") this.ordinary++;
+      this.track();
     }
     try {
       return await work();
     } finally {
       this.running--;
       if (lane !== "protected") this.ordinary--;
+      this.track();
       const priorities: ("protected" | "public")[] = ["protected", "public"];
       for (const priority of priorities) {
         const i = this.queue.findIndex((w) => w.lane === priority);
@@ -63,10 +69,31 @@ export class GameplayScheduler {
           clearTimeout(w.timer);
           this.running++;
           if (priority !== "protected") this.ordinary++;
+          this.track();
           w.run();
         }
       }
     }
+  }
+  private track() {
+    const now = performance.now();
+    if (this.running >= this.max) this.fullSince ||= now;
+    else if (this.fullSince) {
+      this.fullMs += now - this.fullSince;
+      this.fullSince = 0;
+    }
+  }
+  /** Share (0..1) of the time since the last reading that every database work slot was busy. */
+  saturation() {
+    const now = performance.now();
+    if (this.fullSince) {
+      this.fullMs += now - this.fullSince;
+      this.fullSince = now;
+    }
+    const share = this.fullMs / Math.max(1, now - this.sampledAt);
+    this.fullMs = 0;
+    this.sampledAt = now;
+    return Math.min(1, share);
   }
   stats() {
     return {

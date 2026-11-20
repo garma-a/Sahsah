@@ -1,3 +1,4 @@
+import { MEMBERS_PER_ROOM } from "../platform/capacity.js";
 import { DatabaseService } from "../../database/database.module.js";
 import { GameplayTransactions } from "../platform/transaction.js";
 import { GameplayOutbox } from "../platform/outbox.js";
@@ -263,9 +264,9 @@ export class RoomOperations {
         requireState(room.presentationMode === "lobby", "LOBBY_NOT_OPEN");
         const members = await this.access.members(db, room.id);
         requireState(
-          members.length < 6 &&
+          members.length < MEMBERS_PER_ROOM &&
             members.filter((item) => item.accountId !== room.ownerAccountId)
-              .length < 5,
+              .length < MEMBERS_PER_ROOM - 1,
           "ROOM_FULL",
         );
         if (actor?.account)
