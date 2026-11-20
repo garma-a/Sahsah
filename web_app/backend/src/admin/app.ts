@@ -14,6 +14,7 @@ import { ContentService } from "./content/service.js";
 import { CommerceService } from "./commerce/service.js";
 import { createMailer } from "./messages/mailer.js";
 import { MessagesService } from "./messages/service.js";
+import { PublicSiteService } from "./public-site/service.js";
 import { PlayersService } from "./players/service.js";
 import { createAdminMedia } from "./content/storage.js";
 import { StaffError, StaffService } from "./staff-service.js";
@@ -53,6 +54,7 @@ export async function createAdminApplication(env: NodeJS.ProcessEnv = process.en
     const players = new PlayersService(database, config.bulkGrantChunkSize);
     const commerce = new CommerceService(database);
     const messages = new MessagesService(database, createMailer(env));
+    const publicSite = new PublicSiteService(database, media, config.cloudflareAnalyticsUrl);
     // First boot only: with no staff account the environment creates the first Super Admin.
     if (await staff.bootstrap(config.bootstrapEmail, config.bootstrapPassword)) log.info("admin.bootstrap", { outcome: "super_admin_created" });
 
@@ -78,7 +80,7 @@ export async function createAdminApplication(env: NodeJS.ProcessEnv = process.en
       resources: [],
       componentLoader,
       dashboard: { component: components.Home },
-      pages: buildPages(staff, () => database.db, content, players, commerce, messages, components),
+      pages: buildPages(staff, () => database.db, content, players, commerce, messages, publicSite, components),
       branding: { companyName: "Sahsah Admin", logo: false, withMadeWithLove: false, theme },
       locale: { language: "en", availableLanguages: ["en"], translations: { en: { messages: { loginWelcome: "Sign in to Sahsah Admin" } } } },
     });

@@ -45,6 +45,8 @@ export function httpRatePolicy(env: NodeJS.ProcessEnv) {
     ipBurst: setting("GAMEPLAY_HTTP_IP_BURST", 240),
     subjectRate: setting("GAMEPLAY_HTTP_SUBJECT_RATE", 60),
     subjectBurst: setting("GAMEPLAY_HTTP_SUBJECT_BURST", 240),
+    /** Contact form submissions per client per hour (also the burst). */
+    contactPerHour: setting("GAMEPLAY_CONTACT_PER_HOUR", 5),
   };
 }
 
@@ -107,6 +109,11 @@ export class GameplayHttpInterceptor implements NestInterceptor {
     const publicRead =
       path.endsWith("/categories") ||
       path.includes("/packs") ||
+      // Public site content and the contact form: no account is needed; the contact service limits each client.
+      path.endsWith("/announcements") ||
+      path.includes("/v1/pages/") ||
+      path.endsWith("/v1/site") ||
+      path.endsWith("/v1/contact") ||
       path.endsWith("/gameplay/availability") ||
       // ADR 0019: the card's code is its own credential; still rate limited per address.
       (req.method === "GET" && path.endsWith("/charades-card")) ||
@@ -152,6 +159,9 @@ export class GameplayHttpInterceptor implements NestInterceptor {
       // CDN may reuse a success briefly. Everything else stays uncached.
       if (path.endsWith("/categories"))
         req.res!.setHeader("Cache-Control", "public, max-age=60");
+      // Site content changes rarely and is the same for everyone.
+      if (req.method === "GET" && (path.endsWith("/announcements") || path.includes("/v1/pages/") || path.endsWith("/v1/site")))
+        req.res!.setHeader("Cache-Control", "public, max-age=30");
       if (allocation && sourceKey) {
         if (this.sources.size >= 4096)
           this.sources.delete(this.sources.keys().next().value!);

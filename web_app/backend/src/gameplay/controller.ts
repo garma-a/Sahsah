@@ -2,8 +2,8 @@ import { RoomCreation } from "./rooms/create.js";
 import { RoomReceipts } from "./platform/receipts.js";
 import { GameplayIdentity } from "./platform/identity.js";
 import { GameplayRuntime } from "./platform/runtime.js";
-import { Body, Controller, Get, HttpCode, Param, Patch, Post, Put, Query, Req, SerializeOptions, StandardSchemaSerializerInterceptor, UseFilters, UseInterceptors } from "@nestjs/common";
-import type { Request } from "express";
+import { Body, Controller, Get, HttpCode, Param, Patch, Post, Put, Query, Req, Res, SerializeOptions, StandardSchemaSerializerInterceptor, UseFilters, UseInterceptors } from "@nestjs/common";
+import type { Request, Response } from "express";
 import { id, position, schemas } from "./contract.js";
 import { GameplayProblemFilter } from "./platform/problem.js";
 import type { Contract } from "./contract.js";
@@ -13,6 +13,7 @@ import { GameOperations } from "./games/operations.js";
 import { CatalogService } from "./catalog/catalog.js";
 import { RoomLifecycle } from "./rooms/lifecycle.js";
 import { MediaService } from "./media/media.js";
+import { SiteService } from "./site/site.js";
 import { GameplayHttpInterceptor } from "./platform/http.js";
 
 @Controller("v1")
@@ -30,6 +31,7 @@ export class GameplayController {
     private catalog: CatalogService,
     private lifecycle: RoomLifecycle,
     private media: MediaService,
+    private site: SiteService,
   ) {}
   @Get("categories")
   @SerializeOptions({ schema: schemas.CategoryPage })
@@ -48,6 +50,32 @@ export class GameplayController {
       id(categoryId),
       query,
     );
+  }
+  @Get("announcements")
+  @SerializeOptions({ schema: schemas.AnnouncementList })
+  async announcements(@Query() query: Record<string, unknown>) {
+    return this.site.announcements(query);
+  }
+  @Get("pages/:slug")
+  @SerializeOptions({ schema: schemas.PublicPage })
+  async page(@Param("slug") slug: string, @Query() query: Record<string, unknown>) {
+    return this.site.page(slug, query);
+  }
+  @Get("site")
+  @SerializeOptions({ schema: schemas.SiteSettings })
+  async siteSettings() {
+    return this.site.settings();
+  }
+  @Post("contact")
+  @SerializeOptions({ schema: schemas.ContactReceipt })
+  async contact(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+    @Body({ schema: schemas.ContactRequest }) body: Contract<"ContactRequest">,
+  ) {
+    const { receipt, replayed } = await this.site.contact(req, body);
+    if (replayed) res.setHeader("Idempotency-Replayed", "true");
+    return receipt;
   }
   @Get("gameplay/availability")
   @SerializeOptions({ schema: schemas.Availability })

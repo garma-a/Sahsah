@@ -74,5 +74,5 @@ test("Nest route, status, request and response contracts match the reviewed Open
     ),
   ).length;
   assert.equal(operations.length, expected);
-  assert.equal(expected, 28);
+  assert.equal(expected, 32);
 });
