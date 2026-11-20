@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { and, desc, eq, lt, or } from "drizzle-orm";
-import type { SahsahDatabase } from "../database/connection.js";
+import type { DatabaseConnection, SahsahDatabase } from "../database/connection.js";
 import { staffAccounts, staffAuditEvents } from "../database/schema/index.js";
 import type { JsonObject } from "../database/schema/types.js";
 
@@ -100,4 +100,23 @@ export async function listAudit(db: SahsahDatabase, filter: AuditFilter) {
 export async function auditActions(db: SahsahDatabase) {
   const rows = await db.selectDistinct({ action: staffAuditEvents.actionCode }).from(staffAuditEvents).limit(100);
   return rows.map((row) => row.action).sort();
+}
+
+/**
+ * Runs one staff change in a transaction. The change writes its audit row first, so a retry with
+ * the same request key hits the unique key, rolls back and reports `replayed` instead of redoing it.
+ */
+export async function applyOnce<T>(database: DatabaseConnection, work: (tx: SahsahDatabase) => Promise<T>): Promise<T | { replayed: true }> {
+  try {
+    return await database.transaction(work);
+  } catch (error) {
+    const source = ((error as { cause?: unknown })?.cause ?? error) as { code?: string; constraint?: string };
+    if (source.code === "23505" && source.constraint?.includes("request_key")) return { replayed: true };
+    throw error;
+  }
+}
+
+export async function requestKeySeen(db: SahsahDatabase, requestKey: string) {
+  const [row] = await db.select({ id: staffAuditEvents.id }).from(staffAuditEvents).where(eq(staffAuditEvents.requestKey, requestKey)).limit(1);
+  return !!row;
 }
