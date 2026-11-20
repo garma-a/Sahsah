@@ -31,6 +31,8 @@ export async function copyQuestionSnapshots(state: StartState, gameId: string) {
         answerAr: q.answerAr,
         answerFranco: q.answerFranco,
         config: cfg,
+        // The definition as it is now: later edits to the format never reach this game (ADR 0002).
+        ...(prepared.composed ? { composed: prepared.composed } : {}),
       },
     });
   }

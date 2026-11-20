@@ -41,6 +41,7 @@ type QuestionScreenProps = {
 };
 
 function promptOf(question: QuestionContent): string {
+  if (question.format === "COMPOSED") return question.prompt ?? question.label;
   return "prompt" in question ? question.prompt : question.instruction;
 }
 
@@ -89,9 +90,11 @@ export default function QuestionScreen({
 
   // The clip this device may play: the question's, or the forward answer clip after the reveal. Viewers get none.
   const audio: AudioRef | undefined = hostView
-    ? (answer?.forwardAudio ?? ("audio" in question ? question.audio : undefined))
+    ? (answer?.forwardAudio ?? answer?.audio ?? ("audio" in question ? question.audio : undefined))
     : undefined;
-  const hasSound = "durationMs" in question;
+  const hasSound = "durationMs" in question && question.durationMs !== undefined;
+  // A composed answer clip has its own length; every other clip is the question's.
+  const soundMs = (answer?.audio && audio === answer.audio ? answer.durationMs : undefined) ?? ("durationMs" in question ? (question.durationMs ?? 0) : 0);
   // Only the host, and only after the reveal, has the forward (original) clip of a reversed question.
   const forwardClip = answer?.forwardAudio !== undefined && audio === answer.forwardAudio;
 
@@ -104,7 +107,8 @@ export default function QuestionScreen({
   const refs: MediaRef[] = [shown, clue, audio].filter((ref): ref is MediaRef => ref !== undefined);
   const media = useMediaLinks(gameId, auth, refs);
   const controls = view.controls ?? [];
-  const stages = "stageSuggestions" in question ? question : undefined;
+  const stages = "stageSuggestions" in question && question.stageSuggestions ? { stageIndex: question.stageIndex, stageSuggestions: question.stageSuggestions } : undefined;
+  const composedLabel = question.format === "COMPOSED" && question.prompt ? question.label : undefined;
   const hint = question.format === "AUDIO_VOICE" ? question.hint : undefined;
   const swatch = answer?.colorHex && /^#[0-9a-f]{3,8}$/i.test(answer.colorHex) ? answer.colorHex : undefined;
   const prompt = promptOf(question);
@@ -153,6 +157,7 @@ export default function QuestionScreen({
             >
               {prompt}
             </h1>
+            {composedLabel && <p className="rounded-full border-[3px] border-ink bg-white px-5 py-1 font-heading text-xl">{composedLabel}</p>}
             {hint && answering && <p className="rounded-full border-[3px] border-ink bg-white px-5 py-1 font-heading text-2xl">تلميح: {hint}</p>}
             {stages && answering && <HintStages stageIndex={stages.stageIndex} suggestions={stages.stageSuggestions} />}
             {answer && (
@@ -219,13 +224,13 @@ export default function QuestionScreen({
                 failed={media.failed}
                 onRetry={media.retry}
                 live={live}
-                durationMs={(question as { durationMs: number }).durationMs}
+                durationMs={soundMs}
                 caption={soundCaption(question, forwardClip)}
                 onReport={(playing, positionMs) => onPlayback(audio, playing, positionMs)}
               />
             ) : (
               <ViewerSound
-                durationMs={(question as { durationMs: number }).durationMs}
+                durationMs={soundMs}
                 caption={soundCaption(question, forwardClip)}
                 playback={playback}
                 clockOffsetMs={clockOffsetMs}

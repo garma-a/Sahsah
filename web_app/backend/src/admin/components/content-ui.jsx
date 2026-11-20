@@ -121,6 +121,17 @@ export const MESSAGES = {
   invalid_facebookUrl: "The Facebook address must start with https://.",
   invalid_instagramUrl: "The Instagram address must start with https://.",
   invalid_tiktokUrl: "The TikTok address must start with https://.",
+  label_required: "Enter the Arabic label players see.",
+  invalid_base: "Choose what the question starts with.",
+  invalid_stages: "A format has at most 3 hint stages, each a picture or an audio clip.",
+  invalid_answer: "Choose what the answer shows.",
+  invalid_prompt_flag: "Choose whether the question text is shown.",
+  format_empty: "A format with only text and no hint stages or answer file is just a Standard question. Add a stage or an answer file.",
+  name_not_usable: "Use a name with at least two letters or digits.",
+  format_in_use: "Questions already use this format, so its stages and files cannot change. You can still rename it or change its label and the question text switch. For a different shape, create a new format.",
+  format_exists: "A format with that name already exists. Choose another name.",
+  format_required: "Choose a format for this question.",
+  format_archived: "That format is archived. Choose an active format, or restore it first.",
   too_many_numbers: "A pasted list can have at most 5000 numbers.",
 };
 export const messageFor = (code) => MESSAGES[code] ?? "That did not work. Check the page before trying again.";
@@ -138,6 +149,7 @@ export const FORMAT_LABELS = {
   IMAGE_MEMORY: "Memory (scene picture)",
   IMAGE_CLUES: "Clue image (up to 4 clue cards)",
   CHARADES: "Charades card",
+  COMPOSED: "Staff-defined format",
 };
 
 export const colors = { forest: "#0d2e1d", gold: "#e7a72b", red: "#d9342b", cream: "#f6f1e6", line: "#d8d0bb", muted: "#5b6a60" };

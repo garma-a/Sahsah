@@ -226,7 +226,7 @@ _Avoid_: Notification, which implies delivery to a device while the app is close
 A staff email answer to a contact message, recorded against that message. The player's answers arrive in the support mailbox, not the dashboard.
 
 **Composed format**:
-A question format staff define as a base (text, image or audio) and an ordered set of media slots, such as each hint stage and the answer. Staff upload every slot as a finished file prepared elsewhere; Sahsah does not alter media. It adds no new gameplay rules.
+A question format staff define as a base (text, image or audio) and an ordered set of media slots, such as each hint stage and the answer. Staff upload every slot as a finished file prepared elsewhere; Sahsah does not alter media. It adds no new gameplay rules. A game copies the format's definition when it starts, so editing the format never changes a running game; archiving hides it from new questions without invalidating existing ones.
 _Avoid_: Built-in format, for memory, clue image and charades, whose interaction is defined in code.
 
 **Points**:

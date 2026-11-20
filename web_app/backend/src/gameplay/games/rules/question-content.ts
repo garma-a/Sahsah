@@ -1,6 +1,7 @@
 import type * as s from "../../../database/schema/index.js";
 import { settings } from "../content.js";
 import { slotPoints } from "./points.js";
+import { composedSlots, type ComposedDefinition } from "./composed-format.js";
 
 type Format = (typeof s.questions.$inferSelect)["format"];
 type Role = (typeof s.questionMedia.$inferSelect)["mediaRole"];
@@ -75,7 +76,12 @@ export const FORMAT_SLOTS: Record<Format, SlotSpec[]> = {
   IMAGE_MEMORY: [slot("prompt", "prompt_image", "Scene picture", true), slot("answer", "answer_image", "Answer picture", true)],
   IMAGE_CLUES: [slot("prompt", "prompt_image", "Main picture", true), clue(0), clue(1), clue(2), clue(3)],
   CHARADES: [slot("prompt", "prompt_image", "Card picture (what to act)", true), slot("answer", "answer_image", "Answer picture", true)],
+  // Defined by staff in the Formats tab: the slots come from the format row (see composedSlots).
+  COMPOSED: [],
 };
+
+/** The upload slots of a question: fixed for built-in formats, taken from the format definition for composed ones. */
+export const slotsFor = (format: Format, composed?: ComposedDefinition): SlotSpec[] => (format === "COMPOSED" ? (composed ? composedSlots(composed) : []) : FORMAT_SLOTS[format]);
 
 export type ContentIssue = {
   code: string;
@@ -92,10 +98,11 @@ const MAX_AUDIO_MS = 1_800_000;
  * Everything the game start requires of one current question, as a list of problems. Game start
  * and the staff dashboard's publish check both use it, so what staff can publish is what hosts can start.
  */
-export function questionContentIssues(question: QuestionContent, media: MediaPin[], assets: Asset[]): ContentIssue[] {
+export function questionContentIssues(question: QuestionContent, media: MediaPin[], assets: Asset[], composed?: ComposedDefinition): ContentIssue[] {
   const issues: ContentIssue[] = [];
   const add = (code: string, message: string, lineage = false) => issues.push({ code, message, ...(lineage ? { lineage } : {}) });
-  const specs = FORMAT_SLOTS[question.format];
+  const specs = slotsFor(question.format, composed);
+  if (question.format === "COMPOSED" && !composed) add("format_missing", "The question's format is not available.");
   const pin = (role: Role, variant = 0) => media.find((m) => m.mediaRole === role && m.variantNumber === variant);
   const asset = (id: string | undefined) => assets.find((a) => a.id === id);
 
@@ -105,7 +112,7 @@ export function questionContentIssues(question: QuestionContent, media: MediaPin
   if (longest > MAX_TEXT) add("text_too_long", `Question and answer text can be at most ${MAX_TEXT} characters.`);
 
   const forward = (question.formatConfig as { allowForward?: unknown }).allowForward === true;
-  const hints = media.filter((m) => m.mediaRole === "hint_image").sort((a, b) => a.variantNumber - b.variantNumber);
+  const hints = media.filter((m) => m.mediaRole === "hint_image" || m.mediaRole === "hint_audio").sort((a, b) => a.variantNumber - b.variantNumber);
   for (const spec of specs) {
     const required = spec.required === "forward" ? forward : spec.required;
     if (required && !pin(spec.role, spec.variant)) add(`missing_${spec.key}`, `${spec.label} is missing.`);
@@ -116,7 +123,8 @@ export function questionContentIssues(question: QuestionContent, media: MediaPin
 
   // Authored settings; point bands are checked against the slot's tile value.
   const expectedHints = question.format === "IMAGE_CLUES" ? hints.length >= 1 : hints.length === 3;
-  if (["IMAGE_BLUR", "IMAGE_ZOOM", "IMAGE_CLUES"].includes(question.format) ? expectedHints : true) {
+  const composedStages = composed?.stageKinds.length ?? 0;
+  if (question.format === "COMPOSED" ? composedStages > 0 && hints.length === composedStages : ["IMAGE_BLUR", "IMAGE_ZOOM", "IMAGE_CLUES"].includes(question.format) ? expectedHints : true) {
     const points = slotPoints(question.slotNumber);
     const stageSuggestions = hints.map((m) => m.suggestedPoints);
     try {
@@ -125,13 +133,13 @@ export function questionContentIssues(question: QuestionContent, media: MediaPin
         {
           ...question.formatConfig,
           ...(["IMAGE_BLUR", "IMAGE_ZOOM"].includes(question.format) ? { stageSuggestions } : {}),
-          ...(question.format === "IMAGE_CLUES" ? { stageSuggestions: [points, ...stageSuggestions] } : {}),
+          ...(question.format === "IMAGE_CLUES" || question.format === "COMPOSED" ? { stageSuggestions: [points, ...stageSuggestions] } : {}),
           ...(question.format === "CHARADES" ? { cardToken: "x".repeat(22) } : {}),
         },
         points,
       );
     } catch {
-      const hinted = ["IMAGE_BLUR", "IMAGE_ZOOM", "IMAGE_CLUES"].includes(question.format);
+      const hinted = ["IMAGE_BLUR", "IMAGE_ZOOM", "IMAGE_CLUES", "COMPOSED"].includes(question.format);
       add(
         "config_invalid",
         hinted

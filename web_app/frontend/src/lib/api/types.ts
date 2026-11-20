@@ -95,8 +95,8 @@ export type AudioRef = {
   kind: "audio";
   boardPosition: number;
   questionPosition: number;
-  role: "question_audio" | "answer_audio";
-  variantNumber: 0;
+  role: "question_audio" | "answer_audio" | "hint_audio";
+  variantNumber: number;
 };
 export type MediaRef = ImageRef | AudioRef;
 
@@ -121,7 +121,8 @@ export type QuestionFormat =
   | "AUDIO_REVERSE"
   | "AUDIO_VOICE"
   | "IMAGE_CLUES"
-  | "CHARADES";
+  | "CHARADES"
+  | "COMPOSED";
 
 /** What the audience reads, by format. Only the host's view ever carries an `audio` reference. */
 export type QuestionContent =
@@ -137,7 +138,20 @@ export type QuestionContent =
   /** The picture stays; each revealed clue card replaces the previous one (cards repeat earlier clues). */
   | { format: "IMAGE_CLUES"; prompt: string; image: ImageRef; clue?: ImageRef; stageIndex: number; stageSuggestions: number[] }
   /** Everyone sees the code; only whoever opens it sees the card (ADR 0019). */
-  | { format: "CHARADES"; prompt: string; cardUrl: string };
+  | { format: "CHARADES"; prompt: string; cardUrl: string }
+  /** A staff-defined format: stage 0 is the base, each hint stage replaces it. Audio stages carry `audio` for the host only. */
+  | {
+      format: "COMPOSED";
+      label: string;
+      baseKind: "text" | "image" | "audio";
+      prompt?: string;
+      stageIndex: number;
+      stageSuggestions?: number[];
+      mediaKind: "none" | "image" | "audio";
+      image?: ImageRef;
+      durationMs?: number;
+      audio?: AudioRef;
+    };
 
 /** The private charades card, fetched by the page its code opens. */
 export type CharadesCard = { url: string; expiresAt: string; contentType: string; width?: number; height?: number };
@@ -148,6 +162,9 @@ export type AnswerContent = {
   image?: ImageRef;
   colorHex?: string;
   forwardAudio?: AudioRef;
+  /** Composed formats: the host's answer clip and its length. */
+  audio?: AudioRef;
+  durationMs?: number;
 };
 
 export type CommandName =
