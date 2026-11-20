@@ -20,6 +20,11 @@ export async function validateStart(state: StartState) {
       body.expectedReadyGeneration === room.lobbyGeneration,
     "STALE_ROOM_VERSION",
   );
+  // A new game is new participation for every account in it (a running game is never touched).
+  await operations.identity.requireNotBanned(
+    db,
+    accounts.map((a) => a.id),
+  );
   requireState(
     accounts.every((a) => a.state === "active" && !a.activeGameId),
     "ACCOUNT_ALREADY_PLAYING",

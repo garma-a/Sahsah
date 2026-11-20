@@ -41,6 +41,20 @@ export const MESSAGES = {
   audio_too_long: "Audio can be at most 10 minutes.",
   invalid_filter: "That filter is not valid.",
   invalid_cursor: "That page link is not valid. Reload the list.",
+  reason_required: "Enter a reason: it is kept in the audit log.",
+  reason_too_long: "Reasons can be at most 500 characters.",
+  invalid_quantity: "Enter a whole number of tokens from 1 to 1000.",
+  invalid_search: "Search with a phone number or at least the last 4 digits of one.",
+  account_not_active: "Complimentary credit can only go to an active account.",
+  account_deleted: "That account was deleted.",
+  already_banned: "That account is already banned. Reload the page.",
+  not_banned: "That account is not banned. Reload the page.",
+  note_required: "Write the note.",
+  note_too_long: "Notes can be at most 1000 characters.",
+  already_resolved: "That flag was already resolved. Reload the page.",
+  invalid_target: "Choose who receives the credit.",
+  no_numbers: "Paste at least one valid phone number.",
+  too_many_numbers: "A pasted list can have at most 5000 numbers.",
 };
 export const messageFor = (code) => MESSAGES[code] ?? "That did not work. Check the page before trying again.";
 
@@ -102,7 +116,7 @@ export const Notice = ({ notice }) =>
  * One request key per intent and payload: a retry after a timeout reuses it, so the change is
  * applied once; an edited form is a different intent and gets a new key.
  */
-export function useSend(setNotice) {
+export function useSend(setNotice, pageName = "content") {
   const keys = useRef({});
   const [busy, setBusy] = useState(false);
   const send = async (body, { success } = {}) => {
@@ -120,7 +134,7 @@ export function useSend(setNotice) {
         form.append("file", file);
         data = form;
       }
-      const response = await api.getPage({ pageName: "content", method: "POST", data });
+      const response = await api.getPage({ pageName, method: "POST", data });
       delete keys.current[intent];
       if (success) setNotice?.({ kind: "ok", text: success });
       return response.data;
@@ -137,4 +151,4 @@ export function useSend(setNotice) {
   return { send, busy };
 }
 
-export const get = async (params) => (await api.getPage({ pageName: "content", params })).data;
+export const get = async (params, pageName = "content") => (await api.getPage({ pageName, params })).data;

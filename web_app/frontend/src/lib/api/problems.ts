@@ -5,6 +5,7 @@ const byCode: Record<string, string> = {
   // identity
   UNAUTHENTICATED: "الكود السري مش صح. اتأكد منه وجرّب تاني.",
   INVALID_PROOF: "الجلسة خلصت. ادخل تاني من الأول.",
+  ACCOUNT_BANNED: "الحساب ده موقوف ومينفعش يلعب أو يدخل لعبة جديدة. لو محتاج تفاصيل كلم فريق صحصح.",
   CREDENTIAL_EXPIRED: "الجلسة خلصت. ادخل تاني من الأول.",
   CONTROLLER_FENCED: "الغرفة بتتدار من جهاز تاني دلوقتي.",
   FRESH_CONTROL_SECRET_REQUIRED: "الغرفة بتتدار من جهاز تاني. كمّل من هنا لو عايز تاخد التحكم.",

@@ -19,7 +19,7 @@ export const tokenLedgerEntries = t.pgTable("token_ledger_entries", {
   sourceOrderId: t.uuid("source_order_id").unique(),
   sourceOrderSettlementKind: settlementKind("source_order_settlement_kind"),
   deletionRequestId: t.uuid("deletion_request_id").unique(),
-  staffAuditEventId: t.uuid("staff_audit_event_id").unique(),
+  staffAuditEventId: t.uuid("staff_audit_event_id"),
   gameId: t.uuid("game_id"),
   sourceDebitId: t.uuid("source_debit_id"),
   sourceDebitKind: tokenEntryKind("source_debit_kind"),
@@ -30,6 +30,8 @@ export const tokenLedgerEntries = t.pgTable("token_ledger_entries", {
   t.uniqueIndex("token_ledger_entries_game_effect").on(table.gameId, table.entryKind),
   t.uniqueIndex("token_ledger_entries_typed_source").on(table.accountId, table.gameId, table.id, table.entryKind),
   t.index("token_ledger_entries_account_history").on(table.accountId, table.createdAt, table.id),
+  // One staff action may credit many accounts (bulk grant), but each account at most once.
+  t.uniqueIndex("token_ledger_entries_staff_action_account").on(table.staffAuditEventId, table.accountId),
   t.foreignKey({
     name: "token_ledger_restored_debit",
     columns: [table.accountId, table.gameId, table.sourceDebitId, table.sourceDebitKind],

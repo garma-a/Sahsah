@@ -57,6 +57,13 @@
       "when": 1795176873019,
       "tag": "0007_content_admin_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1795177782597,
+      "tag": "0008_player_admin",
+      "breakpoints": true
     }
   ]
 }
