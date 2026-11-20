@@ -87,3 +87,9 @@ export function problemMessage(code: string, status: number): string {
 export function isIdentityRejected(code: string): boolean {
   return code === "INVALID_PROOF" || code === "CREDENTIAL_EXPIRED" || code === "UNAUTHENTICATED";
 }
+
+/** The contact form refuses a client for an hour, not a moment, so it says so instead of "wait a moment". */
+export function contactProblemMessage(code: string, status: number): string {
+  if (code === "RATE_LIMITED") return "بعتّ رسائل كتير. جرّب تاني بعد شوية.";
+  return problemMessage(code, status);
+}

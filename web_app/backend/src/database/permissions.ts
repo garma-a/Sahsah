@@ -43,7 +43,7 @@ export async function grantRuntime(client: Client, runtimeRole: string) {
     await client.query(`GRANT UPDATE (details) ON public.staff_audit_events TO ${app}`);
     await client.query(`GRANT DELETE ON public.question_media, public.game_question_media,
       public.staff_sessions, public.phone_verification_challenges, public.public_page_media,
-      public.game_actions, public.outbox_events, public.room_pack_selections, public.room_actions, public.promotions TO ${app}`);
+      public.game_actions, public.outbox_events, public.room_pack_selections, public.room_actions, public.promotions, public.announcements TO ${app}`);
     await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK");

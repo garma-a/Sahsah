@@ -173,5 +173,15 @@ export function makeSchemas(factory: <T>(name: string) => ZodType<T>) {
     CharadesHostAnswer: factory<WireTypes["CharadesHostAnswer"]>("CharadesHostAnswer"),
     HostCharadesAnswerView: factory<WireTypes["HostCharadesAnswerView"]>("HostCharadesAnswerView"),
     CharadesCard: factory<WireTypes["CharadesCard"]>("CharadesCard"),
+    Announcement: factory<WireTypes["Announcement"]>("Announcement"),
+    AnnouncementList: factory<WireTypes["AnnouncementList"]>("AnnouncementList"),
+    FaqItem: factory<WireTypes["FaqItem"]>("FaqItem"),
+    PublicPage: factory<WireTypes["PublicPage"]>("PublicPage"),
+    SiteSettings: factory<WireTypes["SiteSettings"]>("SiteSettings"),
+    ContactSupport: factory<WireTypes["ContactSupport"]>("ContactSupport"),
+    ContactBusiness: factory<WireTypes["ContactBusiness"]>("ContactBusiness"),
+    ContactExperience: factory<WireTypes["ContactExperience"]>("ContactExperience"),
+    ContactRequest: factory<WireTypes["ContactRequest"]>("ContactRequest"),
+    ContactReceipt: factory<WireTypes["ContactReceipt"]>("ContactReceipt"),
   };
 }

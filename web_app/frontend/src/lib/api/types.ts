@@ -283,6 +283,37 @@ export type SelectionConflict = {
   alternatives: Pack[];
 };
 
+export type Announcement = {
+  id: Id;
+  title: string;
+  body: string;
+  linkLabel?: string;
+  linkUrl?: string;
+  startsAt: string;
+  endsAt?: string;
+};
+export type AnnouncementList = { items: Announcement[] };
+export type PublicPageSlug = "about" | "privacy" | "terms" | "faq";
+export type FaqItem = { question: string; answer: string };
+/** About, privacy and terms carry plain-text `body`; the FAQ carries `items`. Never HTML. */
+export type PublicPage = { slug: PublicPageSlug; title: string; body?: string; items?: FaqItem[]; updatedAt: string };
+export type SiteSettings = {
+  logoUrl?: string;
+  logoWidth?: number;
+  logoHeight?: number;
+  supportPhone?: string;
+  whatsapp?: string;
+  supportEmail?: string;
+  facebookUrl?: string;
+  instagramUrl?: string;
+  tiktokUrl?: string;
+};
+export type ContactRequest =
+  | { kind: "support"; reason: "technical" | "purchase" | "account"; email: string; message: string; name?: string; website?: string }
+  | { kind: "business"; businessKind: "business" | "influencer"; email: string; message: string; handle?: string; name?: string; website?: string }
+  | { kind: "experience"; rating?: number; message?: string; email?: string; name?: string; website?: string };
+export type ContactReceipt = { id: Id; receivedAt: string };
+
 export type ProblemBody = {
   type: string;
   title: string;

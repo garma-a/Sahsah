@@ -7,15 +7,8 @@ import { ContentError, type ContentService } from "./content/service.js";
 import type { CommerceService } from "./commerce/service.js";
 import type { MessagesService } from "./messages/service.js";
 import type { PlayersService } from "./players/service.js";
+import type { PublicSiteService } from "./public-site/service.js";
 import { StaffError, type StaffService } from "./staff-service.js";
-
-/**
- * Sections of the navigation. Later releases replace a placeholder with the real screens; until
- * then the page says so rather than pretending to work.
- */
-export const SECTIONS = [
-  { name: "public-site", title: "Public site", planned: "Announcements, public pages and site settings" },
-] as const;
 
 type Reply = { status: (code: number) => unknown };
 type UploadedFile = { path: string; size: number };
@@ -63,13 +56,7 @@ function refuse(response: Reply, error: unknown) {
   throw error;
 }
 
-export function buildPages(staff: StaffService, db: () => SahsahDatabase, content: ContentService, players: PlayersService, commerce: CommerceService, messages: MessagesService, components: { MessagesPage: string; ShopPage: string; Placeholder: string; AuditLog: string; StaffPage: string; ContentPage: string; PlayersPage: string }) {
-  const placeholder = (section: (typeof SECTIONS)[number]) => ({
-    component: components.Placeholder,
-    icon: "Circle",
-    handler: (async () => ({ title: section.title, planned: section.planned })) as PageHandler,
-  });
-
+export function buildPages(staff: StaffService, db: () => SahsahDatabase, content: ContentService, players: PlayersService, commerce: CommerceService, messages: MessagesService, publicSite: PublicSiteService, components: { PublicSitePage: string; MessagesPage: string; ShopPage: string; AuditLog: string; StaffPage: string; ContentPage: string; PlayersPage: string }) {
   const staffPage: PageHandler = async (request, response, context) => {
     const req = request as unknown as PageRequest, actorId = (context as Context).currentAdmin?.id;
     try {
@@ -275,6 +262,53 @@ export function buildPages(staff: StaffService, db: () => SahsahDatabase, conten
     }
   };
 
+  const publicSitePage: PageHandler = async (request, response, context) => {
+    const req = request as unknown as PageRequest, actorId = (context as Context).currentAdmin?.id;
+    try {
+      // Admins and Super Admins both edit the public site (ADR 0008); the account is re-read on every call.
+      await staff.requireStaff(actorId);
+      if (req.method?.toUpperCase() !== "POST") {
+        const query = req.query ?? {}, analyticsUrl = publicSite.analyticsUrl ?? null;
+        switch (text(query.view) || "announcements") {
+          case "pages":
+            return { ...(await publicSite.pages()), analyticsUrl };
+          case "settings":
+            return { ...(await publicSite.settings()), analyticsUrl };
+          default:
+            return { ...(await publicSite.announcements({ status: text(query.status), cursor: text(query.cursor) })), analyticsUrl };
+        }
+      }
+      const body = req.payload ?? {}, requestKey = uuid(body.requestKey);
+      const base = { actorId: actorId!, requestKey };
+      switch (body.op) {
+        case "announcement.create":
+          return await publicSite.createAnnouncement({ ...base, fields: body });
+        case "announcement.update":
+          return await publicSite.updateAnnouncement({ ...base, announcementId: body.id, fields: body });
+        case "announcement.activate":
+        case "announcement.deactivate":
+          return await publicSite.setAnnouncementActive({ ...base, announcementId: body.id, active: body.op === "announcement.activate" });
+        case "announcement.delete":
+          return await publicSite.deleteAnnouncement({ ...base, announcementId: body.id });
+        case "page.save":
+          return await publicSite.savePage({ ...base, slug: body.slug, content: body.content });
+        case "page.publish":
+        case "page.unpublish":
+          return await publicSite.setPagePublished({ ...base, slug: body.slug, published: body.op === "page.publish" });
+        case "settings.save":
+          return await publicSite.saveSettings({ ...base, fields: body });
+        case "logo.upload":
+          return await publicSite.uploadLogo({ ...base, body: body.file ? await readUpload(body.file) : undefined });
+        case "logo.remove":
+          return await publicSite.removeLogo(base);
+        default:
+          throw new StaffError("unknown_operation");
+      }
+    } catch (error) {
+      return refuse(response as unknown as Reply, error);
+    }
+  };
+
   const auditPage: PageHandler = async (request, response) => {
     const query = (request as unknown as PageRequest).query ?? {};
     try {
@@ -290,7 +324,7 @@ export function buildPages(staff: StaffService, db: () => SahsahDatabase, conten
   };
 
   return {
-    ...Object.fromEntries(SECTIONS.map((section) => [section.name, placeholder(section)])),
+    "public-site": { component: components.PublicSitePage, icon: "Globe", handler: publicSitePage },
     content: { component: components.ContentPage, icon: "Folder", handler: contentPage },
     messages: { component: components.MessagesPage, icon: "Mail", handler: messagesPage },
     shop: { component: components.ShopPage, icon: "ShoppingCart", handler: shopPage },

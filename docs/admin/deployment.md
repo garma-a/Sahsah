@@ -55,6 +55,18 @@ Setting up Resend (free tier, 100 emails a day and 3,000 a month at the time of 
 
 If a send fails the reply is kept as failed with a plain reason (key or domain refused, address rejected, service unreachable, timed out) and staff can send it again. A request repeated with the same request key never sends twice: the provider also receives an `Idempotency-Key` derived from it. A timeout is reported as "may or may not have been delivered"; check the Resend log before sending that reply again. Email addresses and message text are never written to service logs.
 
+## Public site
+
+Public site has three tabs. Announcements are dated messages the website shows to everyone (not push notifications): title and message in Arabic (Franco optional), an optional link (an https address or a path such as `/faq`), a start, an optional end and an on/off switch. An announcement that was ever shown cannot be deleted, only deactivated. Pages edits About, Privacy, Terms and FAQ (question and answer items); a page is hidden from the website until it is published, and text pages are plain text (blank line = paragraph, `## ` heading, `- ` list item), never HTML. Site settings holds the logo (public bucket, PNG/JPEG/WebP up to 2 MB) and the support phone, WhatsApp, email and social addresses shown in the footer.
+
+| Variable | Service | Purpose |
+| --- | --- | --- |
+| `CLOUDFLARE_ANALYTICS_URL` | admin | Optional https link to the Cloudflare Web Analytics dashboard, shown on the Public site page. |
+| `GAMEPLAY_CONTACT_PER_HOUR` | API | Contact form submissions per client per hour (default 5, also the burst). |
+| `NEXT_PUBLIC_CF_ANALYTICS_TOKEN` | frontend | Cloudflare Web Analytics beacon token. The beacon script is added only when it is set. |
+
+The API keeps live announcements and site settings in process for 30 to 60 seconds, so a change can take that long to reach the website.
+
 ## Content
 
 Content (sections, categories, packs, questions) is under Content for every staff role. Publishing a pack checks the same rules the game start checks, so a published pack always starts. Editing a published pack asks for confirmation, is validated as a whole and saves atomically; each save raises the pack's revision so a lobby that already picked it asks the host to confirm again. Games that are already running keep the copy they started with.

@@ -60,7 +60,7 @@ function normalize(value: unknown): unknown {
     return Object.fromEntries(
       Object.entries(value).map(([key, item]) => [
         key,
-        ["displayName", "teamOneName", "teamTwoName"].includes(key) &&
+        ["displayName", "teamOneName", "teamTwoName", "message", "name", "email", "handle"].includes(key) &&
         typeof item === "string"
           ? item.trim()
           : normalize(item),

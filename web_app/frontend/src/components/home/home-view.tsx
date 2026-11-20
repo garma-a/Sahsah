@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import Logo from "@/components/brand/logo";
 import Hero from "@/components/home/hero";
 import SelectionBar from "@/components/home/selection-bar";
 import { DisplayLedge, GutterDecor } from "@/components/home/shelf-decor";
 import CinemaWall from "@/components/room/cinema-wall";
 import Shelves from "@/components/home/shelves";
+import AnnouncementBanner from "@/components/site/announcement-banner";
+import SiteFooter from "@/components/site/site-footer";
 import SessionDialog from "@/components/setup/session-dialog";
 import Button from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -100,6 +101,7 @@ export default function HomeView() {
 
   return (
     <div className="min-h-dvh bg-cream">
+      <AnnouncementBanner />
       <Hero categories={categories} onPlay={play} />
 
       <main
@@ -133,12 +135,7 @@ export default function HomeView() {
         </div>
       </main>
 
-      <footer className="relative z-10 bg-night text-cream">
-        <div className="mx-auto flex max-w-[1200px] flex-wrap items-center justify-between gap-4 px-5 py-8 sm:px-8 lg:px-12">
-          <Logo variant="mono" className="w-14 text-sun" />
-          <p className="font-heading text-2xl">ذكريات .. أسئلة .. متعة</p>
-        </div>
-      </footer>
+      <SiteFooter />
 
       <SelectionBar count={selected.length} notice={notice} onStart={start} />
       <SessionDialog open={dialog !== null} onClose={closeDialog} onDone={dialogDone} />

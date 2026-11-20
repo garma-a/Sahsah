@@ -3,7 +3,7 @@
   "info": {
     "title": "Sahsah gameplay API",
     "version": "1.0.0-design",
-    "description": "Gameplay v1 contract, 2026-11-06. API-Q1–Q19 accepted and implemented on feat/gameplay-api. Auth/login/payment/staff/history-browser APIs excluded. Production integration and deployment certification are separate release prerequisites."
+    "description": "Gameplay v1 contract, 2026-11-06. API-Q1\u2013Q19 accepted and implemented on feat/gameplay-api. Auth/login/payment/staff/history-browser APIs excluded. Production integration and deployment certification are separate release prerequisites."
   },
   "servers": [
     {
@@ -46,6 +46,9 @@
     },
     {
       "name": "Results"
+    },
+    {
+      "name": "Site"
     }
   ],
   "paths": {
@@ -1254,7 +1257,7 @@
             "$ref": "#/components/responses/Problem503"
           }
         },
-        "description": "Both anonymous proof and verified account required; lobby-only NULL→account, no body accountId, no login/progress backfill."
+        "description": "Both anonymous proof and verified account required; lobby-only NULL\u2192account, no body accountId, no login/progress backfill."
       }
     },
     "/rooms/{roomId}/memberships/me/departure": {
@@ -1884,12 +1887,12 @@
                         "teams": [
                           {
                             "number": 1,
-                            "name": "الفراعنة",
+                            "name": "\u0627\u0644\u0641\u0631\u0627\u0639\u0646\u0629",
                             "score": "0"
                           },
                           {
                             "number": 2,
-                            "name": "الجدعان",
+                            "name": "\u0627\u0644\u062c\u062f\u0639\u0627\u0646",
                             "score": "0"
                           }
                         ],
@@ -1901,7 +1904,7 @@
                         "idleExpiresAt": "2026-11-07T12:00:00Z",
                         "question": {
                           "format": "AUDIO_GUESS",
-                          "prompt": "اسم الأغنية؟",
+                          "prompt": "\u0627\u0633\u0645 \u0627\u0644\u0623\u063a\u0646\u064a\u0629\u061f",
                           "durationMs": 12000
                         }
                       }
@@ -1930,12 +1933,12 @@
                         "teams": [
                           {
                             "number": 1,
-                            "name": "الفراعنة",
+                            "name": "\u0627\u0644\u0641\u0631\u0627\u0639\u0646\u0629",
                             "score": "0"
                           },
                           {
                             "number": 2,
-                            "name": "الجدعان",
+                            "name": "\u0627\u0644\u062c\u062f\u0639\u0627\u0646",
                             "score": "0"
                           }
                         ],
@@ -1947,7 +1950,7 @@
                         "question": {
                           "format": "IMAGE_MEMORY",
                           "memoryPhase": "viewing_first",
-                          "instruction": "بص للصورة كويس",
+                          "instruction": "\u0628\u0635 \u0644\u0644\u0635\u0648\u0631\u0629 \u0643\u0648\u064a\u0633",
                           "image": {
                             "kind": "image",
                             "boardPosition": 1,
@@ -2652,6 +2655,289 @@
           }
         },
         "description": "ADR 0019: no membership check. Works only while that charades question is the open, unrevealed question of an active game. TTL300s presigned read."
+      }
+    },
+    "/announcements": {
+      "get": {
+        "operationId": "listAnnouncements",
+        "summary": "List live announcements",
+        "tags": [
+          "Site"
+        ],
+        "security": [
+          {}
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Language"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "$ref": "#/components/schemas/Id"
+                }
+              },
+              "Idempotency-Replayed": {
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnouncementList"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Problem410"
+          },
+          "429": {
+            "$ref": "#/components/responses/Problem429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem503"
+          }
+        }
+      }
+    },
+    "/pages/{slug}": {
+      "get": {
+        "operationId": "getPublicPage",
+        "summary": "Get one published public page",
+        "tags": [
+          "Site"
+        ],
+        "security": [
+          {}
+        ],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "about",
+                "privacy",
+                "terms",
+                "faq"
+              ]
+            }
+          },
+          {
+            "$ref": "#/components/parameters/Language"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "$ref": "#/components/schemas/Id"
+                }
+              },
+              "Idempotency-Replayed": {
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Problem410"
+          },
+          "429": {
+            "$ref": "#/components/responses/Problem429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem503"
+          }
+        }
+      }
+    },
+    "/site": {
+      "get": {
+        "operationId": "getSiteSettings",
+        "summary": "Get public site settings",
+        "tags": [
+          "Site"
+        ],
+        "security": [
+          {}
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "$ref": "#/components/schemas/Id"
+                }
+              },
+              "Idempotency-Replayed": {
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteSettings"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Problem410"
+          },
+          "429": {
+            "$ref": "#/components/responses/Problem429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem503"
+          }
+        }
+      }
+    },
+    "/contact": {
+      "post": {
+        "operationId": "sendContact",
+        "summary": "Send a contact form submission",
+        "tags": [
+          "Site"
+        ],
+        "security": [
+          {},
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OperationId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContactRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Stored, or matching replay of an earlier submission. A signed-in sender is linked to the account.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "$ref": "#/components/schemas/Id"
+                }
+              },
+              "Idempotency-Replayed": {
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactReceipt"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Problem410"
+          },
+          "429": {
+            "$ref": "#/components/responses/Problem429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem503"
+          }
+        }
       }
     }
   },
@@ -9157,6 +9443,368 @@
           "url",
           "expiresAt",
           "contentType"
+        ]
+      },
+      "Announcement": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "linkLabel": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
+          },
+          "linkUrl": {
+            "type": "string",
+            "maxLength": 500,
+            "pattern": "^(https://[^\\s\\\\]+|/([^/\\s\\\\][^\\s\\\\]*)?)$"
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "body",
+          "startsAt"
+        ],
+        "description": "A staff message that is live now. linkUrl is an https address or a same-site path. Text is in the requested language, falling back to Arabic."
+      },
+      "AnnouncementList": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Announcement"
+            },
+            "minItems": 0,
+            "maxItems": 5
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "description": "Live announcements, newest start first. Cached briefly by the server."
+      },
+      "FaqItem": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "question": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "answer": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "question",
+          "answer"
+        ]
+      },
+      "PublicPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "slug": {
+            "type": "string",
+            "enum": [
+              "about",
+              "privacy",
+              "terms",
+              "faq"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 20000
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FaqItem"
+            },
+            "minItems": 1,
+            "maxItems": 50
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "slug",
+          "title",
+          "updatedAt"
+        ],
+        "description": "A published page. About, privacy and terms carry plain-text body (blank line = paragraph, '## ' heading, '- ' list item); faq carries items. Never HTML."
+      },
+      "SiteSettings": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "logoUrl": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "logoWidth": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "logoHeight": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "supportPhone": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 24
+          },
+          "whatsapp": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 24
+          },
+          "supportEmail": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 254
+          },
+          "facebookUrl": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "instagramUrl": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "tiktokUrl": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [],
+        "description": "Public site settings; absent fields are not configured."
+      },
+      "ContactSupport": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "support"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "technical",
+              "purchase",
+              "account"
+            ]
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 254
+          },
+          "message": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 1000
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "website": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Honeypot: a real person leaves it empty."
+          }
+        },
+        "required": [
+          "kind",
+          "reason",
+          "email",
+          "message"
+        ]
+      },
+      "ContactBusiness": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "business"
+            ]
+          },
+          "businessKind": {
+            "type": "string",
+            "enum": [
+              "business",
+              "influencer"
+            ]
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 254
+          },
+          "handle": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "message": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 1000
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "website": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Honeypot: a real person leaves it empty."
+          }
+        },
+        "required": [
+          "kind",
+          "businessKind",
+          "email",
+          "message"
+        ]
+      },
+      "ContactExperience": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "experience"
+            ]
+          },
+          "rating": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 254
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "website": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Honeypot: a real person leaves it empty."
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "anyOf": [
+          {
+            "required": [
+              "rating"
+            ]
+          },
+          {
+            "required": [
+              "message"
+            ]
+          }
+        ]
+      },
+      "ContactRequest": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/ContactSupport"
+          },
+          {
+            "$ref": "#/components/schemas/ContactBusiness"
+          },
+          {
+            "$ref": "#/components/schemas/ContactExperience"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "kind",
+          "mapping": {
+            "support": "#/components/schemas/ContactSupport",
+            "business": "#/components/schemas/ContactBusiness",
+            "experience": "#/components/schemas/ContactExperience"
+          }
+        },
+        "description": "The contact form. Support needs a reason, email and message; business needs a kind, email and message; experience needs a rating and/or a message. Stored fields follow the contact_submissions form-shape constraint."
+      },
+      "ContactReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "receivedAt"
         ]
       }
     },

@@ -21,6 +21,7 @@ export const LIMITS = {
   imageBytes: 10 * 1024 * 1024,
   audioBytes: 25 * 1024 * 1024,
   coverBytes: 5 * 1024 * 1024,
+  logoBytes: 2 * 1024 * 1024,
   maxSide: 8192,
   minSide: 32,
   audioMs: 10 * 60 * 1000,
@@ -88,7 +89,7 @@ function mp3(b: Buffer) {
   return { durationMs: Math.max(1, Math.round(seconds * 1000)) };
 }
 
-export function inspectMedia(body: Buffer, purpose: "cover" | "image" | "audio"): Inspected {
+export function inspectMedia(body: Buffer, purpose: "cover" | "logo" | "image" | "audio"): Inspected {
   if (!body.length) throw new MediaRefusal("empty_file");
   const isPng = body.length > 8 && body.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
   const isJpeg = body.length > 3 && body[0] === 0xff && body[1] === 0xd8 && body[2] === 0xff;
@@ -103,7 +104,7 @@ export function inspectMedia(body: Buffer, purpose: "cover" | "image" | "audio")
     return { kind: "audio", contentType: "audio/mpeg", extension: "mp3", durationMs };
   }
   if (!isPng && !isJpeg && !isWebp) throw new MediaRefusal("unsupported_image");
-  if (body.length > (purpose === "cover" ? LIMITS.coverBytes : LIMITS.imageBytes)) throw new MediaRefusal("file_too_large");
+  if (body.length > (purpose === "cover" ? LIMITS.coverBytes : purpose === "logo" ? LIMITS.logoBytes : LIMITS.imageBytes)) throw new MediaRefusal("file_too_large");
   const { widthPx, heightPx } = isPng ? png(body) : isJpeg ? jpeg(body) : webp(body);
   if (!widthPx || !heightPx || Math.min(widthPx, heightPx) < LIMITS.minSide || Math.max(widthPx, heightPx) > LIMITS.maxSide) throw new MediaRefusal("image_dimensions");
   if (purpose === "cover") {

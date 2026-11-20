@@ -141,3 +141,38 @@ export const siteSettings = t.pgTable("site_settings", {
   t.check("site_settings_singleton_version", sql`id = 1 AND settings_schema_version > 0`),
   t.check("site_settings_branding_object", sql`jsonb_typeof(branding) = 'object'`),
 ]);
+
+/**
+ * A dated staff message shown to everyone in the website and app (CONTEXT: Announcement).
+ * `ever_live` is set by staff actions the moment a shown announcement is changed or switched off;
+ * an announcement that is active and started also counts as live, so only one that was never shown can be deleted.
+ */
+export const announcements = t.pgTable("announcements", {
+  id: t.uuid("id").primaryKey().notNull(),
+  titleAr: t.text("title_ar").notNull(),
+  titleFranco: t.text("title_franco"),
+  bodyAr: t.text("body_ar").notNull(),
+  bodyFranco: t.text("body_franco"),
+  linkLabel: t.text("link_label"),
+  linkUrl: t.text("link_url"),
+  startsAt: t.timestamp("starts_at", { withTimezone: true, mode: "string" }).notNull(),
+  endsAt: t.timestamp("ends_at", { withTimezone: true, mode: "string" }),
+  isActive: t.boolean("is_active").default(true).notNull(),
+  everLive: t.boolean("ever_live").default(false).notNull(),
+  createdByStaffId: t.uuid("created_by_staff_id").notNull(),
+  updatedByStaffId: t.uuid("updated_by_staff_id").notNull(),
+  createdAt: t.timestamp("created_at", { withTimezone: true, mode: "string" }).default(sql`now()`).notNull(),
+  updatedAt: t.timestamp("updated_at", { withTimezone: true, mode: "string" }).default(sql`now()`).notNull(),
+}, (table): t.PgTableExtraConfigValue[] => [
+  // Admin list, newest start first.
+  t.index("announcements_recent").on(table.startsAt.desc(), table.id.desc()),
+  // The public read: active announcements by start, newest first; the window is filtered on the few rows left.
+  t.index("announcements_live").on(table.startsAt.desc(), table.id.desc()).where(sql`is_active`),
+  t.foreignKey({ name: "announcements_creator", columns: [table.createdByStaffId], foreignColumns: [staffAccounts.id] }).onDelete("no action").onUpdate("no action"),
+  t.foreignKey({ name: "announcements_editor", columns: [table.updatedByStaffId], foreignColumns: [staffAccounts.id] }).onDelete("no action").onUpdate("no action"),
+  t.check("announcements_text_bounds", sql`length(btrim(title_ar)) BETWEEN 1 AND 120 AND length(btrim(body_ar)) BETWEEN 1 AND 500 AND (title_franco IS NULL OR length(btrim(title_franco)) BETWEEN 1 AND 120) AND (body_franco IS NULL OR length(btrim(body_franco)) BETWEEN 1 AND 500)`),
+  t.check("announcements_link_pair", sql`(link_label IS NULL) = (link_url IS NULL)`),
+  // Only https addresses or same-site paths (one leading slash, not a protocol-relative address).
+  t.check("announcements_link_shape", sql`link_url IS NULL OR (length(link_url) <= 500 AND link_url ~ '^(https://[^[:space:]]+|/([^/[:space:]][^[:space:]]*)?)$' AND strpos(link_url, chr(92)) = 0 AND length(btrim(link_label)) BETWEEN 1 AND 60)`),
+  t.check("announcements_window", sql`ends_at IS NULL OR ends_at > starts_at`),
+]);
