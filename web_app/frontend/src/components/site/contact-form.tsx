@@ -43,6 +43,12 @@ export default function ContactForm() {
   const kindItem = useRadioGroup(KINDS, kind, setKind);
   const ratingItem = useRadioGroup([1, 2, 3, 4, 5] as const, rating, setRating);
 
+  // A validation or send error describes the form as it was submitted: any edit makes it stale, so it goes.
+  function edit<T>(set: (value: T) => void, value: T) {
+    set(value);
+    setError(null);
+  }
+
   function build(): ContactRequest | string {
     const text = message.trim(), mail = email.trim(), common = { ...(name.trim() ? { name: name.trim() } : {}), ...(website ? { website } : {}) };
     if (kind === "experience") {
@@ -109,7 +115,7 @@ export default function ContactForm() {
             key={item}
             type="button"
             {...kindItem(item)}
-            onClick={() => setKind(item)}
+            onClick={() => edit(setKind, item)}
             className={cn("h-11 rounded-full border-[3px] border-ink px-5 font-heading text-lg", kind === item ? "bg-ink text-cream" : "bg-cream hover:bg-sun")}
           >
             {KIND_LABEL[item]}
@@ -157,7 +163,7 @@ export default function ContactForm() {
                 type="button"
                 {...ratingItem(value)}
                 aria-label={`${value} من ٥`}
-                onClick={() => setRating(value)}
+                onClick={() => edit(setRating, value)}
                 className={cn("size-12 rounded-full border-[3px] border-ink text-2xl leading-none", rating !== null && value <= rating ? "bg-sun" : "bg-white hover:bg-sun/40")}
               >
                 ★
@@ -171,21 +177,21 @@ export default function ContactForm() {
         <label htmlFor={ids.email} className={label}>
           الإيميل{kind === "experience" && <span className="text-base font-medium"> (اختياري)</span>}
         </label>
-        <Input id={ids.email} type="email" dir="ltr" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={254} className="text-start" />
+        <Input id={ids.email} type="email" dir="ltr" autoComplete="email" value={email} onChange={(e) => edit(setEmail, e.target.value)} maxLength={254} className="text-start" />
       </div>
       {kind === "business" && (
         <div className="space-y-2">
           <label htmlFor={ids.handle} className={label}>
             حسابك على السوشيال <span className="text-base font-medium">(اختياري)</span>
           </label>
-          <Input id={ids.handle} dir="ltr" value={handle} onChange={(e) => setHandle(e.target.value)} maxLength={80} className="text-start" />
+          <Input id={ids.handle} dir="ltr" value={handle} onChange={(e) => edit(setHandle, e.target.value)} maxLength={80} className="text-start" />
         </div>
       )}
       <div className="space-y-2">
         <label htmlFor={ids.name} className={label}>
           اسمك <span className="text-base font-medium">(اختياري)</span>
         </label>
-        <Input id={ids.name} autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} />
+        <Input id={ids.name} autoComplete="name" value={name} onChange={(e) => edit(setName, e.target.value)} maxLength={80} />
       </div>
       <div className="space-y-2">
         <label htmlFor={ids.message} className={label}>
@@ -194,7 +200,7 @@ export default function ContactForm() {
         <textarea
           id={ids.message}
           value={message}
-          onChange={(e) => setMessage(e.target.value)}
+          onChange={(e) => edit(setMessage, e.target.value)}
           maxLength={1000}
           rows={6}
           className="w-full rounded-2xl border-[3px] border-ink bg-white p-4 text-lg font-medium text-ink shadow-[0_3px_0_var(--color-ink)]"

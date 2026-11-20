@@ -14,6 +14,8 @@ const links = [
   { href: "/contact", label: "تواصل معانا" },
 ];
 
+// Numbers and addresses keep their own left-to-right order inside the right-to-left line.
+const ltr = "whitespace-nowrap [unicode-bidi:isolate]";
 const linkClass = "rounded-md underline-offset-4 hover:text-sun hover:underline";
 
 /** The site footer: fixed page links, plus the contact details and social addresses staff configured. */
@@ -32,7 +34,7 @@ export default function SiteFooter() {
       <div className="mx-auto flex max-w-[1200px] flex-wrap items-start justify-between gap-8 px-5 py-8 sm:px-8 lg:px-12">
         <div className="flex items-center gap-4">
           {settings?.logoUrl && settings.logoWidth && settings.logoHeight ? (
-            <Image src={settings.logoUrl} width={settings.logoWidth} height={settings.logoHeight} alt="صحصح" unoptimized className="h-auto max-h-16 w-auto max-w-32 object-contain" />
+            <Image src={settings.logoUrl} width={settings.logoWidth} height={settings.logoHeight} alt="صحصح" unoptimized className="h-14 w-auto max-w-40 object-contain" />
           ) : (
             <Logo variant="mono" className="w-14 text-sun" />
           )}
@@ -53,8 +55,10 @@ export default function SiteFooter() {
           <ul className="flex w-full flex-wrap gap-x-6 gap-y-2 border-t border-cream/20 pt-5 text-base font-medium" aria-label="طرق التواصل">
             {tel && settings?.supportPhone && (
               <li>
-                <a href={tel} dir="ltr" className={linkClass}>
-                  {settings.supportPhone}
+                <a href={tel} className={linkClass}>
+                  <bdi dir="ltr" className={ltr}>
+                    {settings.supportPhone}
+                  </bdi>
                 </a>
               </li>
             )}
@@ -67,8 +71,10 @@ export default function SiteFooter() {
             )}
             {settings?.supportEmail && (
               <li>
-                <a href={`mailto:${settings.supportEmail}`} dir="ltr" className={linkClass}>
-                  {settings.supportEmail}
+                <a href={`mailto:${settings.supportEmail}`} className={linkClass}>
+                  <bdi dir="ltr" className={ltr}>
+                    {settings.supportEmail}
+                  </bdi>
                 </a>
               </li>
             )}
