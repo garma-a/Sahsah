@@ -4,6 +4,7 @@ import { readFile, rm } from "node:fs/promises";
 import type { SahsahDatabase } from "../database/connection.js";
 import { auditActions, AuditFilterError, listAudit } from "./audit.js";
 import { ContentError, type ContentService } from "./content/service.js";
+import type { CommerceService } from "./commerce/service.js";
 import type { PlayersService } from "./players/service.js";
 import { StaffError, type StaffService } from "./staff-service.js";
 
@@ -12,7 +13,6 @@ import { StaffError, type StaffService } from "./staff-service.js";
  * then the page says so rather than pretending to work.
  */
 export const SECTIONS = [
-  { name: "shop", title: "Shop", planned: "Prices, promo codes and orders" },
   { name: "messages", title: "Messages", planned: "Contact messages and replies" },
   { name: "public-site", title: "Public site", planned: "Announcements, public pages and site settings" },
 ] as const;
@@ -63,7 +63,7 @@ function refuse(response: Reply, error: unknown) {
   throw error;
 }
 
-export function buildPages(staff: StaffService, db: () => SahsahDatabase, content: ContentService, players: PlayersService, components: { Placeholder: string; AuditLog: string; StaffPage: string; ContentPage: string; PlayersPage: string }) {
+export function buildPages(staff: StaffService, db: () => SahsahDatabase, content: ContentService, players: PlayersService, commerce: CommerceService, components: { ShopPage: string; Placeholder: string; AuditLog: string; StaffPage: string; ContentPage: string; PlayersPage: string }) {
   const placeholder = (section: (typeof SECTIONS)[number]) => ({
     component: components.Placeholder,
     icon: "Circle",
@@ -199,6 +199,54 @@ export function buildPages(staff: StaffService, db: () => SahsahDatabase, conten
     }
   };
 
+  const shopPage: PageHandler = async (request, response, context) => {
+    const req = request as unknown as PageRequest, actorId = (context as Context).currentAdmin?.id;
+    try {
+      // Admins and Super Admins both manage the shop (ADR 0008); the account is re-read on every call.
+      await staff.requireStaff(actorId);
+      if (req.method?.toUpperCase() !== "POST") {
+        const query = req.query ?? {};
+        switch (text(query.view) || "pricing") {
+          case "promotions":
+            return await commerce.promotions({ status: text(query.status), cursor: text(query.cursor) });
+          case "orders":
+            return { ...(await commerce.orders({ status: text(query.status), settlement: text(query.settlement), channel: text(query.channel), promo: text(query.promo), from: text(query.from), to: text(query.to), phone: text(query.phone), cursor: text(query.cursor) })), anyOrder: await commerce.anyOrder() };
+          case "order":
+            return await commerce.order(query.id);
+          case "reviews":
+            return await commerce.reviews({ state: text(query.state), cursor: text(query.cursor) });
+          case "review":
+            return await commerce.review(query.id);
+          case "products":
+            return await commerce.storeProducts();
+          default:
+            return await commerce.pricing();
+        }
+      }
+      const body = req.payload ?? {}, requestKey = uuid(body.requestKey);
+      const base = { actorId: actorId!, requestKey };
+      switch (body.op) {
+        case "pricing.save":
+          return await commerce.savePricing({ ...base, expectedVersion: body.expectedVersion, baseUnitPriceMinor: body.baseUnitPriceMinor, giftDiscountBps: body.giftDiscountBps, tiers: body.tiers, bundles: body.bundles });
+        case "promo.create":
+          return await commerce.createPromotion({ ...base, kind: body.kind, code: body.code, discountBps: body.discountBps, bundle: body.bundle, startsAt: body.startsAt, endsAt: body.endsAt, maximumRedemptions: body.maximumRedemptions, perBuyerLimit: body.perBuyerLimit });
+        case "promo.update":
+          return await commerce.updatePromotion({ ...base, promotionId: body.id, code: body.code, discountBps: body.discountBps, bundle: body.bundle, startsAt: body.startsAt, endsAt: body.endsAt, maximumRedemptions: body.maximumRedemptions, perBuyerLimit: body.perBuyerLimit });
+        case "promo.activate":
+        case "promo.deactivate":
+          return await commerce.setPromotionActive({ ...base, promotionId: body.id, active: body.op === "promo.activate" });
+        case "promo.delete":
+          return await commerce.deletePromotion({ ...base, promotionId: body.id });
+        case "review.resolve":
+          return await commerce.markReviewed({ ...base, caseId: body.id, note: body.note });
+        default:
+          throw new StaffError("unknown_operation");
+      }
+    } catch (error) {
+      return refuse(response as unknown as Reply, error);
+    }
+  };
+
   const auditPage: PageHandler = async (request, response) => {
     const query = (request as unknown as PageRequest).query ?? {};
     try {
@@ -216,6 +264,7 @@ export function buildPages(staff: StaffService, db: () => SahsahDatabase, conten
   return {
     ...Object.fromEntries(SECTIONS.map((section) => [section.name, placeholder(section)])),
     content: { component: components.ContentPage, icon: "Folder", handler: contentPage },
+    shop: { component: components.ShopPage, icon: "ShoppingCart", handler: shopPage },
     players: { component: components.PlayersPage, icon: "User", handler: playersPage },
     "audit-log": { component: components.AuditLog, icon: "List", handler: auditPage },
     staff: { component: components.StaffPage, icon: "Users", handler: staffPage },
