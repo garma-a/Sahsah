@@ -8,6 +8,7 @@ import { ConfigService } from "@nestjs/config";
 import { sql } from "drizzle-orm";
 import { DatabaseService } from "../../database/database.module.js";
 import { Admission } from "./admission.js";
+import { log } from "./logging.js";
 import { revision } from "../contract.js";
 import { GameplayProblem, requireState } from "./problem.js";
 import type { GameplayOptions } from "./ports.js";
@@ -20,6 +21,8 @@ import {
 } from "./integrations.js";
 import { previewIdentity, previewMode } from "../preview/identity.js";
 
+const METRICS_INTERVAL_MS = 60000;
+
 @Injectable()
 export class GameplayRuntime implements OnModuleInit, OnModuleDestroy {
   constructor(
@@ -31,6 +34,7 @@ export class GameplayRuntime implements OnModuleInit, OnModuleDestroy {
   readonly scheduler = new GameplayScheduler();
   readonly metrics = new GameplayMetrics();
   private pressureTimer?: ReturnType<typeof setInterval>;
+  private metricsTimer?: ReturnType<typeof setInterval>;
   configure(options: GameplayOptions = {}) {
     this.options = {
       ...options,
@@ -129,9 +133,20 @@ export class GameplayRuntime implements OnModuleInit, OnModuleDestroy {
       }, 1000);
       this.pressureTimer.unref();
     }
+    this.metricsTimer = setInterval(() => this.reportMetrics(), METRICS_INTERVAL_MS);
+    this.metricsTimer.unref();
+  }
+  /** One structured line per interval: the signal for dashboards and alerts on the log platform. */
+  private reportMetrics() {
+    log.info("platform.metrics", {
+      ...this.metrics.drain(),
+      ...this.admission.usage(),
+      admission: this.admission.availability().admission,
+    });
   }
   onModuleDestroy() {
     if (this.pressureTimer) clearInterval(this.pressureTimer);
+    if (this.metricsTimer) clearInterval(this.metricsTimer);
     this.metrics.close();
   }
   enabled() {

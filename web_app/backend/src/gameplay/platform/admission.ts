@@ -128,6 +128,10 @@ export class Admission {
       ? { admission: "paused", retryAfterSeconds: 15 }
       : { admission: "open" };
   }
+  /** Current occupancy for observability; undefined until the first reconciliation. */
+  usage(): CapacityVector | undefined {
+    return this.occupancy && { ...this.occupancy };
+  }
   /**
    * Refuses new work while admission is paused, saying why: SERVER_AT_CAPACITY only for real load or a full
    * server, PRESSURE_UNAVAILABLE when there is no fresh reading to judge the load by.

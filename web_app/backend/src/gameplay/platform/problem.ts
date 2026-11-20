@@ -67,26 +67,45 @@ export class GameplayProblemFilter implements ExceptionFilter {
         : status === 401
           ? "UNAUTHENTICATED"
           : "INTERNAL_ERROR");
-    if (status === 429 || status === 503)
-      response.setHeader("Retry-After", "15");
     // Logged once here, at the HTTP boundary. Capacity refusals are routine;
     // invariant failures were already logged with context where they failed.
     if (status < 500 || status === 503) log.warn(context().scope, { code: applicationCode, status });
     else if (applicationCode !== "INTERNAL_INVARIANT")
       log.error(context().scope, { code: applicationCode, status, stack: errorStack(error) });
-    const requestId = currentRequestId();
-    response.setHeader("X-Request-Id", requestId);
-    response.setHeader("Cache-Control", "private, no-store");
-    response
-      .status(status)
-      .type("application/problem+json")
-      .json({
-        type: `urn:sahsah:problem:${applicationCode.toLowerCase()}`,
-        title: applicationCode.replaceAll("_", " "),
-        status,
-        code: applicationCode,
-        requestId,
-        ...(problem?.details ?? {}),
-      });
+    sendProblem(
+      response,
+      status,
+      applicationCode,
+      status === 429 || status === 503 ? 15 : undefined,
+      problem?.details,
+    );
   }
+}
+
+/**
+ * The one writer of RFC 9457 problem responses (filter, body parser, edge limiter): the same
+ * headers, type URN, request ID and no-store caching wherever a request is refused.
+ */
+export function sendProblem(
+  response: Response,
+  status: number,
+  code: string,
+  retryAfterSeconds?: number,
+  details: JsonObject = {},
+) {
+  const requestId = currentRequestId();
+  if (retryAfterSeconds) response.setHeader("Retry-After", String(retryAfterSeconds));
+  response.setHeader("X-Request-Id", requestId);
+  response.setHeader("Cache-Control", "private, no-store");
+  response
+    .status(status)
+    .type("application/problem+json")
+    .json({
+      type: `urn:sahsah:problem:${code.toLowerCase()}`,
+      title: code.replaceAll("_", " "),
+      status,
+      code,
+      requestId,
+      ...details,
+    });
 }
