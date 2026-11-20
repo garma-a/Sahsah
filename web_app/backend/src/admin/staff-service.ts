@@ -84,6 +84,13 @@ export class StaffService {
     return account?.isActive ? account : undefined;
   }
 
+  /** Any active staff member (Admin or Super Admin), checked against the database on every call. */
+  async requireStaff(id: string | undefined) {
+    const account = id ? await this.current(id) : undefined;
+    if (!account) throw new StaffError("forbidden", 403);
+    return account;
+  }
+
   async requireSuperAdmin(id: string | undefined) {
     const account = id ? await this.current(id) : undefined;
     if (!account || account.role !== "super_admin") throw new StaffError("forbidden", 403);

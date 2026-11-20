@@ -20,7 +20,24 @@ The staff dashboard is a second Railway service built from `web_app/backend` (AD
 | `NODE_ENV` | `production`: Secure cookies, requires `DATABASE_URL`. |
 | `ADMIN_DATABASE_POOL_MAX`, `ADMIN_LOGIN_ATTEMPTS_PER_MINUTE` | Optional tuning (defaults 3 and 10). |
 
-Do not set `GAMEPLAY_*` or R2 variables on this service yet; later releases add what media upload needs.
+### Media storage (content uploads)
+
+Staff upload category covers and question files through the dashboard, which validates them and writes them to R2. Without storage configured the dashboard still edits text and says uploads are unavailable.
+
+| Variable | Purpose |
+| --- | --- |
+| `R2_ACCOUNT_ID` | Cloudflare account id (32 hex characters). |
+| `R2_GAMEPLAY_BUCKET` | Private bucket for question media. Must be the same bucket the API reads (`R2_GAMEPLAY_BUCKET` there), because the bucket name is stored on each asset. |
+| `R2_PUBLIC_BUCKET` | Bucket whose public address serves category covers. |
+| `GAMEPLAY_PUBLIC_MEDIA_BASE_URL` | Public https address of that bucket, the same value the API uses to build cover URLs. |
+| `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | An API token with Object Read & Write on both buckets. This is a different, more powerful token than the API's read-only one; keep it only on this service. |
+| `GAMEPLAY_LOCAL_MEDIA_DIR` | Development and tests only: store files in a directory instead of R2 (refused in production). The dashboard serves it at `/dev-media`. Use the same directory as the API's local setup to preview in the game. |
+
+Rules the dashboard enforces on upload: the file type is read from its bytes (PNG, JPEG or WebP pictures; MP3 audio), pictures are 32 to 8192 pixels per side and at most 10 MB, audio is at most 25 MB and 10 minutes, and a category cover is a portrait 4:5 picture 400 to 2400 pixels wide and at most 5 MB. Sahsah does not resize, recode or otherwise process files: staff upload the finished file. Every upload gets a new random object key (`content/<id>.<ext>` private, `covers/<id>.<ext>` public) and never replaces an existing object. Only the key and the measured metadata go in `media_assets`. A file whose save fails or is abandoned stays in the bucket unreferenced; cleaning up unreferenced objects is a later maintenance task.
+
+## Content
+
+Content (sections, categories, packs, questions) is under Content for every staff role. Publishing a pack checks the same rules the game start checks, so a published pack always starts. Editing a published pack asks for confirmation, is validated as a whole and saves atomically; each save raises the pack's revision so a lobby that already picked it asks the host to confirm again. Games that are already running keep the copy they started with.
 
 ## Staff accounts
 

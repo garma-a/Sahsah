@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import * as s from "../../../database/schema/index.js";
 import { requireState } from "../../platform/problem.js";
 import { settings, points } from "../content.js";
+import { questionContentIssues } from "../rules/question-content.js";
 import type { StartState } from "./types.js";
 export function prepareQuestionMedia(
   state: StartState,
@@ -40,103 +41,16 @@ export function prepareQuestionMedia(
     },
     points(q.slotNumber),
   );
-  requireState(
-    q.promptAr.trim().length > 0 &&
-      q.promptAr.length <= 4000 &&
-      q.answerAr.trim().length > 0 &&
-      q.answerAr.length <= 4000 &&
-      (!q.promptFranco || q.promptFranco.length <= 4000) &&
-      (!q.answerFranco || q.answerFranco.length <= 4000),
-    "CONTENT_NOT_READY",
+  // The same rules the staff dashboard checks before publishing.
+  const issues = questionContentIssues(
+    q,
+    qmedia,
+    qmedia.map((m) => assets.find((a) => a.id === m.mediaAssetId)).filter((a) => a !== undefined),
   );
-  const has = (role: string, variant = 0) =>
-    qmedia.some((m) => m.mediaRole === role && m.variantNumber === variant);
-  if (["IMAGE_BLUR", "IMAGE_ZOOM"].includes(q.format))
-    requireState(
-      [0, 1, 2].every((v) => has("hint_image", v)) && has("answer_image"),
-      "CONTENT_NOT_READY",
-    );
-  else if (q.format === "IMAGE_CLUES")
-    requireState(
-      has("prompt_image") &&
-        stages.length >= 1 &&
-        stages.length <= 4 &&
-        stages.every((m, i) => m.variantNumber === i),
-      "CONTENT_NOT_READY",
-    );
-  else if (q.format === "CHARADES")
-    requireState(has("prompt_image") && has("answer_image"), "CONTENT_NOT_READY");
-  else if (q.format.startsWith("IMAGE_"))
-    requireState(
-      has("prompt_image") &&
-        (["IMAGE_PERSON", "IMAGE_COLOR", "IMAGE_MEMORY"].includes(q.format)
-          ? has("answer_image")
-          : true),
-      "CONTENT_NOT_READY",
-    );
-  if (q.format.startsWith("AUDIO_"))
-    requireState(
-      has("question_audio") &&
-        (q.format !== "AUDIO_REVERSE" ||
-          !cfg.allowForward ||
-          has("answer_audio")),
-      "CONTENT_NOT_READY",
-    );
-  const original = qmedia.find(
-    (m) =>
-      m.mediaRole ===
-      (q.format.startsWith("AUDIO_") ? "source_audio" : "answer_image"),
-  )?.mediaAssetId;
-  const rendition = (role: string, operation: string, variant = 0) => {
-    const m = qmedia.find(
-        (m) => m.mediaRole === role && m.variantNumber === variant,
-      ),
-      asset = assets.find((a) => a.id === m?.mediaAssetId);
-    requireState(
-      asset &&
-        original &&
-        asset.id !== original &&
-        asset.sourceAssetId === original &&
-        asset.transformSpec.operation === operation,
-      "UNSAFE_MEDIA_RENDITION",
-    );
-  };
-  if (["IMAGE_BLUR", "IMAGE_ZOOM"].includes(q.format))
-    for (const stage of [0, 1, 2])
-      rendition(
-        "hint_image",
-        q.format === "IMAGE_BLUR" ? "blur" : "crop",
-        stage,
-      );
-  if (["IMAGE_PERSON", "IMAGE_COLOR"].includes(q.format))
-    rendition(
-      "prompt_image",
-      q.format === "IMAGE_COLOR" ? "grayscale" : "crop",
-    );
-  if (q.format === "AUDIO_REVERSE") rendition("question_audio", "reverse");
+  requireState(issues.every((i) => i.lineage), "CONTENT_NOT_READY");
+  requireState(issues.length === 0, "UNSAFE_MEDIA_RENDITION");
   for (const m of qmedia) {
     if (m.mediaRole.startsWith("source_")) continue;
-    const asset = assets.find((a) => a.id === m.mediaAssetId)!;
-    requireState(
-      asset.state === "ready" &&
-        !asset.archivedAt &&
-        asset.accessScope === "private" &&
-        ["r2", "local"].includes(asset.storageProvider) &&
-        asset.contentType &&
-        asset.contentType.length <= 100 &&
-        asset.byteSize !== null &&
-        (asset.widthPx === null || asset.widthPx <= 16384) &&
-        (asset.heightPx === null || asset.heightPx <= 16384),
-      "CONTENT_NOT_READY",
-    );
-    requireState(
-      (m.mediaRole.endsWith("audio") &&
-        asset.mediaKind === "audio" &&
-        asset.durationMs &&
-        asset.durationMs <= 1800000) ||
-        (!m.mediaRole.endsWith("audio") && asset.mediaKind === "image"),
-      "CONTENT_NOT_READY",
-    );
     pins.push({
       gameId,
       boardPosition: choice.boardPosition,

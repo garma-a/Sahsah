@@ -1,6 +1,7 @@
 import AdminJS, { Router as AdminJSRouter } from "adminjs";
 import AdminJSExpress from "@adminjs/express";
 import express, { type ErrorRequestHandler } from "express";
+import os from "node:os";
 import path from "node:path";
 import { DatabaseConnection } from "../database/connection.js";
 import { edgeProtection } from "../gameplay/platform/http.js";
@@ -9,9 +10,12 @@ import { components, componentLoader } from "./components.js";
 import { readAdminConfig } from "./config.js";
 import { buildPages } from "./pages.js";
 import { SESSION_LIFETIME_MS, StaffSessionStore } from "./session-store.js";
+import { ContentService } from "./content/service.js";
+import { createAdminMedia } from "./content/storage.js";
 import { StaffError, StaffService } from "./staff-service.js";
 
 export const ROOT_PATH = "/admin";
+const UPLOAD_LIMIT_BYTES = 26 * 1024 * 1024;
 
 // Sahsah colours: forest green chrome, gold accent, red for errors, cream surfaces.
 const theme = {
@@ -40,6 +44,8 @@ export async function createAdminApplication(env: NodeJS.ProcessEnv = process.en
   try {
     await database.initialize();
     const staff = new StaffService(database);
+    const media = createAdminMedia(env);
+    const content = new ContentService(database, media);
     // First boot only: with no staff account the environment creates the first Super Admin.
     if (await staff.bootstrap(config.bootstrapEmail, config.bootstrapPassword)) log.info("admin.bootstrap", { outcome: "super_admin_created" });
 
@@ -51,6 +57,8 @@ export async function createAdminApplication(env: NodeJS.ProcessEnv = process.en
       const ready = await database.ready();
       res.status(ready ? 200 : 503).json({ status: ready ? "ok" : "unavailable", service: "sahsah-admin" });
     });
+    // Development storage only: the local media directory, private files behind a short signature.
+    if (media?.serve) app.use("/dev-media", media.serve);
     app.get("/", (_req, res) => res.redirect(302, ROOT_PATH));
     // Page responses can carry a one-time temporary password.
     app.use(`${ROOT_PATH}/api`, (_req, res, next) => {
@@ -63,7 +71,7 @@ export async function createAdminApplication(env: NodeJS.ProcessEnv = process.en
       resources: [],
       componentLoader,
       dashboard: { component: components.Home },
-      pages: buildPages(staff, () => database.db, components),
+      pages: buildPages(staff, () => database.db, content, components),
       branding: { companyName: "Sahsah Admin", logo: false, withMadeWithLove: false, theme },
       locale: { language: "en", availableLanguages: ["en"], translations: { en: { messages: { loginWelcome: "Sign in to Sahsah Admin" } } } },
     });
@@ -91,9 +99,17 @@ export async function createAdminApplication(env: NodeJS.ProcessEnv = process.en
       resave: false,
       saveUninitialized: false,
       cookie: { httpOnly: true, sameSite: "lax", secure: config.production, path: ROOT_PATH, maxAge: SESSION_LIFETIME_MS },
+    }, {
+      // Uploads are staged on disk by the multipart parser and read once; the limits refuse early.
+      maxFileSize: UPLOAD_LIMIT_BYTES,
+      maxFields: 60,
+      maxFieldsSize: 1024 * 1024,
+      uploadDir: os.tmpdir(),
     }));
 
     const failure: ErrorRequestHandler = (error, _req, res, _next) => {
+      // The multipart parser's size refusal.
+      if (/maxFileSize|maxFieldsSize|maxFields/.test((error as Error)?.message ?? "")) return void res.status(413).json({ error: "file_too_large" });
       if (error instanceof StaffError) return void res.status(error.status).json({ error: error.code });
       log.error("admin.http", { code: "UNHANDLED", stack: errorStack(error) });
       res.status(500).json({ error: "internal_error" });
