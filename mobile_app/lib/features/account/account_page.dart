@@ -179,7 +179,6 @@ class _AccountPageState extends State<AccountPage> {
               height: 52,
               radius: 16,
               color: AppColors.green,
-              borderColor: AppColors.deep,
               onTap: _send,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -187,7 +186,7 @@ class _AccountPageState extends State<AccountPage> {
                   const Icon(
                     LucideIcons600.messageCircle,
                     size: 19,
-                    color: Colors.white,
+                    color: AppColors.ink,
                   ),
                   const SizedBox(width: 8),
                   Flexible(
@@ -201,7 +200,7 @@ class _AccountPageState extends State<AccountPage> {
                       style: AppText.sans(
                         16,
                         weight: FontWeight.w700,
-                        color: Colors.white,
+                        color: AppColors.ink,
                       ),
                     ),
                   ),
@@ -287,7 +286,6 @@ class _YourGames extends StatelessWidget {
                     radius: 14,
                     depth: 5,
                     color: AppColors.play,
-                    borderColor: AppColors.deep,
                     onTap: () => openSetup(context),
                     child: Text(
                       lang.t('العب', 'El3ab'),
@@ -321,9 +319,8 @@ class _GameRow extends StatelessWidget {
       height: 60,
       radius: 16,
       depth: 5,
-      color: Color.lerp(AppColors.card, AppColors.play, 0.3)!,
-      edgeColor: Color.lerp(AppColors.deep, AppColors.play, 0.2)!,
-      borderColor: AppColors.play.withValues(alpha: 0.8),
+      color: AppColors.ink,
+      borderColor: AppColors.cyan.withValues(alpha: 0.7),
       onTap: () => Navigator.of(
         context,
       ).push(MaterialPageRoute(builder: (_) => const BoardScreen())),

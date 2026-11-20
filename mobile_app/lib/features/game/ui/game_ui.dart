@@ -3,13 +3,15 @@ import 'package:flutter/material.dart';
 import '../../../core/i18n/lang.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/brand_background.dart';
+import '../../../core/ui/game_button.dart';
 import '../../../core/ui/play_button.dart';
 import '../../../core/ui/pressable.dart';
 import '../../../core/ui/surfaces.dart';
 
-/// Team colours from the brand deck: red for the first team, teal for the
-/// second.
-const teamColors = [AppColors.play, AppColors.teal];
+/// Team colours from the website (`teamTone` in components/brand/tones.ts):
+/// cyan for the first team, yellow for the second. Red is the main button
+/// and the alarm, never a team. Text on either fill is ink.
+const teamColors = [AppColors.cyan, AppColors.sun];
 
 /// Full-screen frame for game screens: brand background, safe area, no
 /// bottom bar.
@@ -190,32 +192,22 @@ class GoldButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final enabled = onTap != null;
-    return Semantics(
-      button: true,
-      enabled: enabled,
-      child: Pressable(
-        onTap: onTap,
-        child: AnimatedOpacity(
-          duration: const Duration(milliseconds: 150),
-          opacity: enabled ? 1 : 0.45,
-          child: Container(
-            height: height,
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            decoration: BoxDecoration(
-              color: AppColors.gold,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [cssShadow(const Color(0x40FFC72C), y: 8, blur: 22)],
-            ),
-            child: _Label(icon: icon, label: label, color: AppColors.forest),
-          ),
-        ),
+    // The website's yellow chunk: ink outline, ink lip.
+    return GameButton(
+      height: height,
+      radius: 16,
+      depth: 4,
+      color: AppColors.gold,
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        child: _Label(icon: icon, label: label, color: AppColors.ink),
       ),
     );
   }
 }
 
-/// Outlined glass action.
+/// Secondary action: the website's dark button.
 class GlassButton extends StatelessWidget {
   const GlassButton({
     super.key,
@@ -232,21 +224,17 @@ class GlassButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      enabled: onTap != null,
-      child: Pressable(
-        onTap: onTap,
-        child: Container(
-          height: height,
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          decoration: glassDecoration(
-            radius: BorderRadius.circular(16),
-            shadow: false,
-            borderColor: Colors.white.withValues(alpha: 0.2),
-          ),
-          child: _Label(icon: icon, label: label, color: AppColors.ivory),
-        ),
+    // The website's dark button: ink face with a cyan ring.
+    return GameButton(
+      height: height,
+      radius: 16,
+      depth: 4,
+      color: AppColors.ink,
+      borderColor: AppColors.cyan.withValues(alpha: 0.7),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        child: _Label(icon: icon, label: label, color: AppColors.ivory),
       ),
     );
   }

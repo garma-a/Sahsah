@@ -1,13 +1,11 @@
-import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 
-/// The fixed page background: a deep navy night with soft colour glows and
-/// faint stars. Game screens pass `decorated: false` to drop the glows.
-/// The rainbows live on cards instead, so the page stays calm.
+/// The fixed page background: charcoal, lit a little from the top, with two
+/// soft brand glows. Game screens pass `decorated: false` to drop the glows.
 class BrandBackground extends StatelessWidget {
   const BrandBackground({super.key, this.decorated = true});
 
@@ -26,7 +24,7 @@ class BrandBackground extends StatelessWidget {
   }
 }
 
-/// Navy gradient, two glows (blue and red) and a scatter of stars.
+/// Charcoal gradient and two glows (cyan and red).
 class _NightPainter extends CustomPainter {
   const _NightPainter({required this.glows});
 
@@ -43,28 +41,14 @@ class _NightPainter extends CustomPainter {
         ..shader = const LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xFF121848), AppColors.deep],
+          colors: [Color(0xFF3A4340), AppColors.deep],
         ).createShader(rect),
     );
     if (glows) {
-      _glow(canvas, size, const Offset(0.8, 0.15), 0.55, AppColors.blue, 0.22);
-      _glow(canvas, size, const Offset(0.15, 0.95), 0.45, AppColors.play, 0.12);
+      _glow(canvas, size, const Offset(0.8, 0.15), 0.55, AppColors.cyan, 0.14);
+      _glow(canvas, size, const Offset(0.15, 0.95), 0.45, AppColors.play, 0.10);
     }
 
-    final random = math.Random(3);
-    final star = Paint();
-    final count = (size.width * size.height / 9000).round();
-    for (var i = 0; i < count; i++) {
-      final p = Offset(
-        random.nextDouble() * size.width,
-        random.nextDouble() * size.height,
-      );
-      final big = random.nextDouble() > 0.9;
-      star.color = AppColors.ivory.withValues(
-        alpha: big ? 0.5 : 0.12 + random.nextDouble() * 0.2,
-      );
-      canvas.drawCircle(p, big ? 1.4 : 0.8, star);
-    }
   }
 
   void _glow(
