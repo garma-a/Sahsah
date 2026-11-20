@@ -4,7 +4,12 @@ import type { Id, Language, ProblemBody } from "./types";
 /** The UI is Arabic only; the parameter is wired through so a later toggle needs no API change. */
 export const LANGUAGE: Language = "ar";
 
-const apiBase = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api").replace(/\/$/, "");
+const configuredApi = process.env.NEXT_PUBLIC_API_URL?.trim();
+// The address is inlined at build time: a production build without it would ship a site that calls localhost.
+if (!configuredApi && process.env.NODE_ENV === "production") {
+  throw new Error("NEXT_PUBLIC_API_URL is required for a production build (e.g. https://api.example.com/api).");
+}
+const apiBase = (configuredApi || "http://localhost:3001/api").replace(/\/$/, "");
 export const API_V1 = `${apiBase}/v1`;
 export const REALTIME_URL = `${API_V1.replace(/^http/, "ws")}/realtime`;
 
