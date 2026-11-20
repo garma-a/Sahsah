@@ -19,10 +19,13 @@ import { MessagesService } from "./messages/service.js";
 import { PublicSiteService } from "./public-site/service.js";
 import { PlayersService } from "./players/service.js";
 import { createAdminMedia } from "./content/storage.js";
+import { ImportService } from "./content/import-service.js";
+import { ZIP_LIMITS } from "./content/zip.js";
 import { StaffError, StaffService } from "./staff-service.js";
 
 export const ROOT_PATH = "/admin";
-const UPLOAD_LIMIT_BYTES = 26 * 1024 * 1024;
+// The largest multipart upload: a bulk-import ZIP. Every other upload checks its own smaller limit before reading.
+const UPLOAD_LIMIT_BYTES = ZIP_LIMITS.zipBytes;
 
 // Sahsah colours: forest green chrome, gold accent, red for errors, cream surfaces.
 const theme = {
@@ -53,6 +56,7 @@ export async function createAdminApplication(env: NodeJS.ProcessEnv = process.en
     const staff = new StaffService(database);
     const media = createAdminMedia(env);
     const content = new ContentService(database, media);
+    const imports = new ImportService(database, content, media, { secret: config.sessionSecret, dir: env.ADMIN_IMPORT_DIR, ttlMs: env.ADMIN_IMPORT_TTL_MS ? Number(env.ADMIN_IMPORT_TTL_MS) : undefined, previewPath: `${ROOT_PATH}/import-preview` });
     const players = new PlayersService(database, config.bulkGrantChunkSize);
     const commerce = new CommerceService(database);
     const messages = new MessagesService(database, createMailer(env));
@@ -73,6 +77,8 @@ export async function createAdminApplication(env: NodeJS.ProcessEnv = process.en
     });
     // Development storage only: the local media directory, private files behind a short signature.
     if (media?.serve) app.use("/dev-media", media.serve);
+    // Staged import files behind a signed, expiring link made for the dry-run report.
+    app.get(`${ROOT_PATH}/import-preview/:id`, imports.preview);
     app.get("/", (_req, res) => res.redirect(302, ROOT_PATH));
     // Page responses can carry a one-time temporary password.
     app.use(`${ROOT_PATH}/api`, (_req, res, next) => {
@@ -85,7 +91,7 @@ export async function createAdminApplication(env: NodeJS.ProcessEnv = process.en
       resources: [],
       componentLoader,
       dashboard: { component: components.Home, handler: dashboardHandler(staff, stats) },
-      pages: buildPages(staff, () => database.db, content, players, commerce, messages, publicSite, components),
+      pages: buildPages(staff, () => database.db, content, imports, players, commerce, messages, publicSite, components),
       branding: { companyName: "Sahsah Admin", logo: false, withMadeWithLove: false, theme },
       locale: { language: "en", availableLanguages: ["en"], translations: { en: { messages: { loginWelcome: "Sign in to Sahsah Admin" } } } },
     });

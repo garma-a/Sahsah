@@ -1,0 +1,19 @@
+---
+status: accepted
+---
+
+# Bulk import reads one ZIP in place, checks it first and creates draft packs only
+
+Staff import packs from one ZIP holding `pack.csv` and the media it names. The CSV has one row per question: `pack` (a label grouping six rows), `slot` (1-6), `format` (a built-in code or a composed format's code), the Arabic and Franco texts, the format's settings, and for each upload slot of the format a `<slot>_file` column (plus `<slot>_points` for hint stages). The columns of the downloadable template come from the format's own slot list (`FORMAT_SLOTS` or the composed definition), so a new composed format gets its template with no code. Files are matched by exact file name only; nothing is guessed from content. The forward clip of AUDIO_REVERSE has no column because it is the source clip, exactly as in the editor.
+
+**Dry run first.** `import.check` stages the ZIP in a private temporary directory, judges every row and writes nothing to the database or to R2. Each question is judged by the same `questionContentIssues` that game start and publish use (built from the files the import would write), and each file by `inspectMedia`, so the report cannot disagree with the editor. The report is per pack and per row, with row and column numbers, thumbnails and audio players from short-lived signed links to the staged ZIP. **Import** re-runs the same analysis on the staged ZIP and refuses unless it finds no problem, so what is imported is exactly what was checked.
+
+**Import creates drafts only** and never publishes. Every file gets its own object and `media_assets` row (the editor also creates one per slot), so derived hint stages carry `source_asset_id` and `transform_spec` of their own question's original through the editor's `attachMedia`. Objects are written with `putOnce` before the transaction; the transaction writes one `content.import` audit event (counts and pack ids) and one `content.pack.create` event per pack. Per-question events are left out: the import event carries the counts. All ids, object keys and per-pack request keys derive from the import's request key, so a retry, even a concurrent one, rewrites the same objects and the unique audit key turns the second commit into a replay. An import that fails after uploading leaves only unreferenced private objects, as an abandoned editor upload does.
+
+**Safe ZIP reading.** The ZIP is never extracted: it is opened in place with `yauzl` (exact version pinned) and one entry at a time is read into memory, so no archive name becomes a path on disk and memory stays bounded. Limits: 200 MB ZIP (also the admin multipart limit; other single-file uploads still refuse above 26 MB before reading), 2,000 entries, 25 MB per entry, 400 MB total uncompressed, `pack.csv` up to 2 MB, 600 rows (100 packs). Refused outright: path traversal, absolute or backslash paths, symbolic links, duplicate names, folders nested deeper than one, encrypted entries. `__MACOSX`, `._*` and `.DS_Store` are ignored. `yauzl` validates that the real length equals the declared one, so a lying header cannot inflate past its cap.
+
+**Staging.** A staged ZIP lives in `ADMIN_IMPORT_DIR` (default the system temp directory) under an opaque id, bound to the staff member and session, for 20 minutes (`ADMIN_IMPORT_TTL_MS`). It is removed after the import, replaced by that staff member's next check, and swept on boot, every five minutes and at each new check. At most 20 are kept. The admin service sleeps, so the temporary disk is treated as disposable.
+
+## Consequences
+
+The CSV never carries a derived rendition's lineage by hand: staff give the original and the stages, and the import records the lineage the editor would. Staff-defined formats work with no extra code. Large imports run in one request (uploads are four at a time); a timed-out client retries with the same request key and continues safely. Composed questions still must not be published to mobile players (ADR 0022).

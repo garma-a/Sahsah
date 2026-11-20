@@ -9,7 +9,7 @@ import type { ComposedDefinition } from "../../gameplay/games/rules/composed-for
 import { FormatService } from "./formats.js";
 import { applyOnce, recordAudit, requestKeySeen } from "../audit.js";
 import { StaffError } from "../staff-service.js";
-import { inspectMedia, MediaRefusal } from "./inspect.js";
+import { inspectMedia, MediaRefusal, type Inspected } from "./inspect.js";
 import { loadPackContent, packIssues, questionStats, retiredQuestions, type PackIssue } from "./packs.js";
 import { putOnce, type AdminMedia } from "./storage.js";
 
@@ -58,7 +58,7 @@ function decodeCursor(value: unknown): [number, string] | undefined {
 }
 
 /** Only these settings exist per format; anything else the browser sends is dropped. */
-function cleanConfig(format: string, input: unknown): JsonObject {
+export function cleanConfig(format: string, input: unknown): JsonObject {
   const raw = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
   const out: JsonObject = {};
   const put = (key: string, max: number) => {
@@ -81,6 +81,24 @@ function cleanConfig(format: string, input: unknown): JsonObject {
   }
   return out;
 }
+
+/** The row for a question file that was just stored; it stays pending until a question uses it. */
+export const pendingAsset = (media: AdminMedia, o: { assetId: string; key: string; found: Inspected; body: Buffer; staffId: string }) => ({
+  id: o.assetId,
+  mediaKind: o.found.kind,
+  state: "pending" as const,
+  accessScope: "private" as const,
+  storageProvider: media.provider,
+  storageNamespace: media.namespace("private"),
+  storageKey: o.key,
+  contentType: o.found.contentType,
+  byteSize: BigInt(o.body.length),
+  widthPx: o.found.widthPx ?? null,
+  heightPx: o.found.heightPx ?? null,
+  durationMs: o.found.durationMs ?? null,
+  sha256: createHash("sha256").update(o.body).digest(),
+  uploadedByStaffId: o.staffId,
+});
 
 type MediaItem = { key: string; assetId: string; points?: number };
 type FormatRow = typeof questionFormats.$inferSelect;
@@ -422,22 +440,7 @@ export class ContentService {
       await recordAudit(tx, { staffId: input.actorId, action: "content.media.upload", targetKind: "media_asset", targetKey: assetId, requestKey: input.requestKey, details: { kind: found.kind, contentType: found.contentType, byteSize: body.length } });
       const [asset] = await tx
         .insert(mediaAssets)
-        .values({
-          id: assetId,
-          mediaKind: found.kind,
-          state: "pending",
-          accessScope: "private",
-          storageProvider: this.media!.provider,
-          storageNamespace: this.media!.namespace("private"),
-          storageKey: key,
-          contentType: found.contentType,
-          byteSize: BigInt(body.length),
-          widthPx: found.widthPx ?? null,
-          heightPx: found.heightPx ?? null,
-          durationMs: found.durationMs ?? null,
-          sha256: createHash("sha256").update(body).digest(),
-          uploadedByStaffId: input.actorId,
-        })
+        .values(pendingAsset(this.media!, { assetId, key, found, body, staffId: input.actorId }))
         .returning();
       return { asset: asset! };
     });
@@ -623,7 +626,8 @@ export class ContentService {
   }
 
   /** Writes the question's files; a pending upload becomes ready here, with its lineage when it is a derived slot. */
-  private async attachMedia(tx: SahsahDatabase, questionId: string, format: keyof typeof FORMAT_SLOTS, items: MediaItem[], config: JsonObject, specs: SlotSpec[]) {
+  /** Also used by the bulk import, so imported questions follow exactly the editor's lineage rules. */
+  async attachMedia(tx: SahsahDatabase, questionId: string, format: keyof typeof FORMAT_SLOTS, items: MediaItem[], config: JsonObject, specs: SlotSpec[]) {
     const ids = [...new Set(items.map((i) => i.assetId))];
     const assets = ids.length ? await tx.select().from(mediaAssets).where(inArray(mediaAssets.id, ids)).for("update") : [];
     const pins: { role: (typeof specs)[number]["role"]; variant: number; assetId: string; points: number | null }[] = [];

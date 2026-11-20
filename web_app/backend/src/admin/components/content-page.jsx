@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router";
 import { Field, Notice, button, card, colors, get, input, useSend } from "./content-ui";
 import PackView from "./content-pack";
 import FormatsView from "./content-formats";
+import ImportView from "./content-import";
 
 const PAGE = "/admin/pages/content";
 const Arrows = ({ onMove, first, last, busy }) => (
@@ -192,7 +193,10 @@ const CategoryView = ({ id, navigate, setNotice }) => {
       <div style={card}>
         <Box flex style={{ justifyContent: "space-between" }}>
           <H3>Packs</H3>
-          <button style={button("primary", busy)} disabled={busy} onClick={async () => { const done = await send({ op: "pack.create", categoryId: id }); if (done?.id) navigate(`${PAGE}?view=pack&id=${done.id}`); }}>New draft pack</button>
+          <span style={{ display: "inline-flex", gap: 8 }}>
+            <button style={button("secondary", busy || category.archived)} disabled={busy || category.archived} onClick={() => navigate(`${PAGE}?view=import&id=${id}`)}>Import packs</button>
+            <button style={button("primary", busy)} disabled={busy} onClick={async () => { const done = await send({ op: "pack.create", categoryId: id }); if (done?.id) navigate(`${PAGE}?view=pack&id=${done.id}`); }}>New draft pack</button>
+          </span>
         </Box>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead><tr style={{ textAlign: "left", color: colors.muted }}><th>Pack</th><th>Status</th><th>Questions</th><th>Problems</th></tr></thead>
@@ -308,7 +312,7 @@ const ContentPage = () => {
       )}
       {(view === "drafts" || view === "disliked") && <p><a href={PAGE} onClick={(e) => { e.preventDefault(); navigate(PAGE); }}>← All categories</a></p>}
       <Notice notice={notice} />
-      {view === "category" ? <CategoryView key={params.get("id")} id={params.get("id")} navigate={navigate} setNotice={setNotice} /> : view === "pack" ? <PackView key={params.get("id")} id={params.get("id")} navigate={navigate} setNotice={setNotice} /> : view === "formats" ? <FormatsView setNotice={setNotice} /> : view === "drafts" ? <DraftsView navigate={navigate} setNotice={setNotice} /> : view === "disliked" ? <DislikedView navigate={navigate} setNotice={setNotice} /> : <HomeView navigate={navigate} setNotice={setNotice} />}
+      {view === "category" ? <CategoryView key={params.get("id")} id={params.get("id")} navigate={navigate} setNotice={setNotice} /> : view === "pack" ? <PackView key={params.get("id")} id={params.get("id")} navigate={navigate} setNotice={setNotice} /> : view === "import" ? <ImportView key={params.get("id")} id={params.get("id")} navigate={navigate} setNotice={setNotice} /> : view === "formats" ? <FormatsView setNotice={setNotice} /> : view === "drafts" ? <DraftsView navigate={navigate} setNotice={setNotice} /> : view === "disliked" ? <DislikedView navigate={navigate} setNotice={setNotice} /> : <HomeView navigate={navigate} setNotice={setNotice} />}
     </Box>
   );
 };
