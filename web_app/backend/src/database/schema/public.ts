@@ -7,7 +7,7 @@ import { bytea } from "./types.js";
 import type { JsonObject } from "./types.js";
 import { mediaAssets } from "./catalog.js";
 import { accounts } from "./identity.js";
-import { staffAccounts } from "./staff.js";
+import { staffAccounts, staffAuditEvents } from "./staff.js";
 
 export const contactSubmissions = t.pgTable("contact_submissions", {
   id: t.uuid("id").primaryKey().notNull(),
@@ -28,6 +28,10 @@ export const contactSubmissions = t.pgTable("contact_submissions", {
   closedByStaffId: t.uuid("closed_by_staff_id"),
 }, (table): t.PgTableExtraConfigValue[] => [
   t.index("contact_submissions_staff_inbox").on(table.state, table.createdAt, table.id),
+  // Inbox filters: all messages, one kind, and one kind within a state, newest first.
+  t.index("contact_submissions_recent").on(table.createdAt, table.id),
+  t.index("contact_submissions_kind_recent").on(table.kind, table.createdAt, table.id),
+  t.index("contact_submissions_kind_state_recent").on(table.kind, table.state, table.createdAt, table.id),
   t.index("contact_submissions_account_cleanup").on(table.accountId, table.createdAt, table.id),
   t.foreignKey({
     name: "contact_submissions_account",
@@ -46,6 +50,34 @@ export const contactSubmissions = t.pgTable("contact_submissions", {
   t.check("contact_submissions_closed_time", sql`(state = 'closed') = (closed_at IS NOT NULL)`),
   t.check("contact_submissions_closing_actor", sql`(closed_at IS NULL) = (closed_by_staff_id IS NULL)`),
   t.check("contact_submissions_closing_order", sql`closed_at IS NULL OR closed_at >= created_at`),
+]);
+
+/**
+ * A staff answer to a contact message (CONTEXT: Support reply). The row is written as `sending`
+ * together with its audit event, the email provider is called afterwards, and the row then becomes
+ * `sent` or `failed`. `external` records that staff answered from their own mail app.
+ */
+export const contactReplies = t.pgTable("contact_replies", {
+  id: t.uuid("id").primaryKey().notNull(),
+  contactId: t.uuid("contact_id").notNull(),
+  staffId: t.uuid("staff_id").notNull(),
+  requestKey: t.uuid("request_key").unique().notNull(),
+  auditEventId: t.uuid("audit_event_id").unique().notNull(),
+  body: t.text("body").notNull(),
+  status: t.varchar("status", { length: 16 }).notNull(),
+  providerMessageId: t.text("provider_message_id"),
+  errorCode: t.varchar("error_code", { length: 40 }),
+  createdAt: t.timestamp("created_at", { withTimezone: true, mode: "string" }).default(sql`now()`).notNull(),
+  completedAt: t.timestamp("completed_at", { withTimezone: true, mode: "string" }),
+}, (table): t.PgTableExtraConfigValue[] => [
+  t.index("contact_replies_thread").on(table.contactId, table.createdAt, table.id),
+  t.foreignKey({ name: "contact_replies_contact", columns: [table.contactId], foreignColumns: [contactSubmissions.id] }).onDelete("no action").onUpdate("no action"),
+  t.foreignKey({ name: "contact_replies_staff", columns: [table.staffId], foreignColumns: [staffAccounts.id] }).onDelete("no action").onUpdate("no action"),
+  t.foreignKey({ name: "contact_replies_audit", columns: [table.auditEventId], foreignColumns: [staffAuditEvents.id] }).onDelete("no action").onUpdate("no action"),
+  t.check("contact_replies_body_bounds", sql`length(btrim(body)) > 0 AND length(body) <= 5000`),
+  t.check("contact_replies_status", sql`status IN ('sending', 'sent', 'failed', 'external')`),
+  t.check("contact_replies_completion", sql`(status = 'sending') = (completed_at IS NULL)`),
+  t.check("contact_replies_outcome", sql`(status = 'failed') = (error_code IS NOT NULL) AND (provider_message_id IS NULL OR status = 'sent')`),
 ]);
 
 export const publicPages = t.pgTable("public_pages", {

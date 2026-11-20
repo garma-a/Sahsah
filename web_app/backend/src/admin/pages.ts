@@ -5,6 +5,7 @@ import type { SahsahDatabase } from "../database/connection.js";
 import { auditActions, AuditFilterError, listAudit } from "./audit.js";
 import { ContentError, type ContentService } from "./content/service.js";
 import type { CommerceService } from "./commerce/service.js";
+import type { MessagesService } from "./messages/service.js";
 import type { PlayersService } from "./players/service.js";
 import { StaffError, type StaffService } from "./staff-service.js";
 
@@ -13,7 +14,6 @@ import { StaffError, type StaffService } from "./staff-service.js";
  * then the page says so rather than pretending to work.
  */
 export const SECTIONS = [
-  { name: "messages", title: "Messages", planned: "Contact messages and replies" },
   { name: "public-site", title: "Public site", planned: "Announcements, public pages and site settings" },
 ] as const;
 
@@ -63,7 +63,7 @@ function refuse(response: Reply, error: unknown) {
   throw error;
 }
 
-export function buildPages(staff: StaffService, db: () => SahsahDatabase, content: ContentService, players: PlayersService, commerce: CommerceService, components: { ShopPage: string; Placeholder: string; AuditLog: string; StaffPage: string; ContentPage: string; PlayersPage: string }) {
+export function buildPages(staff: StaffService, db: () => SahsahDatabase, content: ContentService, players: PlayersService, commerce: CommerceService, messages: MessagesService, components: { MessagesPage: string; ShopPage: string; Placeholder: string; AuditLog: string; StaffPage: string; ContentPage: string; PlayersPage: string }) {
   const placeholder = (section: (typeof SECTIONS)[number]) => ({
     component: components.Placeholder,
     icon: "Circle",
@@ -247,6 +247,34 @@ export function buildPages(staff: StaffService, db: () => SahsahDatabase, conten
     }
   };
 
+  const messagesPage: PageHandler = async (request, response, context) => {
+    const req = request as unknown as PageRequest, actorId = (context as Context).currentAdmin?.id;
+    try {
+      // Admins and Super Admins both answer messages (ADR 0008); the account is re-read on every call.
+      await staff.requireStaff(actorId);
+      if (req.method?.toUpperCase() !== "POST") {
+        const query = req.query ?? {};
+        if (text(query.view) === "message") return await messages.detail(query.id);
+        return await messages.list({ state: text(query.state), kind: text(query.kind), cursor: text(query.cursor) });
+      }
+      const body = req.payload ?? {}, requestKey = uuid(body.requestKey);
+      const base = { actorId: actorId!, requestKey };
+      switch (body.op) {
+        case "reply":
+          return await messages.reply({ ...base, contactId: body.id, body: body.body });
+        case "reply.external":
+          return await messages.markReplied({ ...base, contactId: body.id, note: body.note });
+        case "close":
+        case "reopen":
+          return await messages.setClosed({ ...base, contactId: body.id, closed: body.op === "close" });
+        default:
+          throw new StaffError("unknown_operation");
+      }
+    } catch (error) {
+      return refuse(response as unknown as Reply, error);
+    }
+  };
+
   const auditPage: PageHandler = async (request, response) => {
     const query = (request as unknown as PageRequest).query ?? {};
     try {
@@ -264,6 +292,7 @@ export function buildPages(staff: StaffService, db: () => SahsahDatabase, conten
   return {
     ...Object.fromEntries(SECTIONS.map((section) => [section.name, placeholder(section)])),
     content: { component: components.ContentPage, icon: "Folder", handler: contentPage },
+    messages: { component: components.MessagesPage, icon: "Mail", handler: messagesPage },
     shop: { component: components.ShopPage, icon: "ShoppingCart", handler: shopPage },
     players: { component: components.PlayersPage, icon: "User", handler: playersPage },
     "audit-log": { component: components.AuditLog, icon: "List", handler: auditPage },
