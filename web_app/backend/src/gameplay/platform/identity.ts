@@ -1,7 +1,7 @@
 import { GameplayRuntime } from "./runtime.js";
 import { scoped, enrichContext } from "./logging.js";
 import { Injectable } from "@nestjs/common";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { createHash } from "node:crypto";
 import type { Request } from "express";
 import { DatabaseService } from "../../database/database.module.js";
@@ -89,16 +89,23 @@ export class GameplayIdentity {
       "UNAUTHENTICATED",
       401,
     );
-    const row = (
+    const found = (
       await this.database.db
-        .select()
+        .select({
+          account: s.accounts,
+          banned: sql<boolean>`EXISTS (SELECT 1 FROM account_bans b WHERE b.account_id = "accounts"."id" AND b.lifted_at IS NULL)`,
+        })
         .from(s.accounts)
         .where(eq(s.accounts.id, account.accountId))
     )[0];
+    const row = found?.account;
     if (row?.state !== "active") {
       this.credentials.delete(fingerprint);
       throw new GameplayProblem(401, "UNAUTHENTICATED");
     }
+    // An account ban refuses sign-in, but a game the account is already in may finish (its host
+    // controls and play must keep working), so only an account outside a running game is turned away.
+    requireState(!(found!.banned && !row.activeGameId), "ACCOUNT_BANNED", 403);
     const verified = { ...account, accountId: row.id };
     enrichContext({ accountId: row.id });
     if (!cached?.account)
@@ -153,6 +160,28 @@ export class GameplayIdentity {
       "UNAUTHENTICATED",
       401,
     );
+    await this.requireNotBanned(db, [row.id]);
     return row;
+  }
+  /**
+   * Creating a room, joining one and starting a game are new participation, so an account ban
+   * refuses them. The caller already holds the account row lock, which orders this check against
+   * the staff ban (it takes the same lock).
+   */
+  async requireNotBanned(db: Tx, accountIds: string[]) {
+    if (!accountIds.length) return;
+    const ban = (
+      await db
+        .select({ id: s.accountBans.id })
+        .from(s.accountBans)
+        .where(
+          and(
+            inArray(s.accountBans.accountId, accountIds),
+            isNull(s.accountBans.liftedAt),
+          ),
+        )
+        .limit(1)
+    )[0];
+    requireState(!ban, "ACCOUNT_BANNED", 403);
   }
 }
