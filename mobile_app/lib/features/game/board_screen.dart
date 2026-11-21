@@ -315,7 +315,7 @@ class _TeamScoreState extends State<TeamScore>
     final team = widget.team;
     final compact = widget.compact;
     final color = teamColors[team];
-    final ink = AppColors.inkOn(color);
+    const ink = AppColors.ink;
     final leading = game.leader == team;
     final pill = Semantics(
       button: !game.finished,
@@ -329,12 +329,13 @@ class _TeamScoreState extends State<TeamScore>
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           height: compact ? 44 : 52,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          // Solid team colour with an ink outline and drop, like the
-          // website's team ribbons. The leader is marked by the crown.
+          padding: const EdgeInsetsDirectional.fromSTEB(5, 0, 10, 0),
+          // The website's score card: cream with an ink edge, the team name
+          // on a ribbon of its colour and a big ink score. The leader gets
+          // the crown and a deeper drop.
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            color: color,
+            color: AppColors.paper,
             border: Border.all(color: AppColors.ink, width: 3),
             boxShadow: [inkDrop(leading ? 6 : 4)],
           ),
@@ -347,14 +348,27 @@ class _TeamScoreState extends State<TeamScore>
               // Name at the start, a big score at the end: readable from
               // across the room.
               Expanded(
-                child: Text(
-                  game.teamNames[team],
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppText.display(
-                    compact ? 16 : 20,
-                    height: 1.2,
-                    color: ink,
+                child: Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 9,
+                      vertical: 1,
+                    ),
+                    decoration: BoxDecoration(
+                      color: color,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      game.teamNames[team],
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppText.display(
+                        compact ? 16 : 20,
+                        height: 1.2,
+                        color: ink,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -387,7 +401,7 @@ class _TeamScoreState extends State<TeamScore>
                     style: AppText.sans(
                       12,
                       weight: FontWeight.w700,
-                      color: ink.withValues(alpha: 0.85),
+                      color: AppColors.inkMuted,
                       height: 1.1,
                     ),
                   ),
@@ -404,13 +418,13 @@ class _TeamScoreState extends State<TeamScore>
       decoration: BoxDecoration(
         color: AppColors.gold,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.deep, width: 2),
-        boxShadow: [cssShadow(const Color(0x66000000), y: 4, blur: 10)],
+        border: Border.all(color: AppColors.ink, width: 3),
+        boxShadow: [inkDrop(3)],
       ),
       child: Text(
         '+${lang.toAr(_gain)}',
         textDirection: TextDirection.ltr,
-        style: AppText.num(17, color: AppColors.deep, height: 1.1),
+        style: AppText.num(17, color: AppColors.ink, height: 1.1),
       ),
     );
 
