@@ -89,6 +89,7 @@ class Game {
     Map<String, QuestionProgress>? progress,
     this.activeId,
     this.finished = false,
+    this.turn = 0,
     DateTime? lastActionAt,
   }) : scores = scores ?? [0, 0],
        results = results ?? {},
@@ -108,6 +109,7 @@ class Game {
     ),
     activeId: j['activeId'] as String?,
     finished: j['finished'] as bool,
+    turn: j['turn'] as int? ?? 0,
     lastActionAt: DateTime.parse(j['lastActionAt'] as String),
   );
 
@@ -118,6 +120,9 @@ class Game {
   final Map<String, QuestionProgress> progress;
   String? activeId;
   bool finished;
+
+  /// The team (0 or 1) that picks the next question.
+  int turn;
   DateTime lastActionAt;
 
   int get totalQuestions => categoryIds.length * tilePoints.length;
@@ -138,6 +143,7 @@ class Game {
     'progress': progress.map((k, v) => MapEntry(k, v.toJson())),
     'activeId': activeId,
     'finished': finished,
+    'turn': turn,
     'lastActionAt': lastActionAt.toIso8601String(),
   };
 }
@@ -180,6 +186,10 @@ class GameController extends ChangeNotifier {
   final DateTime Function() _now;
   Game? _game;
 
+  /// The last settled tile and whose turn it was, so the host can take a
+  /// wrong tap back. Not saved: undo is only offered right after the award.
+  ({String id, int turn})? _lastAward;
+
   Game? get game => _game;
   bool get hasActiveGame => _game != null && !_game!.finished;
 
@@ -199,6 +209,7 @@ class GameController extends ChangeNotifier {
   void start({required List<String> categoryIds, required List<String> teams}) {
     assert(categoryIds.length == 6 && teams.length == 2);
     _game = Game(categoryIds: List.of(categoryIds), teamNames: List.of(teams));
+    _lastAward = null;
     _commit();
   }
 
@@ -209,12 +220,14 @@ class GameController extends ChangeNotifier {
     if (g.activeId != null) _stop(progressOf(g.activeId!));
     g.activeId = null;
     g.finished = true;
+    _lastAward = null;
     _commit();
   }
 
   /// Forgets the game entirely (after the results, or to start fresh).
   void discard() {
     _game = null;
+    _lastAward = null;
     _prefs?.remove(storageKey);
     notifyListeners();
   }
@@ -331,8 +344,9 @@ class GameController extends ChangeNotifier {
     _commit();
   }
 
-  /// Resolves the tile for [team] (0/1) or nobody. The 36th resolution
-  /// finishes the game automatically (Q60).
+  /// Resolves the tile for [team] (0/1) or nobody, and passes the turn to
+  /// the other team. The 36th resolution finishes the game automatically
+  /// (Q60).
   void award(String id, int? team) {
     final g = _game!;
     if (g.results.containsKey(id)) return;
@@ -341,7 +355,43 @@ class GameController extends ChangeNotifier {
     g.results[id] = TileResult(team, points);
     if (team != null) g.scores[team] += points;
     g.activeId = null;
-    if (g.resolvedCount >= g.totalQuestions) g.finished = true;
+    _lastAward = (id: id, turn: g.turn);
+    g.turn = 1 - g.turn;
+    if (g.resolvedCount >= g.totalQuestions) {
+      g.finished = true;
+      _lastAward = null; // Scores lock with the game.
+    }
+    _commit();
+  }
+
+  /// Whether the last award can still be taken back.
+  bool get canUndoAward =>
+      _lastAward != null && _game != null && !_game!.finished;
+
+  /// Takes back the award of [id] if it was the last one: the tile is open
+  /// again with its reveal and stage kept, the points come off and the turn
+  /// goes back. Returns whether anything changed.
+  bool undoAward(String id) {
+    final g = _game;
+    final last = _lastAward;
+    if (g == null || last == null || last.id != id || g.finished) return false;
+    final result = g.results.remove(id);
+    if (result == null) return false;
+    final team = result.team;
+    if (team != null) {
+      g.scores[team] = math.max(0, g.scores[team] - result.points);
+    }
+    g.turn = last.turn;
+    _lastAward = null;
+    _commit();
+    return true;
+  }
+
+  /// The host hands the next pick to the other team.
+  void switchTurn() {
+    final g = _game;
+    if (g == null || g.finished) return;
+    g.turn = 1 - g.turn;
     _commit();
   }
 

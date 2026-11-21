@@ -53,21 +53,59 @@ class PackScreen extends StatelessWidget {
           onTap: () => Navigator.of(context).pop(),
         ),
         const SizedBox(width: 10),
+        // Whose pick it is, then what to do.
         Expanded(
-          child: Text(
-            lang.t('اختاروا سؤال', 'Ekhtaro so2al'),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: AppText.display(26, height: 1.2),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: teamColors[game.turn],
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      lang.t(
+                        'الدور على ${game.teamNames[game.turn]}',
+                        'El door 3ala ${game.teamNames[game.turn]}',
+                      ),
+                      key: const ValueKey('pack-turn'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppText.sans(
+                        13,
+                        weight: FontWeight.w700,
+                        color: AppColors.ivory.withValues(alpha: 0.85),
+                        height: 1.2,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              Text(
+                lang.t('اختاروا سؤال', 'Ekhtaro so2al'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppText.display(22, height: 1.2),
+              ),
+            ],
           ),
         ),
         SizedBox(
-          width: 180,
+          width: 200,
           child: TeamScore(game: game, team: 0, compact: true),
         ),
         const SizedBox(width: 8),
         SizedBox(
-          width: 180,
+          width: 200,
           child: TeamScore(game: game, team: 1, compact: true),
         ),
       ],
@@ -256,6 +294,7 @@ class _QuestionGrid extends StatelessWidget {
                   Expanded(
                     child: _QuestionTile(
                       id: '$categoryId-${level * 2 + k}',
+                      number: level * 2 + k + 1,
                       game: game,
                       onPlay: onPlay,
                     ),
@@ -273,16 +312,21 @@ class _QuestionGrid extends StatelessWidget {
 class _QuestionTile extends StatelessWidget {
   const _QuestionTile({
     required this.id,
+    required this.number,
     required this.game,
     required this.onPlay,
   });
 
   final String id;
+
+  /// 1–6 inside the pack, so two tiles worth the same can be told apart
+  /// ("open number 3").
+  final int number;
   final Game game;
   final ValueChanged<String> onPlay;
 
-  /// A small hint for formats that play differently (no spoilers).
-  static (IconData, String, String)? _format(QuestionKind kind) =>
+  /// What kind of question is behind the tile (no spoilers).
+  static (IconData, String, String) _format(QuestionKind kind) =>
       switch (kind) {
         QuestionKind.acting => (LucideIcons.drama, 'مثّلها', 'Massel-ha'),
         QuestionKind.staged => (
@@ -294,8 +338,40 @@ class _QuestionTile extends StatelessWidget {
         QuestionKind.person ||
         QuestionKind.color ||
         QuestionKind.riddle => (LucideIcons.image, 'صورة', 'Soora'),
-        QuestionKind.standard => null,
+        QuestionKind.standard => (
+          LucideIcons.messageCircleQuestionMark,
+          'سؤال',
+          'So2al',
+        ),
       };
+
+  /// The tile's number in a corner.
+  Widget _numbered(BuildContext context, Color ink, Widget child) {
+    return SizedBox.expand(
+      child: Stack(
+        children: [
+          Positioned.fill(child: Center(child: child)),
+          PositionedDirectional(
+            top: 6,
+            start: 10,
+            child: Container(
+              width: 24,
+              height: 24,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: ink.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Text(
+                context.lang.toAr(number),
+                style: AppText.num(13, color: ink, height: 1),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -331,38 +407,42 @@ class _QuestionTile extends StatelessWidget {
               width: 2,
             ),
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                team == null ? LucideIcons.x : LucideIcons600.check,
-                size: 20,
-                color: ink.withValues(alpha: team == null ? 0.5 : 1),
-              ),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  team == null
-                      ? lang.t('محدش', 'Ma7adsh')
-                      : game.teamNames[team],
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppText.sans(
-                    16,
-                    weight: FontWeight.w700,
-                    color: ink.withValues(alpha: team == null ? 0.5 : 1),
+          child: _numbered(
+            context,
+            ink.withValues(alpha: team == null ? 0.5 : 1),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  team == null ? LucideIcons.x : LucideIcons600.check,
+                  size: 20,
+                  color: ink.withValues(alpha: team == null ? 0.5 : 1),
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    team == null
+                        ? lang.t('محدش', 'Ma7adsh')
+                        : game.teamNames[team],
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppText.sans(
+                      16,
+                      weight: FontWeight.w700,
+                      color: ink.withValues(alpha: team == null ? 0.5 : 1),
+                    ),
                   ),
                 ),
-              ),
-              if (team != null) ...[
-                const SizedBox(width: 8),
-                Text(
-                  '+${lang.toAr(result.points)}',
-                  textDirection: TextDirection.ltr,
-                  style: AppText.num(16, color: ink, height: 1),
-                ),
+                if (team != null) ...[
+                  const SizedBox(width: 8),
+                  Text(
+                    '+${lang.toAr(result.points)}',
+                    textDirection: TextDirection.ltr,
+                    style: AppText.num(16, color: ink, height: 1),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       );
@@ -372,8 +452,8 @@ class _QuestionTile extends StatelessWidget {
     final face = started ? AppColors.gold : AppColors.cream;
     return Semantics(
       label: lang.t(
-        '$points نقطة${started ? '، مفتوح' : ''}',
-        '${q.points} no2ta${started ? ', maftoo7' : ''}',
+        'سؤال ${lang.toAr(number)}، $points نقطة، ${format.$2}${started ? '، مفتوح' : ''}',
+        'So2al $number, ${q.points} no2ta, ${format.$3}${started ? ', maftoo7' : ''}',
       ),
       excludeSemantics: true,
       child: GameButton(
@@ -384,52 +464,56 @@ class _QuestionTile extends StatelessWidget {
         edgeColor: Color.lerp(face, AppColors.deep, 0.55),
         borderColor: AppColors.deep,
         onTap: () => onPlay(id),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  points,
-                  style: AppText.num(34, color: AppColors.deep, height: 1),
-                ),
-                if (started || format != null) ...[
-                  const SizedBox(width: 10),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.deep.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          started ? LucideIcons600.circlePlay : format!.$1,
-                          size: 14,
-                          color: AppColors.deep,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          started
-                              ? lang.t('كمّل', 'Kammel')
-                              : lang.t(format!.$2, format.$3),
-                          style: AppText.sans(
-                            12,
-                            weight: FontWeight.w700,
+        child: _numbered(
+          context,
+          AppColors.deep,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 36),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    points,
+                    style: AppText.num(34, color: AppColors.deep, height: 1),
+                  ),
+                  ...[
+                    const SizedBox(width: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.deep.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            started ? LucideIcons600.circlePlay : format.$1,
+                            size: 14,
                             color: AppColors.deep,
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 4),
+                          Text(
+                            started
+                                ? lang.t('كمّل', 'Kammel')
+                                : lang.t(format.$2, format.$3),
+                            style: AppText.sans(
+                              12,
+                              weight: FontWeight.w700,
+                              color: AppColors.deep,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),
