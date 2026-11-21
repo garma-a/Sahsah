@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/i18n/lang.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/brand_art.dart';
+import '../../core/ui/motion.dart';
 import '../../core/ui/pressable.dart';
 import '../../core/ui/retro.dart';
 import '../../core/ui/surfaces.dart';
@@ -155,12 +156,16 @@ class _ShelfState extends State<_Shelf> {
             padding: EdgeInsets.zero,
             itemCount: section.categories.length,
             separatorBuilder: (_, _) => const SizedBox(width: 12),
+            // The posters rise onto the shelf one after another.
             itemBuilder: (context, i) => SizedBox(
               width: width,
               height: height,
-              child: CategoryPosterButton(
-                category: section.categories[i],
-                tone: i,
+              child: Rise(
+                delay: Rise.step(i),
+                child: CategoryPosterButton(
+                  category: section.categories[i],
+                  tone: i,
+                ),
               ),
             ),
           ),

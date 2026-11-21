@@ -8,6 +8,7 @@ import 'package:lucide_icons_flutter/lucide_icons_600.dart';
 import '../../core/i18n/lang.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/brand_art.dart';
+import '../../core/ui/motion.dart';
 import '../../core/ui/play_button.dart';
 import '../../core/ui/pressable.dart';
 import '../../core/ui/surfaces.dart';
@@ -493,6 +494,7 @@ class _CategoryStep extends StatelessWidget {
                     child: _SelectablePoster(
                       category: c,
                       tone: t,
+                      delay: Rise.step(t, ms: 50),
                       order: selected.indexOf(c.id),
                       full: selected.length == boardCategories,
                       onTap: () => onToggle(c.id),
@@ -563,6 +565,7 @@ class _SelectablePoster extends StatelessWidget {
   const _SelectablePoster({
     required this.category,
     required this.tone,
+    this.delay = Duration.zero,
     required this.order,
     required this.full,
     required this.onTap,
@@ -570,6 +573,9 @@ class _SelectablePoster extends StatelessWidget {
 
   final Category category;
   final int tone;
+
+  /// When it rises onto the shelf.
+  final Duration delay;
 
   /// Position in the selection, or -1.
   final int order;
@@ -593,15 +599,18 @@ class _SelectablePoster extends StatelessWidget {
         child: AnimatedOpacity(
           duration: const Duration(milliseconds: 160),
           opacity: available && full && !selected ? 0.6 : 1,
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: Poster(
-              category: category,
-              tone: tone,
-              showNewBadge: !selected,
-              selected: selected,
-              order: selected ? lang.toAr(order + 1) : null,
-              soon: !available,
+          child: Rise(
+            delay: delay,
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: Poster(
+                category: category,
+                tone: tone,
+                showNewBadge: !selected,
+                selected: selected,
+                order: selected ? lang.toAr(order + 1) : null,
+                soon: !available,
+              ),
             ),
           ),
         ),
@@ -790,21 +799,23 @@ class _TeamField extends StatelessWidget {
     final color = teamColors[index];
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
-        color: color.withValues(alpha: 0.1),
-        border: Border.all(color: color.withValues(alpha: 0.55), width: 1.5),
-      ),
+      // A printed name card, like the website's team setup: cream with an
+      // ink edge, the team's number on a sticker of its colour.
+      decoration: paperDecoration(radius: BorderRadius.circular(18), drop: 5),
       child: Row(
         children: [
           Container(
             width: 40,
             height: 40,
             alignment: Alignment.center,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.ink, width: 3),
+            ),
             child: Text(
               lang.toAr(index + 1),
-              style: AppText.num(18, color: AppColors.forest),
+              style: AppText.num(18, color: AppColors.ink),
             ),
           ),
           const SizedBox(width: 12),
@@ -816,8 +827,8 @@ class _TeamField extends StatelessWidget {
               textInputAction: index == 0
                   ? TextInputAction.next
                   : TextInputAction.done,
-              style: AppText.display(24, height: 1.3),
-              cursorColor: color,
+              style: AppText.display(24, height: 1.3, color: AppColors.ink),
+              cursorColor: AppColors.ink,
               decoration: InputDecoration(
                 isDense: true,
                 counterText: '',
@@ -828,17 +839,13 @@ class _TeamField extends StatelessWidget {
                 labelStyle: AppText.sans(
                   13,
                   weight: FontWeight.w600,
-                  color: color,
+                  color: AppColors.inkMuted,
                 ),
                 floatingLabelBehavior: FloatingLabelBehavior.always,
               ),
             ),
           ),
-          Icon(
-            LucideIcons.pencil,
-            size: 16,
-            color: AppColors.ivory.withValues(alpha: 0.6),
-          ),
+          Icon(LucideIcons.pencil, size: 16, color: AppColors.inkMuted),
         ],
       ),
     );

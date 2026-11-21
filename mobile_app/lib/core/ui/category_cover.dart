@@ -5,6 +5,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../theme/app_theme.dart';
 import 'surfaces.dart';
+import 'motion.dart';
 
 /// The second ink of each category tone, in the website's order
 /// (`components/brand/cover.tsx`): the title's offset shadow.
@@ -233,7 +234,7 @@ class PosterBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedContainer(
+    final sticker = AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       width: size,
       height: size,
@@ -255,5 +256,7 @@ class PosterBadge extends StatelessWidget {
               ),
             ),
     );
+    // Picking springs the sticker in, as on the website.
+    return selected ? Pop(trigger: order ?? true, child: sticker) : sticker;
   }
 }

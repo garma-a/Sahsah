@@ -155,20 +155,27 @@ class _Stage extends StatelessWidget {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        lang.t('يلا نلعب؟', 'Yalla nel3ab?'),
-                        style: AppText.display(
-                          36,
-                          height: 1.1,
-                          color: AppColors.ink,
+                      // The website's hero labels: printed strips stuck on
+                      // crooked, each with an ink offset shadow.
+                      Rise(
+                        delay: const Duration(milliseconds: 60),
+                        turn: -3,
+                        child: _Label(
+                          text: lang.t('يلا نلعب؟', 'Yalla nel3ab?'),
+                          size: 30,
+                          fill: AppColors.press,
+                          ink: Colors.white,
                         ),
                       ),
-                      Text(
-                        lang.t('مستنيين مين؟', 'Mestanyeen meen?'),
-                        style: AppText.display(
-                          20,
-                          height: 1.2,
-                          color: AppColors.press,
+                      const SizedBox(height: 6),
+                      Rise(
+                        delay: const Duration(milliseconds: 160),
+                        turn: 1.5,
+                        child: _Label(
+                          text: lang.t('مستنيين مين؟', 'Mestanyeen meen?'),
+                          size: 19,
+                          fill: AppColors.cyan,
+                          ink: AppColors.ink,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -179,7 +186,7 @@ class _Stage extends StatelessWidget {
                           const Icon(
                             LucideIcons600.sparkles,
                             size: 15,
-                            color: AppColors.press,
+                            color: AppColors.pressDeep,
                           ),
                           const SizedBox(width: 6),
                           Expanded(
@@ -190,7 +197,7 @@ class _Stage extends StatelessWidget {
                               style: AppText.sans(
                                 14,
                                 weight: FontWeight.w700,
-                                color: AppColors.press,
+                                color: AppColors.pressDeep,
                               ),
                             ),
                           ),
@@ -209,10 +216,18 @@ class _Stage extends StatelessWidget {
                           padding: EdgeInsets.zero,
                           itemCount: featured.categories.length,
                           separatorBuilder: (_, _) => const SizedBox(width: 12),
-                          itemBuilder: (context, i) => _MiniPack(
-                            category: featured.categories[i],
-                            tone: i,
-                            height: rowHeight,
+                          // Pasted up one by one, a little crooked, like the
+                          // website's poster fan.
+                          itemBuilder: (context, i) => Rise(
+                            delay:
+                                Rise.step(i, ms: 90) +
+                                const Duration(milliseconds: 250),
+                            turn: const [-2.0, 1.5, -1.0, 2.0][i % 4],
+                            child: _MiniPack(
+                              category: featured.categories[i],
+                              tone: i,
+                              height: rowHeight,
+                            ),
                           ),
                         ),
                       ),
@@ -544,6 +559,40 @@ class _SeeAll extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// A heading printed on a strip of colour, with an ink offset shadow, like
+/// the website's hero labels.
+class _Label extends StatelessWidget {
+  const _Label({
+    required this.text,
+    required this.size,
+    required this.fill,
+    required this.ink,
+  });
+
+  final String text;
+  final double size;
+  final Color fill;
+  final Color ink;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 1),
+      decoration: BoxDecoration(
+        color: fill,
+        boxShadow: const [
+          BoxShadow(color: AppColors.ink, offset: Offset(4, 4)),
+        ],
+      ),
+      child: Text(
+        text,
+        maxLines: 1,
+        style: AppText.display(size, height: 1.3, color: ink),
       ),
     );
   }

@@ -8,6 +8,7 @@ import '../../core/i18n/lang.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/brand_art.dart';
 import '../../core/ui/category_cover.dart';
+import '../../core/ui/motion.dart';
 import '../../core/ui/pressable.dart';
 import '../../core/ui/surfaces.dart';
 import '../../data/categories.dart';
@@ -748,14 +749,18 @@ class _Board extends StatelessWidget {
             spacing: gap,
             runSpacing: gap,
             children: [
-              for (final id in game.categoryIds)
+              for (final (i, id) in game.categoryIds.indexed)
                 SizedBox(
                   width: cardWidth,
                   height: cardHeight,
-                  child: _CategoryCard(
-                    categoryId: id,
-                    game: game,
-                    onOpen: onOpen,
+                  // The packs rise onto the board one after another.
+                  child: Rise(
+                    delay: Rise.step(i, ms: 70),
+                    child: _CategoryCard(
+                      categoryId: id,
+                      game: game,
+                      onOpen: onOpen,
+                    ),
                   ),
                 ),
             ],

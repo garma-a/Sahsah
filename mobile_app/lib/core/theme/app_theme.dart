@@ -217,9 +217,10 @@ extension SurfaceColors on BuildContext {
   Color get mutedText =>
       onPaper ? AppColors.inkMuted : AppColors.ivory.withValues(alpha: 0.72);
 
-  /// The accent for small headings and links: yellow on dark, red on paper
-  /// (yellow on cream fails contrast).
-  Color get accentText => onPaper ? AppColors.press : AppColors.gold;
+  /// The accent for small headings and links: yellow on dark, deep red on
+  /// paper (yellow on cream fails contrast, and so, just, does the button
+  /// red: 4.4:1).
+  Color get accentText => onPaper ? AppColors.pressDeep : AppColors.gold;
 
   /// Hairlines and faint fills.
   Color get faint => onPaper
