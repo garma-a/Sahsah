@@ -128,7 +128,7 @@ class _PlayerBadge extends StatelessWidget {
                   ),
                   Text(
                     lang.t('سجّل دخولك', 'Sagel dokhoolak'),
-                    style: AppText.sans(10, color: AppColors.gold, height: 1.2),
+                    style: AppText.sans(12, color: AppColors.gold, height: 1.2),
                   ),
                 ],
               ),

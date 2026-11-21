@@ -209,7 +209,7 @@ Future<void> showCategorySheet(BuildContext context, Category category) {
                           style: AppText.sans(
                             12,
                             weight: FontWeight.w600,
-                            color: AppColors.ivory.withValues(alpha: 0.5),
+                            color: AppColors.ivory.withValues(alpha: 0.72),
                           ),
                         ),
                       ],

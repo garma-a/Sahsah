@@ -24,7 +24,9 @@ abstract final class AppColors {
   static const cream = Color(0xFFF3E9D2);
   static const stroke = Color(0xFFE8DCC0);
 
-  /// The red of the play button and the first team.
+  /// The red of the play button and the first team. Inside a game solid
+  /// red means the first team and nothing else: badges are gold, and the
+  /// clock's alarm is a light pill with a red edge.
   static const play = Color(0xFFE63B2E);
   static const playHover = Color(0xFFC92F24);
 

@@ -167,7 +167,7 @@ class Poster extends StatelessWidget {
                           child: Text(
                             lang.t('جديد', 'Gdeed'),
                             style: AppText.sans(
-                              11,
+                              12,
                               weight: FontWeight.w700,
                               color: AppColors.forest,
                             ),

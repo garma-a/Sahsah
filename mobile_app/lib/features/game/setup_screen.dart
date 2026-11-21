@@ -655,7 +655,7 @@ class _SelectablePoster extends StatelessWidget {
                     child: Text(
                       lang.t('قريبًا', '2orayeban'),
                       style: AppText.sans(
-                        11,
+                        12,
                         weight: FontWeight.w700,
                         color: AppColors.gold,
                       ),
@@ -897,7 +897,7 @@ class _TeamField extends StatelessWidget {
           Icon(
             LucideIcons.pencil,
             size: 16,
-            color: AppColors.ivory.withValues(alpha: 0.4),
+            color: AppColors.ivory.withValues(alpha: 0.6),
           ),
         ],
       ),
