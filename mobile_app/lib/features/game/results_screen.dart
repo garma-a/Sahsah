@@ -68,6 +68,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
     final actions = Row(
       children: [
         Expanded(
+          flex: 2,
           child: GlassButton(
             height: 56,
             icon: LucideIcons.house,
@@ -77,7 +78,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
         ),
         const SizedBox(width: 10),
         Expanded(
-          flex: 2,
+          flex: 3,
           child: PlayButton(
             height: 56,
             onPressed: _replay,
@@ -289,7 +290,10 @@ class _Banner extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             lang.t(
-              '${lang.toAr(game.resolvedCount)} سؤال من ${lang.toAr(game.totalQuestions)}',
+              // A lone Arabic zero is a dot, so none is said in words.
+              game.resolvedCount == 0
+                  ? 'ولا سؤال من ${lang.toAr(game.totalQuestions)}'
+                  : '${lang.toAr(game.resolvedCount)} سؤال من ${lang.toAr(game.totalQuestions)}',
               '${game.resolvedCount} so2al men ${game.totalQuestions}',
             ),
             style: AppText.sans(
@@ -337,8 +341,10 @@ class _ScoreCard extends StatelessWidget {
             tween: Tween(begin: 0, end: game.scores[team].toDouble()),
             duration: const Duration(milliseconds: 1200),
             curve: Curves.easeOutCubic,
+            // An Arabic zero is a dot, so zero is written out, as on the
+            // board.
             builder: (context, v, _) => Text(
-              lang.toAr(v.round()),
+              v.round() == 0 && lang.ar ? 'صفر' : lang.toAr(v.round()),
               textDirection: TextDirection.ltr,
               style: AppText.num(36, color: color, height: 1.1),
             ),
@@ -397,8 +403,9 @@ class _CategoryRow extends StatelessWidget {
             const SizedBox(width: 12),
             SizedBox(
               width: 64,
+              // No points in a category reads as a dash, not a lone dot.
               child: Text(
-                lang.toAr(totals[t]),
+                totals[t] == 0 ? '–' : lang.toAr(totals[t]),
                 textAlign: TextAlign.center,
                 textDirection: TextDirection.ltr,
                 style: AppText.num(16, color: teamColors[t]),
