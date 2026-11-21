@@ -339,7 +339,6 @@ class _PackCard extends StatelessWidget {
             radius: 14,
             depth: 5,
             color: AppColors.play,
-            borderColor: AppColors.deep,
             onTap: onBuy,
             child: Row(
               mainAxisSize: MainAxisSize.min,

@@ -21,7 +21,23 @@ BoxShadow cssShadow(
   );
 }
 
-/// `.glass`: translucent ivory gradient with a warm hairline border.
+/// The website's hard offset shadow (`0 6px 0 var(--color-ink)`): no blur,
+/// straight down, so cards look printed and stuck on.
+BoxShadow inkDrop([double y = 5, Color color = AppColors.ink]) =>
+    BoxShadow(color: color, offset: Offset(0, y));
+
+/// The website's paper grain (`--grain`), tiled. See tool/make_grain.py.
+const grainImage = DecorationImage(
+  image: AssetImage('assets/img/grain.png'),
+  repeat: ImageRepeat.repeat,
+  fit: BoxFit.none,
+  alignment: Alignment.topLeft,
+);
+
+/// A dark card on the page, after the website's TV cabinet (`.cabinet`):
+/// a charcoal face with a soft top light, an ink outline and an ink drop.
+/// The name is kept from the old frosted-glass panel so every caller moves
+/// over. Text on it stays light.
 BoxDecoration glassDecoration({
   BorderRadiusGeometry? radius,
   BoxShape shape = BoxShape.rectangle,
@@ -34,30 +50,36 @@ BoxDecoration glassDecoration({
     gradient: const LinearGradient(
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
-      colors: [Color(0x1AFFFDF8), Color(0x0AFFFDF8)],
+      colors: [Color(0xFF353D3A), AppColors.ui],
+      stops: [0, 0.3],
     ),
-    border: Border.all(color: borderColor ?? const Color(0x29FFF0C8)),
-    boxShadow: shadow
-        ? [cssShadow(const Color(0x40000000), y: 20, blur: 50)]
-        : null,
+    border: Border.all(color: borderColor ?? AppColors.ink, width: 3),
+    boxShadow: shadow ? [inkDrop()] : null,
   );
 }
 
-/// `.paper`: light card used for the mission/vision quotes.
-BoxDecoration paperDecoration({BorderRadiusGeometry? radius}) {
+/// The website's paper card (`.paper-card`): cream with grain, a chunky ink
+/// outline and an ink drop. Text on it is ink; use [Paper] to get that by
+/// default.
+BoxDecoration paperDecoration({
+  BorderRadiusGeometry? radius,
+  BoxShape shape = BoxShape.rectangle,
+  Color color = AppColors.paper,
+  Color edge = AppColors.ink,
+  double border = 3,
+  double drop = 6,
+}) {
   return BoxDecoration(
-    borderRadius: radius,
-    gradient: const LinearGradient(
-      begin: Alignment.topCenter,
-      end: Alignment.bottomCenter,
-      colors: [AppColors.ivory, Color(0xFFEADFC4)],
-    ),
-    border: Border.all(color: AppColors.stroke),
-    boxShadow: [cssShadow(const Color(0x47000000), y: 16, blur: 40)],
+    shape: shape,
+    borderRadius: shape == BoxShape.circle ? null : radius,
+    color: color,
+    image: grainImage,
+    border: Border.all(color: edge, width: border),
+    boxShadow: drop > 0 ? [inkDrop(drop)] : null,
   );
 }
 
-/// Glass with the inner top highlight (`inset 0 1px 0 rgba(255,255,255,.08)`).
+/// A dark card (see [glassDecoration]).
 class Glass extends StatelessWidget {
   const Glass({
     super.key,
@@ -87,6 +109,43 @@ class Glass extends StatelessWidget {
         borderColor: borderColor,
       ),
       child: Padding(padding: padding ?? EdgeInsets.zero, child: child),
+    );
+  }
+}
+
+/// A paper card (see [paperDecoration]). Text and icons inside default to
+/// ink; styles that name their own colour keep it.
+class Paper extends StatelessWidget {
+  const Paper({
+    super.key,
+    required this.child,
+    this.radius = 22,
+    this.padding,
+    this.color = AppColors.paper,
+    this.drop = 6,
+  });
+
+  final Widget child;
+  final double radius;
+  final EdgeInsetsGeometry? padding;
+  final Color color;
+  final double drop;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: paperDecoration(
+        radius: BorderRadius.circular(radius),
+        color: color,
+        drop: drop,
+      ),
+      child: DefaultTextStyle.merge(
+        style: const TextStyle(color: AppColors.ink),
+        child: IconTheme.merge(
+          data: const IconThemeData(color: AppColors.ink),
+          child: Padding(padding: padding ?? EdgeInsets.zero, child: child),
+        ),
+      ),
     );
   }
 }

@@ -362,14 +362,14 @@ class _Quote extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(LucideIcons.quote, size: 20, color: AppColors.gold),
+              const Icon(LucideIcons.quote, size: 20, color: AppColors.press),
               const SizedBox(width: 8),
               Text(
                 label,
                 style: AppText.sans(
                   12,
                   weight: FontWeight.w700,
-                  color: AppColors.forest.withValues(alpha: 0.55),
+                  color: AppColors.inkMuted,
                 ),
               ),
             ],

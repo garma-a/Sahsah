@@ -210,7 +210,7 @@ class _PackCover extends StatelessWidget {
                 gradient: LinearGradient(
                   begin: Alignment.bottomCenter,
                   end: Alignment.topCenter,
-                  colors: [Color(0xF50B0F2E), Color(0x000B0F2E)],
+                  colors: [Color(0xF52B3230), Color(0x002B3230)],
                   stops: [0.3, 0.8],
                 ),
               ),
@@ -461,8 +461,6 @@ class _QuestionTile extends StatelessWidget {
         radius: 18,
         depth: 6,
         color: face,
-        edgeColor: Color.lerp(face, AppColors.deep, 0.55),
-        borderColor: AppColors.deep,
         onTap: () => onPlay(id),
         child: _numbered(
           context,

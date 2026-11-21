@@ -203,7 +203,7 @@ class _SectionTab extends StatelessWidget {
                   color: AppColors.gold,
                   borderRadius: BorderRadius.circular(999),
                   boxShadow: [
-                    cssShadow(const Color(0x40FFC72C), y: 6, blur: 14),
+                    cssShadow(const Color(0x40FFD233), y: 6, blur: 14),
                   ],
                 )
               : glassDecoration(

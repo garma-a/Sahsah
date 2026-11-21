@@ -316,7 +316,6 @@ class _SetupScreenState extends State<SetupScreen> {
   Widget _teamsBar(LangController lang) {
     return PlayButton(
       height: 60,
-      sheen: true,
       onPressed: _full ? _start : null,
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -527,15 +526,17 @@ class _QuickPick extends StatelessWidget {
         child: Container(
           height: 40,
           padding: const EdgeInsets.symmetric(horizontal: 14),
+          // The website's outline button: cream, ink edge, ink drop.
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(999),
-            color: AppColors.gold.withValues(alpha: 0.12),
-            border: Border.all(color: AppColors.gold.withValues(alpha: 0.4)),
+            color: AppColors.paper,
+            border: Border.all(color: AppColors.ink, width: 2.5),
+            boxShadow: [inkDrop(3)],
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 16, color: AppColors.gold),
+              Icon(icon, size: 16, color: AppColors.ink),
               const SizedBox(width: 6),
               Flexible(
                 child: Text(
@@ -545,7 +546,7 @@ class _QuickPick extends StatelessWidget {
                   style: AppText.sans(
                     14,
                     weight: FontWeight.w600,
-                    color: AppColors.gold,
+                    color: AppColors.ink,
                   ),
                 ),
               ),

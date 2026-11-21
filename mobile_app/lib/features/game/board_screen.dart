@@ -328,16 +328,13 @@ class _TeamScoreState extends State<TeamScore>
           duration: const Duration(milliseconds: 200),
           height: compact ? 44 : 52,
           padding: const EdgeInsets.symmetric(horizontal: 10),
-          // Solid team colour like the deck's score pills; the leader gets
-          // a yellow ring.
+          // Solid team colour with an ink outline and drop, like the
+          // website's team ribbons. The leader is marked by the crown.
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             color: color,
-            border: Border.all(
-              color: leading ? AppColors.gold : AppColors.deep,
-              width: leading ? 3 : 2,
-            ),
-            boxShadow: [cssShadow(const Color(0x66000000), y: 6, blur: 14)],
+            border: Border.all(color: AppColors.ink, width: 3),
+            boxShadow: [inkDrop(leading ? 6 : 4)],
           ),
           child: Row(
             children: [
@@ -835,7 +832,7 @@ class _CategoryCard extends StatelessWidget {
                     gradient: LinearGradient(
                       begin: Alignment.bottomCenter,
                       end: Alignment.center,
-                      colors: [Color(0xF00B0F2E), Color(0x000B0F2E)],
+                      colors: [Color(0xF02B3230), Color(0x002B3230)],
                     ),
                   ),
                 ),

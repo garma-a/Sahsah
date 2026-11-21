@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'surfaces.dart';
+import '../theme/app_theme.dart';
 
-/// Chunky game-style button: a raised face on a darker edge that sinks
-/// when pressed. Give it a [height] (and a [width] inside a Row), or put it
+/// Chunky game-style button after the website's tiles: a flat face with an
+/// ink outline, standing on an ink lip that it sinks onto when pressed. Give it a [height] (and a [width] inside a Row), or put it
 /// where its size is fixed by the parent.
 class GameButton extends StatefulWidget {
   const GameButton({
@@ -14,6 +14,7 @@ class GameButton extends StatefulWidget {
     required this.color,
     this.edgeColor,
     this.borderColor,
+    this.borderWidth = 3,
     this.height,
     this.width,
     this.radius = 18,
@@ -24,12 +25,15 @@ class GameButton extends StatefulWidget {
   final Widget child;
   final VoidCallback? onTap;
 
-  /// Face colour; the top is lightened a little for a glossy look.
+  /// Face colour.
   final Color color;
 
-  /// Side colour under the face. Defaults to [color] darkened.
+  /// The lip under the face. Defaults to ink.
   final Color? edgeColor;
+
+  /// The outline. Defaults to ink.
   final Color? borderColor;
+  final double borderWidth;
   final double? height;
   final double? width;
   final double radius;
@@ -54,8 +58,7 @@ class _GameButtonState extends State<GameButton> {
   Widget build(BuildContext context) {
     final enabled = widget.onTap != null;
     final radius = BorderRadius.circular(widget.radius);
-    final edge =
-        widget.edgeColor ?? Color.lerp(widget.color, Colors.black, 0.5)!;
+    final edge = widget.edgeColor ?? AppColors.ink;
     final sink = _down ? widget.depth : 0.0;
 
     return Semantics(
@@ -86,9 +89,6 @@ class _GameButtonState extends State<GameButton> {
                     decoration: BoxDecoration(
                       color: edge,
                       borderRadius: radius,
-                      boxShadow: [
-                        cssShadow(const Color(0x66000000), y: 8, blur: 16),
-                      ],
                     ),
                   ),
                 ),
@@ -101,19 +101,10 @@ class _GameButtonState extends State<GameButton> {
                   child: Container(
                     decoration: BoxDecoration(
                       borderRadius: radius,
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Color.lerp(widget.color, Colors.white, 0.16)!,
-                          widget.color,
-                        ],
-                      ),
+                      color: widget.color,
                       border: Border.all(
-                        color:
-                            widget.borderColor ??
-                            Colors.white.withValues(alpha: 0.22),
-                        width: 1.5,
+                        color: widget.borderColor ?? AppColors.ink,
+                        width: widget.borderWidth,
                       ),
                     ),
                     child: Center(child: widget.child),

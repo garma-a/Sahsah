@@ -80,7 +80,6 @@ class _ResultsScreenState extends State<ResultsScreen> {
           flex: 2,
           child: PlayButton(
             height: 56,
-            sheen: true,
             onPressed: _replay,
             child: Row(
               mainAxisSize: MainAxisSize.min,

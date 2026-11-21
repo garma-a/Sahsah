@@ -247,8 +247,10 @@ class _QuestionScreenState extends State<QuestionScreen> {
 
     final card = _QuestionCard(
       badge: lang.t(
-        '${category.name} · ${lang.toAr(points)} نقطة',
-        '${category.nameEn} · $points no2ta',
+        // A dash, not a dot: an Arabic zero is a dot, so "٢٠٠ ·" would
+        // read as ٢٠٠٠.
+        '${category.name} – ${lang.toAr(points)} نقطة',
+        '${category.nameEn} – $points no2ta',
       ),
       child: content,
     );
@@ -396,13 +398,16 @@ class _QuestionCard extends StatelessWidget {
         Positioned.fill(
           child: Container(
             padding: const EdgeInsets.fromLTRB(16, 22, 16, 14),
+            // The website's TV glass (`.screen-glass`): deep, with an
+            // ink, teal and ink trim.
             decoration: BoxDecoration(
-              color: AppColors.card,
+              color: const Color(0xFF151B19),
               borderRadius: BorderRadius.circular(26),
-              border: Border.all(
-                color: AppColors.gold.withValues(alpha: 0.45),
-                width: 2,
-              ),
+              border: Border.all(color: AppColors.ink, width: 3),
+              boxShadow: const [
+                BoxShadow(color: AppColors.ink, spreadRadius: 6),
+                BoxShadow(color: Color(0xFF4FBDBA), spreadRadius: 3),
+              ],
             ),
             child: child,
           ),
@@ -658,12 +663,11 @@ class _GreenButton extends StatelessWidget {
       radius: 16,
       depth: 5,
       color: AppColors.green,
-      borderColor: AppColors.deep,
       onTap: onTap,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 19, color: Colors.white),
+          Icon(icon, size: 19, color: AppColors.ink),
           const SizedBox(width: 8),
           Flexible(
             child: FittedBox(
@@ -674,7 +678,7 @@ class _GreenButton extends StatelessWidget {
                 style: AppText.sans(
                   17,
                   weight: FontWeight.w700,
-                  color: Colors.white,
+                  color: AppColors.ink,
                 ),
               ),
             ),
@@ -1280,7 +1284,6 @@ class _AnswerView extends StatelessWidget {
       radius: 16,
       depth: 5,
       color: teamColors[team],
-      borderColor: AppColors.deep,
       onTap: () => onAward(team),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -1782,7 +1785,6 @@ class _LeaveDialogState extends State<_LeaveDialog> {
       radius: 16,
       depth: 5,
       color: teamColors[i],
-      borderColor: AppColors.deep,
       onTap: () => nav.pop(i),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12),

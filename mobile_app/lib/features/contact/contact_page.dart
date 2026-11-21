@@ -214,7 +214,6 @@ class _ContactPageState extends State<ContactPage> {
               height: 52,
               radius: 16,
               color: AppColors.play,
-              borderColor: AppColors.deep,
               onTap: _send,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -366,7 +365,7 @@ class _ReachUs extends StatelessWidget {
                 gradient: LinearGradient(
                   begin: Alignment.bottomCenter,
                   end: Alignment.topCenter,
-                  colors: [AppColors.card, Color(0x00101540)],
+                  colors: [AppColors.card, Color(0x0022160E)],
                   stops: [0.35, 1],
                 ),
               ),
