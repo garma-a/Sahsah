@@ -35,13 +35,13 @@ export default function HostTools({ teams, busy, onAdjust, onEnd }: HostToolsPro
   }, [armed]);
 
   return (
-    <div className="relative flex shrink-0 flex-wrap justify-center gap-2">
+    <div className="relative flex shrink-0 flex-wrap justify-center gap-2 short:flex-nowrap short:gap-1.5">
       {armed && (
         <p role="status" className="absolute bottom-full end-0 z-10 mb-2 w-64 rounded-xl border-[3px] border-ink bg-cream px-4 py-1.5 text-base font-bold text-ink shadow-[0_4px_0_var(--color-ink)]">
           اللعبة هتخلص والنقط هتتثبت. اضغط تاني للتأكيد.
         </p>
       )}
-      <Button variant="dark" size="sm" disabled={busy} onClick={() => setAdjusting(true)} className="short:h-8 short:px-3 short:text-sm">
+      <Button variant="dark" size="sm" disabled={busy} onClick={() => setAdjusting(true)} className="short:h-8 short:min-w-0 short:px-2 short:text-[0.8rem]">
         <PencilLine aria-hidden className="size-4" />
         صحّح النتيجة
       </Button>
@@ -49,7 +49,7 @@ export default function HostTools({ teams, busy, onAdjust, onEnd }: HostToolsPro
         variant={armed ? "default" : "dark"}
         size="sm"
         disabled={busy}
-        className="short:h-8 short:px-3 short:text-sm"
+        className="short:h-8 short:min-w-0 short:px-2 short:text-[0.8rem]"
         onClick={() => {
           if (!armed) return setArmed(true);
           setArmed(false);

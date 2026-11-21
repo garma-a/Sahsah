@@ -15,8 +15,8 @@ type BoardProps = {
 };
 
 /**
- * Six category cards in one row (three by two in a narrow window), each 3:4 unless the window is too short. At most one card is held flipped
- * at a time; hovering flips a card as well. The board is drawn only from the server's projection.
+ * Six category cards in two rows of three that fill the whole board on every screen. At most one card is held flipped
+ * at a time; hovering flips a card as well. The cards are dealt in one after another when the board appears. The board is drawn only from the server's projection.
  */
 export default function Board({ view, categories, canOpen, pending, onOpen }: BoardProps) {
   const [open, setOpen] = useState<number | null>(null);
@@ -26,11 +26,12 @@ export default function Board({ view, categories, canOpen, pending, onOpen }: Bo
       aria-label="لوحة الأسئلة"
       className="paper-card flex min-h-0 flex-1 flex-col rounded-[1.6rem] border-4 border-ink p-3 shadow-[0_10px_0_var(--color-ink)] sm:p-4 lg:p-5 short:rounded-2xl short:p-2 short:shadow-[0_6px_0_var(--color-ink)]"
     >
-      <ol className="grid min-h-0 flex-1 grid-cols-3 grid-rows-2 gap-3 sm:grid-cols-6 sm:grid-rows-1 lg:gap-x-4 short:gap-2">
+      <ol className="grid min-h-0 flex-1 grid-cols-3 grid-rows-2 gap-3 lg:gap-5 short:gap-2">
         {columns.map((column, i) => (
-          <li key={column.boardPosition} className="flex min-h-0 items-center">
+          <li key={column.boardPosition} className="relative min-h-0 min-w-0">
             <CategoryCard
               column={column}
+              order={i}
               entry={categories.get(column.categoryId)}
               toneIndex={categories.get(column.categoryId)?.index ?? i}
               flipped={open === column.boardPosition}

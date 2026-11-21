@@ -137,8 +137,10 @@ export default function QuestionScreen({
           )}
         </header>
 
-        <div className={cn("flex flex-1 items-center gap-6 py-4 short:gap-4 short:py-2", shown || hasSound || cardUrl ? "flex-col sm:flex-row" : "flex-col justify-center")}>
-          <div className="flex w-full min-w-0 flex-1 flex-col items-center gap-4 text-center short:gap-2">
+        {/* The question reads across the top in one or two wide lines; a QR card or sound sits under it. A picture sits
+            under it too, except on a phone held sideways, where it stands beside a wide text column so it stays big. */}
+        <div className={cn("flex min-h-0 flex-1 flex-col items-center justify-center gap-5 py-4 short:gap-2 short:py-1.5", shown && "short:flex-row short:gap-4")}>
+          <div className={cn("flex w-full min-w-0 max-w-5xl flex-col items-center gap-4 text-center short:gap-2", shown && "short:flex-1")}>
             <h1
               id="question-title"
               tabIndex={-1}
@@ -149,6 +151,8 @@ export default function QuestionScreen({
                     ? "text-5xl leading-[1.35] lg:text-7xl short:text-4xl"
                     : "text-3xl leading-[1.35] lg:text-5xl short:text-2xl"
                   : "text-2xl leading-snug text-charcoal/70 lg:text-3xl short:text-xl",
+                // Beside a picture on a phone, smaller type keeps the question to two wide lines.
+                shown && "short:text-lg short:leading-snug",
               )}
             >
               {prompt}
@@ -171,8 +175,8 @@ export default function QuestionScreen({
           {shown && (
             <div
               className={cn(
-                "w-full shrink-0",
-                clue ? "grid max-w-3xl grid-cols-[2fr_3fr] items-center gap-4 sm:w-[45%] lg:w-[40rem]" : "flex max-w-xl flex-col items-center sm:w-[44%] lg:w-[30rem]",
+                "min-h-0 shrink short:max-w-[45%]",
+                clue ? "grid w-full max-w-3xl grid-cols-[2fr_3fr] items-center gap-4" : "flex max-w-full flex-col items-center",
               )}
             >
               <MediaImage
@@ -180,7 +184,7 @@ export default function QuestionScreen({
                 failed={media.failed}
                 onRetry={media.retry}
                 alt={answerImage ? "صورة الإجابة" : "صورة السؤال"}
-                className={cn("w-full", !clue && "lg:rotate-[-2deg]")}
+                className={cn(clue ? "w-full" : "w-fit max-w-full", !clue && "lg:rotate-[-1.5deg]")}
               />
               {clue && (
                 <MediaImage
@@ -194,21 +198,23 @@ export default function QuestionScreen({
             </div>
           )}
           {cardUrl && (
-            <div className="flex w-full max-w-sm shrink-0 flex-col items-center gap-3 rounded-[1.6rem] border-4 border-ink bg-white p-4 shadow-[0_8px_0_var(--color-ink)] sm:w-auto short:flex-row short:p-2">
-              <div className="w-44 max-w-full shrink-0 [&_svg]:block [&_svg]:h-auto [&_svg]:w-full short:w-28">
+            <div className="flex max-w-xl shrink-0 items-center gap-5 rounded-[1.6rem] border-4 border-ink bg-white p-4 shadow-[0_8px_0_var(--color-ink)] short:gap-3 short:rounded-2xl short:p-2">
+              <div className="w-40 shrink-0 [&_svg]:block [&_svg]:h-auto [&_svg]:w-full lg:w-44 short:w-24">
                 <QRCodeSVG value={cardUrl} size={176} level="M" marginSize={1} fgColor="#1d2321" bgColor="#ffffff" role="img" title="كود كارت التمثيل" />
               </div>
-              <p className="text-center font-heading text-2xl leading-snug">اللي هيمثّل يمسح الكود ويشوف الكارت لوحده</p>
+              <div className="flex flex-col items-center gap-3 short:gap-2">
+              <p className="text-center font-heading text-2xl leading-snug text-balance short:text-base">اللي هيمثّل يمسح الكود ويشوف الكارت لوحده</p>
               {hostView && (
                 <a
                   href={cardUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="rounded-full border-[3px] border-ink bg-sun px-5 py-1 font-heading text-xl shadow-[0_3px_0_var(--color-ink)] hover:bg-cream"
+                  className="rounded-full border-[3px] border-ink bg-sun px-5 py-1 font-heading text-xl shadow-[0_3px_0_var(--color-ink)] hover:bg-cream short:px-3 short:text-base"
                 >
                   افتح الكارت هنا
                 </a>
               )}
+              </div>
             </div>
           )}
           {hasSound &&

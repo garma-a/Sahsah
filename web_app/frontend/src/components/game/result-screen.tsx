@@ -35,9 +35,9 @@ export default function ResultScreen({ view, roster, isHost, busy, error, onPlay
   const categories = [...result.categories].sort((a, b) => a.boardPosition - b.boardPosition);
 
   return (
-    <section aria-labelledby="result-title" className="flex flex-1 flex-col gap-4">
-      <div className="paper-card rounded-[2rem] border-4 border-ink p-4 shadow-[0_12px_0_var(--color-ink)] sm:p-6 lg:px-10 lg:py-8">
-        <header className="flex flex-col items-center gap-3 text-center">
+    <section aria-labelledby="result-title" className="flex flex-1 flex-col gap-4 short:gap-2">
+      <div className="paper-card rounded-[2rem] border-4 border-ink p-4 shadow-[0_12px_0_var(--color-ink)] sm:p-6 lg:px-10 lg:py-8 short:rounded-2xl short:p-3 short:shadow-[0_6px_0_var(--color-ink)]">
+        <header className="flex flex-col items-center gap-3 text-center short:gap-1.5">
           <p className="rounded-full border-[3px] border-ink bg-cream px-4 py-0.5 text-base font-bold">{endNote[result.endReason] ?? "اللعبة خلصت"}</p>
           <h1 id="result-title" tabIndex={-1} className="sr-only focus:outline-none">
             نتيجة اللعبة
@@ -48,7 +48,7 @@ export default function ResultScreen({ view, roster, isHost, busy, error, onPlay
               winner ? teamTone(winner.number).fill : "bg-cream",
             )}
           >
-            <p className="flex items-center justify-center gap-3 font-heading text-4xl leading-tight sm:text-5xl lg:text-7xl">
+            <p className="flex items-center justify-center gap-3 font-heading text-4xl leading-tight sm:text-5xl lg:text-7xl short:text-3xl">
               {winner ? (
                 <>
                   <Crown aria-hidden className="size-9 lg:size-14" strokeWidth={2.5} />
@@ -64,14 +64,14 @@ export default function ResultScreen({ view, roster, isHost, busy, error, onPlay
           </div>
         </header>
 
-        <ul className="mt-8 grid gap-4 sm:grid-cols-2">
+        <ul className="mt-8 grid gap-4 sm:grid-cols-2 short:mt-3 short:gap-2">
           {teams.map((team) => (
             <TeamCard key={team.number} team={team} won={team.number === result.winningTeamNumber} roster={roster} />
           ))}
         </ul>
 
-        <h2 className="mt-8 mb-3 font-heading text-3xl leading-none">الفئات</h2>
-        <ul className="grid grid-cols-2 gap-3 lg:grid-cols-6">
+        <h2 className="mt-8 mb-3 font-heading text-3xl leading-none short:sr-only">الفئات</h2>
+        <ul className="grid grid-cols-2 gap-3 lg:grid-cols-6 short:mt-3 short:grid-cols-6 short:gap-1.5">
           {categories.map((category) => (
             <CategoryRow key={category.boardPosition} category={category} teams={teams} />
           ))}
@@ -81,7 +81,7 @@ export default function ResultScreen({ view, roster, isHost, busy, error, onPlay
       {error && <ErrorBanner>{error}</ErrorBanner>}
       {isHost ? (
         <div className="flex justify-center">
-          <Button size="xl" disabled={busy} aria-busy={busy || undefined} onClick={onPlayAgain}>
+          <Button size="xl" disabled={busy} aria-busy={busy || undefined} onClick={onPlayAgain} className="short:h-11 short:text-lg">
             {busy ? "ثانية…" : "نلعب تاني"}
           </Button>
         </div>
@@ -97,10 +97,10 @@ function TeamCard({ team, won, roster }: { team: ResultTeam; won: boolean; roste
   const players = teamPlayers(team, roster);
   const adjustment = Number(team.manualAdjustmentTotal);
   return (
-    <li className={cn("rounded-[1.4rem] border-4 border-ink bg-cream p-4 shadow-[0_6px_0_var(--color-ink)]", won && "ring-4 ring-sun ring-offset-2 ring-offset-cream")}>
+    <li className={cn("rounded-[1.4rem] border-4 border-ink bg-cream p-4 shadow-[0_6px_0_var(--color-ink)] short:rounded-2xl short:px-3 short:py-2 short:shadow-[0_4px_0_var(--color-ink)]", won && "ring-4 ring-sun ring-offset-2 ring-offset-cream")}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className={cn("max-w-full truncate rounded-lg px-3 py-0.5 font-heading text-2xl sm:text-3xl", tone.fill)}>{team.name}</h2>
-        <p className="tabular font-heading text-6xl leading-none lg:text-7xl">
+        <h2 className={cn("max-w-full truncate rounded-lg px-3 py-0.5 font-heading text-2xl sm:text-3xl short:text-xl", tone.fill)}>{team.name}</h2>
+        <p className="tabular font-heading text-6xl leading-none lg:text-7xl short:text-4xl">
           <span className="sr-only">{formatNumber(team.score)} نقطة</span>
           <span aria-hidden>{formatNumber(team.score)}</span>
         </p>
@@ -111,7 +111,7 @@ function TeamCard({ team, won, roster }: { team: ResultTeam; won: boolean; roste
           {formatNumber(Math.abs(adjustment))}
         </p>
       )}
-      <ul aria-label={`لاعبين ${team.name}`} className="mt-2 flex flex-wrap gap-1.5">
+      <ul aria-label={`لاعبين ${team.name}`} className="mt-2 flex flex-wrap gap-1.5 short:mt-1">
         {players.length === 0 && <li className="text-sm font-semibold">مفيش لاعبين</li>}
         {players.map((player) => (
           <li key={player.id} className="max-w-full truncate rounded-full border-2 border-ink bg-white px-3 py-0.5 text-sm font-bold">
@@ -126,14 +126,14 @@ function TeamCard({ team, won, roster }: { team: ResultTeam; won: boolean; roste
 function CategoryRow({ category, teams }: { category: CategoryResult; teams: ResultTeam[] }) {
   const winner = teams.find((t) => t.number === category.winningTeamNumber);
   return (
-    <li className="flex flex-col gap-1 rounded-2xl border-[3px] border-ink bg-white p-3">
-      <p className="truncate font-heading text-xl leading-tight">{category.name}</p>
+    <li className="flex min-w-0 flex-col gap-1 rounded-2xl border-[3px] border-ink bg-white p-3 short:gap-0.5 short:rounded-xl short:p-1.5">
+      <p className="truncate font-heading text-xl leading-tight short:text-sm">{category.name}</p>
       <p className="tabular flex items-center gap-2 text-sm font-bold" dir="rtl">
         <span className={cn("rounded px-1.5", teamTone(1).fill)}>{formatNumber(category.teamOneAwardPoints)}</span>
         <span className={cn("rounded px-1.5", teamTone(2).fill)}>{formatNumber(category.teamTwoAwardPoints)}</span>
       </p>
       <p className="text-xs font-semibold text-charcoal/80">اتلعب {formatDigits(category.resolvedCount)} من ٦</p>
-      <p className="line-clamp-2 text-sm font-bold">{winner ? `كسبها ${winner.name}` : category.resolvedCount === 0 ? "محدش لعب فيها" : "تعادل"}</p>
+      <p className="line-clamp-2 text-sm font-bold short:text-xs">{winner ? `كسبها ${winner.name}` : category.resolvedCount === 0 ? "محدش لعب فيها" : "تعادل"}</p>
     </li>
   );
 }

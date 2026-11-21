@@ -42,7 +42,7 @@ export default function CharadesCardView({ gameId, board, question, token }: { g
       <div className="mt-5">
         {state.status === "loading" && <MediaImage alt="كارت التمثيل" />}
         {state.status === "ready" && (
-          <MediaImage url={state.card.url} alt="كارت التمثيل" onRetry={() => void load()} />
+          <MediaImage url={state.card.url} alt="كارت التمثيل" onRetry={() => void load()} className="[&_img]:max-h-[60vh] [&_img]:w-full" />
         )}
         {state.status === "closed" && <ErrorBanner>السؤال ده اتقفل أو الإجابة ظهرت خلاص.</ErrorBanner>}
         {state.status === "missing" && <ErrorBanner>الكود ده مش شغال. امسح الكود اللي على الشاشة تاني.</ErrorBanner>}

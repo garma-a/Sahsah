@@ -12,9 +12,9 @@ type FitBoxProps = {
 
 /**
  * Fills the space its parent gives it without scrolling: when the content is taller than the box, the whole
- * column is scaled down (from the top centre) until it fits. If that would take it below 60%, it scrolls instead,
- * so no control is ever clipped out of reach. Content that fits is left untouched, so screens
- * laid out for the viewport only shrink on unusually short windows or long questions.
+ * column is scaled down (from the top centre) until it fits, so no screen outside the home page ever scrolls.
+ * Content that fits is left untouched, so screens laid out for the viewport only shrink on unusually short
+ * windows or long questions.
  * Native <dialog>s inside still open in the top layer, unaffected by the scale.
  */
 export default function FitBox({ children, className, innerClassName }: FitBoxProps) {
@@ -30,7 +30,6 @@ export default function FitBox({ children, className, innerClassName }: FitBoxPr
     const measure = () => {
       const room = box.clientHeight;
       const need = column.offsetHeight;
-      // Below 0.6 the text and buttons would be too small to use: let the column scroll instead of clipping it.
       const next = need > room + 1 && room > 0 ? room / need : 1;
       setScale((current) => (Math.abs(current - next) < 0.005 ? current : next));
     };
@@ -42,11 +41,11 @@ export default function FitBox({ children, className, innerClassName }: FitBoxPr
   }, []);
 
   return (
-    <div ref={outer} className={cn("relative min-h-0 flex-1", scale < 0.6 ? "overflow-y-auto" : "overflow-hidden", className)}>
+    <div ref={outer} className={cn("relative min-h-0 flex-1 overflow-hidden", className)}>
       <div
         ref={inner}
         className={cn("absolute inset-x-0 top-0 flex min-h-full flex-col", innerClassName)}
-        style={scale < 1 && scale >= 0.6 ? { transform: `scale(${scale})`, transformOrigin: "50% 0" } : undefined}
+        style={scale < 1 ? { transform: `scale(${scale})`, transformOrigin: "50% 0" } : undefined}
       >
         {children}
       </div>

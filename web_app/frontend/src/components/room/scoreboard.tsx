@@ -41,11 +41,11 @@ export default function Scoreboard({ teams, members, connected, tools, rail }: S
           const players = teamPlayers(team, members);
           return (
             <article key={team.number} aria-label={team.name} className="min-w-0 rounded-2xl border-[3px] border-ink bg-cream px-3 py-2 text-ink sm:px-4 compact:py-1 short:py-0.5">
-              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                <h3 className={cn("max-w-full truncate rounded-lg px-3 py-0.5 font-heading text-xl sm:text-2xl short:text-lg", tone.fill)}>{team.name}</h3>
-                <p className="tabular flex items-center gap-2 leading-none">
+              <div className={cn("flex flex-wrap items-center justify-between gap-x-3 gap-y-1", rail && "short:flex-nowrap short:gap-x-2")}>
+                <h3 className={cn("max-w-full truncate rounded-lg px-3 py-0.5 font-heading text-xl sm:text-2xl short:text-lg", rail && "short:min-w-0 short:px-2 short:text-base", tone.fill)}>{team.name}</h3>
+                <p className="tabular flex shrink-0 items-center gap-2 leading-none short:gap-1">
                   <span className="sr-only">{formatNumber(team.score)} نقطة</span>
-                  <span aria-hidden className={cn("font-heading short:text-[2rem]", rail ? "text-[2.75rem] short:text-[1.75rem]" : "text-[3.5rem] sm:text-[4rem] compact:text-[2.75rem]")}>
+                  <span aria-hidden className={cn("font-heading short:text-[2rem]", rail ? "text-[2.75rem] short:text-[1.6rem]" : "text-[3.5rem] sm:text-[4rem] compact:text-[2.75rem]")}>
                     {formatNumber(team.score)}
                   </span>
                   <span aria-hidden className="text-sm font-bold">
