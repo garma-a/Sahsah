@@ -39,9 +39,9 @@ export default function MediaImage({ url: latest, alt, failed, onRetry, classNam
       ) : url ? (
         // A short-lived signed URL of unknown size: next/image has nothing to optimise or cache here.
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={url} alt={alt} draggable={false} onError={() => setBrokenUrl(url)} className="max-h-[50vh] compact:max-h-[44vh] w-full rounded-lg object-contain" />
+        <img src={url} alt={alt} draggable={false} onError={() => setBrokenUrl(url)} className="mx-auto max-h-[46vh] w-auto max-w-full rounded-lg object-contain compact:max-h-[40vh] short:max-h-[50vh]" />
       ) : (
-        <div role="status" aria-label="بنحمّل الصورة" className="aspect-[4/3] w-full animate-pulse rounded-lg bg-charcoal/10" />
+        <div role="status" aria-label="بنحمّل الصورة" className="aspect-[4/3] w-[min(24rem,60vw)] max-w-full animate-pulse rounded-lg bg-charcoal/10" />
       )}
     </figure>
   );

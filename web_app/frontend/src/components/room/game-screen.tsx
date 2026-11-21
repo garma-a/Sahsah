@@ -192,7 +192,7 @@ export default function GameScreen({ channel, roomId, auth, isHost, categories }
           }
         />
         </div>
-        <div className="flex shrink-0 flex-col justify-end sm:w-72 lg:w-80 short:w-60">{scoreboard(view.teams)}</div>
+        <div className="flex shrink-0 flex-col justify-end sm:w-72 lg:w-80 short:w-52 short:max-[760px]:w-40">{scoreboard(view.teams)}</div>
       </div>
     );
   }

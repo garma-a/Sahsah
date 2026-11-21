@@ -272,33 +272,107 @@
   }
 
   /*
-    Flip card: the front (cover) and back (tiles) are two faces of one card. A card flips while it is
+    Flip card: the front (cover) and back (tiles) are two faces of one card. A card turns over while it is
     hovered (devices that can hover) or when `data-flipped="true"` is set by a click, tap or Enter.
-    The face that is turned away is also `visibility: hidden`, so its buttons leave the tab order;
-    the visibility switch is delayed to the half-turn so nothing pops while the card is rotating.
+    Layers: .flip (perspective, pointer tilt variables) > .flip-shadow (soft shadow on the board) and
+    .flip-lift (rises toward the viewer and follows the pointer tilt) > .flip-inner (the slow half turn) >
+    two .flip-face (each with a .flip-glare sheen that sweeps across).
+    The face that is turned away is also `visibility: hidden`, so its buttons leave the tab order; the
+    visibility switch waits for the half-turn so nothing pops while the card is rotating.
   */
   .flip {
-    perspective: 1200px;
+    --flip-time: 1.1s;
+    --flip-half: 0.47s;
+    --flip-ease: cubic-bezier(0.5, 0, 0.15, 1);
+    --tx: 0deg;
+    --ty: 0deg;
+    perspective: 1400px;
+  }
+  @media (max-height: 560px) {
+    .flip {
+      --flip-time: 0.8s;
+      --flip-half: 0.36s;
+    }
+  }
+  .flip:hover,
+  .flip[data-flipped="true"] {
+    z-index: 5;
+  }
+  .flip-shadow {
+    position: absolute;
+    inset: 4% 6% 0;
+    border-radius: 0.75rem;
+    background: rgb(29 35 33 / 0.55);
+    filter: blur(10px);
+    opacity: 0.3;
+    transform: translateY(4px);
+    transition:
+      transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1),
+      opacity 0.5s;
+    animation: deal-shadow 0.85s cubic-bezier(0.2, 0.9, 0.25, 1) backwards;
+    animation-delay: calc(var(--i, 0) * 90ms + 100ms);
+  }
+  .flip-lift {
+    --lift: 0px;
+    --scale: 1;
+    position: relative;
+    height: 100%;
+    transform-style: preserve-3d;
+    transform: translateZ(var(--lift)) scale(var(--scale)) rotateX(var(--ty)) rotateY(var(--tx));
+    transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+    animation: deal 0.85s cubic-bezier(0.2, 0.9, 0.25, 1) backwards;
+    animation-delay: calc(var(--i, 0) * 90ms + 100ms);
+  }
+  .flip[data-flipped="true"] .flip-lift {
+    --lift: 36px;
+    --scale: 1.04;
+  }
+  .flip[data-flipped="true"] .flip-shadow {
+    opacity: 0.55;
+    transform: translateY(18px) scale(1.06);
   }
   .flip-inner {
     position: relative;
     height: 100%;
     transform-style: preserve-3d;
-    transition: transform 0.55s cubic-bezier(0.3, 0.9, 0.3, 1);
+    transition: transform var(--flip-time) var(--flip-ease) 0.06s;
   }
   .flip-face {
     position: absolute;
     inset: 0;
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
-    transition: visibility 0s linear 0.26s;
+    transform: translateZ(1px);
+    transition: visibility 0s linear var(--flip-half);
   }
   .flip-back {
-    transform: rotateY(180deg);
+    transform: rotateY(180deg) translateZ(1px);
     visibility: hidden;
+  }
+  .flip-glare {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(105deg, transparent 38%, rgb(255 250 235 / 0.55) 50%, transparent 62%) no-repeat;
+    background-size: 260% 100%;
+    background-position: 115% 0;
+    mix-blend-mode: soft-light;
+    transition: background-position var(--flip-time) var(--flip-ease) 0.06s;
+  }
+  /* On a card wider than it is tall (a phone held sideways), the six tiles stand in three columns of
+     two (200 | 400 | 600) so each is squarer and its number bigger. The back face is the size container. */
+  @container (min-aspect-ratio: 1) {
+    .tile-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-rows: repeat(2, minmax(0, 1fr));
+      grid-auto-flow: column;
+    }
   }
   .flip[data-flipped="true"] .flip-inner {
     transform: rotateY(180deg);
+  }
+  .flip[data-flipped="true"] .flip-glare {
+    background-position: -15% 0;
   }
   .flip[data-flipped="true"] .flip-front {
     visibility: hidden;
@@ -307,8 +381,19 @@
     visibility: visible;
   }
   @media (hover: hover) {
+    .flip:hover .flip-lift {
+      --lift: 36px;
+      --scale: 1.04;
+    }
+    .flip:hover .flip-shadow {
+      opacity: 0.55;
+      transform: translateY(18px) scale(1.06);
+    }
     .flip:hover .flip-inner {
       transform: rotateY(180deg);
+    }
+    .flip:hover .flip-glare {
+      background-position: -15% 0;
     }
     .flip:hover .flip-front {
       visibility: hidden;
@@ -317,19 +402,45 @@
       visibility: visible;
     }
   }
-  /* Reduced motion: the faces swap in place, nothing rotates. */
+  /* Reduced motion: the card still turns over (it is how the board works), but nothing deals in, lifts,
+     tilts or shines. */
   @media (prefers-reduced-motion: reduce) {
-    .flip-inner,
-    .flip[data-flipped="true"] .flip-inner,
-    .flip:hover .flip-inner {
-      transform: none;
-    }
-    .flip-back {
-      transform: none;
-    }
-    .flip-face {
+    .flip-lift,
+    .flip-shadow {
+      animation: none;
+      transform: none !important;
       transition: none;
     }
+    .flip-glare {
+      display: none;
+    }
+    /* Exempt the turn itself from the site-wide reduced-motion rule at the end of this file. */
+    .flip .flip-inner {
+      transition-duration: var(--flip-time) !important;
+    }
+  }
+
+}
+
+/* Dealing the board: each card swings in from edge-on and settles, one after another (see .flip-lift). */
+@keyframes deal {
+  0% {
+    opacity: 0;
+    transform: translateY(28px) rotateY(-80deg) rotateZ(-3deg) scale(0.9);
+  }
+  55% {
+    opacity: 1;
+    transform: translateY(-4px) rotateY(10deg) rotateZ(0.5deg) scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes deal-shadow {
+  0% {
+    opacity: 0;
+    transform: translateY(28px) scale(0.8);
   }
 }
 
