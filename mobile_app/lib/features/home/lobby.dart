@@ -211,9 +211,7 @@ class _Stage extends StatelessWidget {
                           separatorBuilder: (_, _) => const SizedBox(width: 12),
                           itemBuilder: (context, i) => _MiniPack(
                             category: featured.categories[i],
-                            color:
-                                AppColors.categoryColors[i %
-                                    AppColors.categoryColors.length],
+                            tone: i,
                             height: rowHeight,
                           ),
                         ),
@@ -235,12 +233,12 @@ class _Stage extends StatelessWidget {
 class _MiniPack extends StatelessWidget {
   const _MiniPack({
     required this.category,
-    required this.color,
+    required this.tone,
     required this.height,
   });
 
   final Category category;
-  final Color color;
+  final int tone;
   final double height;
 
   @override
@@ -252,47 +250,16 @@ class _MiniPack extends StatelessWidget {
         onTap: () => showCategorySheet(context, category),
         child: Container(
           width: height * 0.78,
+          // A small poster: the website's lobby strip, name on a slab.
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: color, width: 3),
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(color: coverBorders[toneOf(tone)], width: 3),
+            boxShadow: [inkDrop(4)],
           ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(11),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                Image.asset(
-                  BrandImages.category(category.id),
-                  fit: BoxFit.cover,
-                  alignment: const Alignment(0, -0.3),
-                ),
-                const DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.bottomCenter,
-                      end: Alignment.center,
-                      colors: [Color(0xF02B3230), Color(0x002B3230)],
-                    ),
-                  ),
-                ),
-                Positioned(
-                  left: 6,
-                  right: 6,
-                  bottom: 6,
-                  child: Text(
-                    lang.t(category.name, category.nameEn),
-                    maxLines: 2,
-                    textAlign: TextAlign.center,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppText.sans(
-                      12,
-                      weight: FontWeight.w700,
-                      height: 1.2,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          child: CategoryCover(
+            image: BrandImages.category(category.id),
+            name: lang.t(category.name, category.nameEn),
+            tone: tone,
           ),
         ),
       ),

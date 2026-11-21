@@ -7,6 +7,7 @@ import 'package:lucide_icons_flutter/lucide_icons_600.dart';
 import '../../core/i18n/lang.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/brand_art.dart';
+import '../../core/ui/category_cover.dart';
 import '../../core/ui/game_button.dart';
 import '../../core/ui/play_button.dart';
 import '../../core/ui/pressable.dart';

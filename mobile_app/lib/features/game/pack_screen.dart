@@ -5,6 +5,7 @@ import 'package:lucide_icons_flutter/lucide_icons_600.dart';
 import '../../core/i18n/lang.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/brand_art.dart';
+import '../../core/ui/category_cover.dart';
 import '../../core/ui/game_button.dart';
 import '../../core/ui/surfaces.dart';
 import '../../data/categories.dart';
@@ -41,8 +42,8 @@ class PackScreen extends StatelessWidget {
     if (game == null) return const GameScaffold(child: SizedBox());
     final category = allCategories.firstWhere((c) => c.id == categoryId);
     final slot = game.categoryIds.indexOf(categoryId);
-    final frame =
-        AppColors.categoryColors[slot % AppColors.categoryColors.length];
+    // The pack keeps its board card's frame colour.
+    final frame = coverBorders[toneOf(slot)];
 
     final header = Row(
       children: [
@@ -139,6 +140,7 @@ class PackScreen extends StatelessWidget {
                               child: _PackCover(
                                 category: category,
                                 frame: frame,
+                                tone: slot,
                                 game: game,
                               ),
                             ),
@@ -154,6 +156,7 @@ class PackScreen extends StatelessWidget {
                               child: _PackCover(
                                 category: category,
                                 frame: frame,
+                                tone: slot,
                                 game: game,
                               ),
                             ),
@@ -176,11 +179,13 @@ class _PackCover extends StatelessWidget {
   const _PackCover({
     required this.category,
     required this.frame,
+    required this.tone,
     required this.game,
   });
 
   final Category category;
   final Color frame;
+  final int tone;
   final Game game;
 
   @override
@@ -189,80 +194,102 @@ class _PackCover extends StatelessWidget {
     final left = [
       for (var r = 0; r < tilePoints.length; r++) '${category.id}-$r',
     ].where((id) => !game.results.containsKey(id)).length;
+    final accent = coverAccents[toneOf(tone)];
 
+    // The website's cover, big: the film still in its tone's frame, the
+    // name lettered in Rakkas, then what the pack is and how many
+    // questions are left.
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: frame, width: 4),
-        boxShadow: [cssShadow(const Color(0x66000000), y: 12, blur: 28)],
+        color: AppColors.paper,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: frame, width: 5),
+        boxShadow: [inkDrop(6)],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(18),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Image.asset(
-              BrandImages.category(category.id),
-              fit: BoxFit.cover,
-              alignment: const Alignment(0, -0.3),
-            ),
-            const DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.bottomCenter,
-                  end: Alignment.topCenter,
-                  colors: [Color(0xF52B3230), Color(0x002B3230)],
-                  stops: [0.3, 0.8],
-                ),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          CategoryCover(
+            image: BrandImages.category(category.id),
+            name: lang.t(category.name, category.nameEn),
+            tone: tone,
+            showName: false,
+          ),
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.bottomCenter,
+                end: Alignment.topCenter,
+                colors: [Color(0xF2120A06), Color(0x00120A06)],
+                stops: [0.3, 0.8],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.end,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
+          ),
+          Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Transform.rotate(
+                  angle: -0.035,
+                  child: Text(
                     lang.t(category.name, category.nameEn),
-                    style: AppText.display(26, height: 1.2),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    style: AppText.poster(30, color: const Color(0xFFFBF1DC))
+                        .copyWith(
+                          shadows: [
+                            const Shadow(
+                              color: Color(0xFF120A06),
+                              offset: Offset(0, 1.5),
+                            ),
+                            Shadow(
+                              color: accent.withValues(alpha: 0.6),
+                              offset: const Offset(3, 3.5),
+                            ),
+                          ],
+                        ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    lang.t(category.help, category.helpEn),
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  lang.t(category.help, category.helpEn),
+                  maxLines: 3,
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppText.sans(
+                    12,
+                    color: AppColors.ivory.withValues(alpha: 0.8),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.paper,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: AppColors.ink, width: 2),
+                  ),
+                  child: Text(
+                    lang.t(
+                      'باقي ${lang.toAr(left)} من ${lang.toAr(tilePoints.length)}',
+                      'Ba2y $left men ${tilePoints.length}',
+                    ),
                     style: AppText.sans(
                       12,
-                      color: AppColors.ivory.withValues(alpha: 0.75),
+                      weight: FontWeight.w700,
+                      color: AppColors.ink,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: frame,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      lang.t(
-                        'باقي ${lang.toAr(left)} من ${lang.toAr(tilePoints.length)}',
-                        'Ba2y $left men ${tilePoints.length}',
-                      ),
-                      style: AppText.sans(
-                        12,
-                        weight: FontWeight.w700,
-                        color: AppColors.inkOn(frame),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
