@@ -319,11 +319,14 @@ class _Rating extends StatelessWidget {
                       ? BoxDecoration(
                           color: AppColors.gold,
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppColors.deep, width: 1.5),
+                          border: Border.all(color: AppColors.ink, width: 2.5),
+                          boxShadow: [inkDrop(3)],
                         )
-                      : glassDecoration(
+                      : paperDecoration(
                           radius: BorderRadius.circular(14),
-                          shadow: false,
+                          color: Colors.white,
+                          border: 2.5,
+                          drop: 0,
                         ),
                   child: Text(face, style: const TextStyle(fontSize: 24)),
                 ),
@@ -348,7 +351,8 @@ class _ReachUs extends StatelessWidget {
       height: 250,
       decoration: BoxDecoration(
         borderRadius: radius,
-        border: Border.all(color: AppColors.ivory.withValues(alpha: 0.14)),
+        border: Border.all(color: AppColors.ink, width: 3),
+        boxShadow: [inkDrop(5)],
       ),
       child: ClipRRect(
         borderRadius: radius,
@@ -378,7 +382,11 @@ class _ReachUs extends StatelessWidget {
                 children: [
                   Text(
                     lang.t('كلمنا', 'Kalemna'),
-                    style: AppText.display(32, height: 1.1),
+                    style: AppText.display(
+                      32,
+                      height: 1.1,
+                      color: AppColors.ivory,
+                    ),
                   ),
                   Text(
                     lang.t(
@@ -405,11 +413,16 @@ class _ReachUs extends StatelessWidget {
                               width: 42,
                               height: 42,
                               alignment: Alignment.center,
-                              decoration: glassDecoration(
+                              decoration: paperDecoration(
                                 shape: BoxShape.circle,
-                                shadow: false,
+                                border: 2.5,
+                                drop: 3,
                               ),
-                              child: SocialIcon(social, size: 18),
+                              child: SocialIcon(
+                                social,
+                                size: 18,
+                                color: AppColors.ink,
+                              ),
                             ),
                           ),
                         ),

@@ -32,6 +32,7 @@ flutter:
     - assets/game/stages/
     - assets/sfx/
     - assets/logo/
+    - assets/cinema/
   fonts:
     - family: Lalezar
       fonts:

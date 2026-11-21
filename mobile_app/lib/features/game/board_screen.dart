@@ -127,6 +127,7 @@ class _BoardScreenState extends State<BoardScreen> {
         if (!didPop) _exit();
       },
       child: GameScaffold(
+        tv: true,
         child: Column(
           children: [
             Padding(

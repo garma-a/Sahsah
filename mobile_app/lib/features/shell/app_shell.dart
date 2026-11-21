@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/brand_background.dart';
+import '../../core/ui/surfaces.dart';
 import '../account/account_page.dart';
 import '../categories/categories_page.dart';
 import '../contact/contact_page.dart';
@@ -83,14 +84,25 @@ class _AppShellState extends State<AppShell> with TickerProviderStateMixin {
       padding: EdgeInsets.only(bottom: 14 + bottomInset),
       child: HomePage(tokens: _tokens),
     ),
+    // Other pages sit on a sheet of paper pinned to the poster wall.
     AppRoute.categories => Padding(
-      padding: EdgeInsets.only(bottom: 14 + bottomInset),
-      child: const CategoriesPage(),
+      padding: EdgeInsets.fromLTRB(0, 4, 8, 18 + bottomInset),
+      child: const PaperSheet(
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(14, 12, 14, 12),
+          child: CategoriesPage(),
+        ),
+      ),
     ),
-    _ => SingleChildScrollView(
-      controller: _scroll,
-      padding: EdgeInsets.only(bottom: 24 + bottomInset),
-      child: _page(),
+    _ => Padding(
+      padding: EdgeInsets.fromLTRB(0, 4, 8, 18 + bottomInset),
+      child: PaperSheet(
+        child: SingleChildScrollView(
+          controller: _scroll,
+          padding: const EdgeInsets.fromLTRB(18, 16, 18, 24),
+          child: _page(),
+        ),
+      ),
     ),
   };
 
@@ -192,7 +204,7 @@ class _AppShellState extends State<AppShell> with TickerProviderStateMixin {
                 left: 0,
                 right: 0,
                 height: padding.top,
-                child: ColoredBox(color: AppColors.deep.withValues(alpha: 0.8)),
+                child: const ColoredBox(color: AppColors.ink),
               ),
             ],
           ),

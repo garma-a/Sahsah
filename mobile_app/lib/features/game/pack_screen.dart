@@ -118,6 +118,7 @@ class PackScreen extends StatelessWidget {
     );
 
     return GameScaffold(
+      tv: true,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
         child: LayoutBuilder(

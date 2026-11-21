@@ -43,9 +43,14 @@ class SahsahField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final lang = context.lang;
+    // On paper the field is the website's input: white with an ink edge
+    // and a cyan ring when focused. On dark it stays a faint glass field.
+    final paper = context.onPaper;
     final border = OutlineInputBorder(
       borderRadius: BorderRadius.circular(14),
-      borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.14)),
+      borderSide: paper
+          ? const BorderSide(color: AppColors.ink, width: 2.5)
+          : BorderSide(color: Colors.white.withValues(alpha: 0.14)),
     );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -58,10 +63,7 @@ class SahsahField extends StatelessWidget {
               if (optional)
                 TextSpan(
                   text: lang.t(' (اختياري)', ' (e5tyary)'),
-                  style: AppText.sans(
-                    12,
-                    color: AppColors.ivory.withValues(alpha: 0.7),
-                  ),
+                  style: AppText.sans(12, color: context.mutedText),
                 ),
             ],
           ),
@@ -77,18 +79,22 @@ class SahsahField extends StatelessWidget {
           autofillHints: autofillHints,
           textDirection: ltr ? TextDirection.ltr : null,
           textAlign: TextAlign.start,
-          style: AppText.sans(16, weight: FontWeight.w600),
+          style: AppText.sans(
+            16,
+            weight: FontWeight.w600,
+            color: context.textColor,
+          ),
+          cursorColor: paper ? AppColors.ink : AppColors.gold,
           decoration: InputDecoration(
             hintText: hint,
             hintTextDirection: ltr ? TextDirection.ltr : null,
-            hintStyle: AppText.sans(
-              15,
-              color: AppColors.ivory.withValues(alpha: 0.55),
-            ),
+            hintStyle: AppText.sans(15, color: context.mutedText),
             counterText: '',
             isDense: true,
             filled: true,
-            fillColor: Colors.white.withValues(alpha: 0.06),
+            fillColor: paper
+                ? Colors.white
+                : Colors.white.withValues(alpha: 0.06),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 14,
               vertical: 13,
@@ -96,7 +102,9 @@ class SahsahField extends StatelessWidget {
             border: border,
             enabledBorder: border,
             focusedBorder: border.copyWith(
-              borderSide: const BorderSide(color: AppColors.gold, width: 2),
+              borderSide: paper
+                  ? const BorderSide(color: AppColors.cyan, width: 3)
+                  : const BorderSide(color: AppColors.gold, width: 2),
             ),
           ),
         ),
@@ -151,7 +159,8 @@ class _Pill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ink = selected ? AppColors.deep : AppColors.ivory;
+    final paper = context.onPaper;
+    final ink = selected || paper ? AppColors.ink : AppColors.ivory;
     return Semantics(
       button: true,
       selected: selected,
@@ -165,7 +174,14 @@ class _Pill extends StatelessWidget {
               ? BoxDecoration(
                   color: AppColors.gold,
                   borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: AppColors.deep, width: 1.5),
+                  border: Border.all(color: AppColors.ink, width: 2.5),
+                  boxShadow: [inkDrop(3)],
+                )
+              : paper
+              ? paperDecoration(
+                  radius: BorderRadius.circular(999),
+                  border: 2.5,
+                  drop: 0,
                 )
               : glassDecoration(
                   radius: BorderRadius.circular(999),
@@ -204,26 +220,22 @@ class FormError extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = message;
     if (text == null) return const SizedBox.shrink();
+    // A light red on dark; the website's error red on paper.
+    final red = context.onPaper
+        ? const Color(0xFFB3261E)
+        : const Color(0xFFFF8A80);
     return Padding(
       padding: const EdgeInsets.only(top: 10),
       child: Semantics(
         liveRegion: true,
         child: Row(
           children: [
-            const Icon(
-              LucideIcons.circleAlert,
-              size: 16,
-              color: Color(0xFFFF8A80),
-            ),
+            Icon(LucideIcons.circleAlert, size: 16, color: red),
             const SizedBox(width: 6),
             Expanded(
               child: Text(
                 text,
-                style: AppText.sans(
-                  13,
-                  weight: FontWeight.w600,
-                  color: const Color(0xFFFF8A80),
-                ),
+                style: AppText.sans(13, weight: FontWeight.w600, color: red),
               ),
             ),
           ],
@@ -233,7 +245,8 @@ class FormError extends StatelessWidget {
   }
 }
 
-/// A dark card that groups a form or a list.
+/// A printed card that groups a form or a list: the website's paper card,
+/// with ink text.
 class PanelCard extends StatelessWidget {
   const PanelCard({super.key, required this.child, this.padding = 18});
 
@@ -242,13 +255,10 @@ class PanelCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return Paper(
+      radius: 22,
+      drop: 5,
       padding: EdgeInsets.all(padding),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppColors.ivory.withValues(alpha: 0.12)),
-      ),
       child: child,
     );
   }
