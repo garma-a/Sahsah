@@ -127,10 +127,7 @@ class _ShopPageState extends State<ShopPage> {
               'التوكنز بتوصل للمستلم على رقم موبايله.',
               'El tokens btewsal lel mostalem 3ala raqam mobailo.',
             ),
-            style: AppText.sans(
-              13,
-              color: AppColors.ivory.withValues(alpha: 0.65),
-            ),
+            style: AppText.sans(13, color: context.mutedText),
           ),
           const SizedBox(height: 12),
           SahsahField(
@@ -159,7 +156,7 @@ class _ShopPageState extends State<ShopPage> {
 
     final footnote = Row(
       children: [
-        const Icon(LucideIcons.info, size: 15, color: AppColors.gold),
+        Icon(LucideIcons.info, size: 15, color: context.accentText),
         const SizedBox(width: 6),
         Expanded(
           child: Text(
@@ -167,10 +164,7 @@ class _ShopPageState extends State<ShopPage> {
               'توكن واحد = لعبة واحدة بـ٣٦ سؤال. الدفع بفوري أو المحافظ الإلكترونية.',
               'Token wa7ed = le3ba wa7da b 36 so2al. El daf3 b Fawry aw el ma7afez el electroneya.',
             ),
-            style: AppText.sans(
-              12,
-              color: AppColors.ivory.withValues(alpha: 0.6),
-            ),
+            style: AppText.sans(12, color: context.mutedText),
           ),
         ),
       ],
@@ -216,9 +210,10 @@ class _FreeBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: AppColors.green.withValues(alpha: 0.18),
+        color: AppColors.green,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.green.withValues(alpha: 0.6)),
+        border: Border.all(color: AppColors.ink, width: 2.5),
+        boxShadow: [inkDrop(3)],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -226,12 +221,16 @@ class _FreeBadge extends StatelessWidget {
           const Icon(
             LucideIcons600.partyPopper,
             size: 15,
-            color: AppColors.green,
+            color: AppColors.ink,
           ),
           const SizedBox(width: 6),
           Text(
             lang.t('اللعب مجاني دلوقتي', 'El le3b magany delwa2ty'),
-            style: AppText.sans(12, weight: FontWeight.w700),
+            style: AppText.sans(
+              12,
+              weight: FontWeight.w700,
+              color: AppColors.ink,
+            ),
           ),
         ],
       ),
@@ -240,7 +239,7 @@ class _FreeBadge extends StatelessWidget {
 }
 
 /// One pack: how many games, the price, and a buy (or gift) button. The
-/// most popular pack is on cream paper with a yellow ring.
+/// most popular pack is printed in yellow, with a red ribbon.
 class _PackCard extends StatelessWidget {
   const _PackCard({
     required this.count,
@@ -261,39 +260,26 @@ class _PackCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final lang = context.lang;
     final featured = count == featuredPack;
-    final ink = featured ? AppColors.deep : AppColors.ivory;
-    final muted = ink.withValues(alpha: 0.6);
+    // Printed cards on the paper, as on the website: cream, or yellow for
+    // the featured pack, both with ink text.
+    const ink = AppColors.ink;
+    const muted = AppColors.inkMuted;
     final price = packPrice(count, gift: gift);
     final list = packListPrice(count);
 
     final card = Container(
       padding: const EdgeInsets.fromLTRB(12, 18, 12, 12),
-      decoration: featured
-          ? BoxDecoration(
-              gradient: const LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [AppColors.ivory, AppColors.cream],
-              ),
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: AppColors.gold, width: 3),
-              boxShadow: [cssShadow(const Color(0x66000000), y: 10, blur: 24)],
-            )
-          : BoxDecoration(
-              color: AppColors.card,
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(
-                color: AppColors.ivory.withValues(alpha: 0.14),
-              ),
-            ),
+      decoration: paperDecoration(
+        radius: BorderRadius.circular(22),
+        color: featured ? AppColors.sun : AppColors.paper,
+        drop: featured ? 8 : 5,
+      ),
       child: Column(
         children: [
           Icon(
             LucideIcons600.coins,
             size: 22,
-            color: featured
-                ? AppColors.deep.withValues(alpha: 0.6)
-                : AppColors.gold,
+            color: featured ? AppColors.ink : AppColors.press,
           ),
           const SizedBox(height: 4),
           Text(
@@ -380,16 +366,16 @@ class _PackCard extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
             decoration: BoxDecoration(
-              color: AppColors.gold,
+              color: AppColors.press,
               borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: AppColors.deep, width: 1.5),
+              border: Border.all(color: AppColors.ink, width: 2.5),
             ),
             child: Text(
               lang.t('الأكثر طلبًا', 'El aktar talaban'),
               style: AppText.sans(
                 12,
                 weight: FontWeight.w700,
-                color: AppColors.deep,
+                color: Colors.white,
               ),
             ),
           ),

@@ -11,11 +11,12 @@ import 'app_route.dart';
 import 'header.dart';
 
 /// Height of the landscape top bar.
-const hudHeight = 52.0;
+const hudHeight = 60.0;
 
 /// Landscape top bar, like a game lobby: logo and player badge in the lobby,
 /// a back button and the screen title elsewhere; coins and language on the
-/// other side.
+/// other side. Drawn as the website's red header bar
+/// (`components/room/room-shell.tsx`): an ink outline and an ink drop.
 class GameHud extends StatelessWidget {
   const GameHud({super.key, required this.route, required this.tokens});
 
@@ -28,12 +29,19 @@ class GameHud extends StatelessWidget {
     final nav = ShellNav.of(context);
     final home = route == AppRoute.home;
 
-    return SizedBox(
+    return Container(
       height: hudHeight,
+      padding: const EdgeInsets.symmetric(horizontal: 5),
+      decoration: BoxDecoration(
+        color: AppColors.press,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.ink, width: 3),
+        boxShadow: [inkDrop(5)],
+      ),
       child: Row(
         children: [
           if (home) ...[
-            const Logo(size: 44),
+            const Logo(size: 50),
             const SizedBox(width: 12),
             const _PlayerBadge(),
             const Spacer(),
@@ -50,7 +58,7 @@ class GameHud extends StatelessWidget {
                 routeTitle(lang, route),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: AppText.display(28, height: 1.1),
+                style: AppText.display(28, height: 1.1, color: Colors.white),
               ),
             ),
           ],

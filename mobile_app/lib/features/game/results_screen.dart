@@ -169,6 +169,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
       },
       child: landscape
           ? GameScaffold(
+              tv: true,
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
                 child: Row(
@@ -212,6 +213,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
               ),
             )
           : GameScaffold(
+              tv: true,
               bottom: actions,
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),

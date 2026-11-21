@@ -13,12 +13,21 @@ import '../../../core/ui/surfaces.dart';
 /// and the alarm, never a team. Text on either fill is ink.
 const teamColors = [AppColors.cyan, AppColors.sun];
 
-/// Full-screen frame for game screens: brand background, safe area, no
-/// bottom bar.
+/// Full-screen frame for game screens: the poster wall, safe area, no
+/// bottom bar. With [tv] the screen is played on the retro TV, as the
+/// website stages its board, questions and result.
 class GameScaffold extends StatelessWidget {
-  const GameScaffold({super.key, required this.child, this.bottom});
+  const GameScaffold({
+    super.key,
+    required this.child,
+    this.bottom,
+    this.tv = false,
+  });
 
   final Widget child;
+
+  /// Stage [child] on the retro TV.
+  final bool tv;
 
   /// Pinned action area above the system bar.
   final Widget? bottom;
@@ -35,7 +44,15 @@ class GameScaffold extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Expanded(
-                child: SafeArea(bottom: bottom == null, child: child),
+                child: SafeArea(
+                  bottom: bottom == null,
+                  child: tv
+                      ? Padding(
+                          padding: const EdgeInsets.fromLTRB(8, 6, 8, 12),
+                          child: RetroScreen(child: child),
+                        )
+                      : child,
+                ),
               ),
               // The bar's background runs edge to edge; its content stays
               // clear of camera cutouts and the system bar.
@@ -43,11 +60,9 @@ class GameScaffold extends StatelessWidget {
                 ClipRect(
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      color: AppColors.forest.withValues(alpha: 0.92),
-                      border: Border(
-                        top: BorderSide(
-                          color: Colors.white.withValues(alpha: 0.08),
-                        ),
+                      color: AppColors.forest.withValues(alpha: 0.94),
+                      border: const Border(
+                        top: BorderSide(color: AppColors.ink, width: 3),
                       ),
                     ),
                     child: SafeArea(

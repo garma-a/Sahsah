@@ -107,7 +107,16 @@ class _GameButtonState extends State<GameButton> {
                         width: widget.borderWidth,
                       ),
                     ),
-                    child: Center(child: widget.child),
+                    // Text and icons default to what reads on the face.
+                    child: DefaultTextStyle.merge(
+                      style: TextStyle(color: AppColors.inkOn(widget.color)),
+                      child: IconTheme.merge(
+                        data: IconThemeData(
+                          color: AppColors.inkOn(widget.color),
+                        ),
+                        child: Center(child: widget.child),
+                      ),
+                    ),
                   ),
                 ),
               ],
