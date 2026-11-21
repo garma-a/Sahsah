@@ -8,6 +8,10 @@
       {
         "include": "gameplay/contracts/*.json",
         "watchAssets": true
+      },
+      {
+        "include": "admin/components/*.jsx",
+        "watchAssets": true
       }
     ]
   }

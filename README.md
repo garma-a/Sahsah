@@ -75,22 +75,19 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-The NestJS API listens at http://localhost:3001/api/health. Copy `.env.example` to `.env` to configure the server and PostgreSQL. Process liveness remains `/api/health`; database readiness is `/api/health/ready`. Follow the [backend guide](web_app/backend/README.md) for separate migration/runtime credentials, schema setup and `pnpm test:database`. Run `pnpm check`, `pnpm test` and `pnpm build`; run `pnpm start` after building. Backend HTTP tests cover the API, admin disabled/misconfigured states, login, session cookies and AdminJS asset delivery.
+The NestJS API listens at http://localhost:3001/api/health. Copy `.env.example` to `.env` to configure the server and PostgreSQL. Process liveness remains `/api/health`; database readiness is `/api/health/ready`. Follow the [backend guide](web_app/backend/README.md) for separate migration/runtime credentials, schema setup and `pnpm test:database`. Run `pnpm check`, `pnpm test` and `pnpm build`; run `pnpm start` after building. Backend HTTP tests cover the API and the separate admin service.
 
-AdminJS belongs to this backend at `src/admin/` and shares its server at **http://localhost:3001/admin**. It uses the supported Express integration directly with Nest's Express server; there is no separate admin package, process, port or dependency installation. Keeping it with the API also gives future database resources one owner.
-
-The dashboard is disabled by default. To enable it in the backend's `.env`, set:
+AdminJS belongs to this backend at `src/admin/` but runs as its own process, apart from the gameplay API (ADR 0021). After `pnpm build:admin`, start it with `pnpm start:admin` (or `pnpm dev:admin` locally) at **http://localhost:3002/admin**. It reads the same `DATABASE_URL` and signs staff in against `staff_accounts` with sessions in PostgreSQL. In the backend's `.env` set:
 
 ```dotenv
-ADMIN_ENABLED=true
-ADMIN_EMAIL=your-admin-email
-ADMIN_PASSWORD=your-password-of-at-least-16-characters
 ADMIN_SESSION_SECRET=your-random-secret-of-at-least-32-characters
+ADMIN_BOOTSTRAP_EMAIL=first-super-admin-email
+ADMIN_BOOTSTRAP_PASSWORD=password-of-at-least-12-characters
 ```
 
-Generate a session secret with `openssl rand -hex 32`, and restart the backend after editing `.env`. Enabling the dashboard without valid credentials fails startup. Login protects the dashboard; public assets remain available to render the login page. The cookie is HttpOnly, SameSite=Lax, scoped to `/admin`, and Secure in production. Production HTTPS behind a proxy requires configuring Express's trusted proxy for your deployment.
+Generate the secret with `openssl rand -hex 32`. The bootstrap pair creates the first Super Admin only when no staff account exists; afterwards it is ignored and the Super Admin manages staff in the dashboard. See [docs/admin/deployment.md](docs/admin/deployment.md) for the Railway service. Backend HTTP tests boot the admin entrypoint against a disposable PostgreSQL cluster and cover login, bootstrap, persistent sessions, deactivation, roles and the audit log.
 
-The dashboard currently has no database resources. The staff tables now exist, but it still uses the starter environment login and in-memory sessions; staff-backed login/session integration remains a separate increment. The prototype's simulated `/admin` editor remains a separate feature of the presentation app.
+The prototype's simulated `/admin` editor remains a separate feature of the presentation app.
 
 The backend alone pins AdminJS's TipTap core/PM/starter-kit to the same compatible v2 release. Frontend dependencies and versions do not inherit these overrides.
 

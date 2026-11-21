@@ -4,7 +4,6 @@ import { StandardSchemaValidationPipe, ValidationPipe } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { NestFactory } from "@nestjs/core";
 import AppModule from "./app.module.js";
-import { mountAdminDashboard } from "./admin/admin-dashboard.js";
 
 import type { GameplayOptions } from "./gameplay/platform/ports.js";
 import { localMedia, publicMediaBaseUrl, r2Signer } from "./gameplay/media/media.js";
@@ -21,7 +20,7 @@ export async function createApplication(
   const app = await NestFactory.create(AppModule, { abortOnError: false, logger: false });
   app.useLogger(new SafeNestLogger(await app.resolve(PinoLogger)));
   app.use(requestLogging());
-  // Before AdminJS, body parsing and Nest's handlers: refuse floods while they are still cheap.
+  // Before body parsing and Nest's handlers: refuse floods while they are still cheap.
   app.use(edgeProtection(process.env));
   const config = app.get(ConfigService);
   const express = app.getHttpAdapter().getInstance();
@@ -77,8 +76,6 @@ export async function createApplication(
     new StandardSchemaValidationPipe(),
   );
   try {
-    // Mount before Nest installs its body parser and catch-all handlers.
-    await mountAdminDashboard(app, config);
     app.use("/api/v1", json({ limit: "16kb", strict: true }));
     const bodyError: ErrorRequestHandler = (error, _req, res, next) => {
       if (!error) return next();

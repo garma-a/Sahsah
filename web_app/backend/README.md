@@ -12,7 +12,7 @@ The API defaults to http://localhost:3001/api/health. Run `pnpm check`, `pnpm te
 
 ## Database setup
 
-The 42-table schema is in `src/database/schema/`, grouped by domain with camelCase TypeScript properties and the agreed snake_case database names. All 37 enums, 95 foreign keys, 315 checks and 158 indexes (21 partial) are represented. `drizzle/0000_sahsah_schema.sql` creates the physical schema; `0001_postgresql_integrity.sql` preserves foreign-key deferral and the 28 private PostgreSQL helper functions and 28 triggers. No shop, staff, player, provider or authored content rows are inserted automatically.
+The 42-table schema is in `src/database/schema/`, grouped by domain with camelCase TypeScript properties and the agreed snake_case database names. All 37 enums, 95 foreign keys, 315 checks and 160 indexes (21 partial) are represented. `drizzle/0000_sahsah_schema.sql` creates the physical schema; `0001_postgresql_integrity.sql` preserves foreign-key deferral and the 28 private PostgreSQL helper functions and 28 triggers. No shop, staff, player, provider or authored content rows are inserted automatically.
 
 Provision a **new local database** using an existing PostgreSQL administrator connection:
 
@@ -80,21 +80,21 @@ pnpm db:check
 pnpm build
 ```
 
-The HTTP tests preserve health, CORS, disabled/misconfigured admin, login, cookies and asset delivery without needing a database. The database suite requires Python 3, `psql` and PostgreSQL 18 binaries, runs as a normal user and creates its own private Unix-socket cluster with TCP disabled. Set `PG_BIN` if the binaries are not in `/usr/lib/postgresql/18/bin`. It never reads a supplied database URL for its target and removes its cluster on exit.
+The HTTP tests preserve health, CORS, the separate admin service without needing a database. The database suite requires Python 3, `psql` and PostgreSQL 18 binaries, runs as a normal user and creates its own private Unix-socket cluster with TCP disabled. Set `PG_BIN` if the binaries are not in `/usr/lib/postgresql/18/bin`. It never reads a supplied database URL for its target and removes its cluster on exit.
 
 The suite runs 68 backend-owned SQL reference cases against the **actual migrations as the restricted runtime role**, including six independent-connection races. Two mutation-rejection cases now verify permission denial before the underlying guard. Additional Node integration cases verify typed sourced credits, exact numeric/hash/timestamp handling, COMMIT failure and connection release, readiness, role restrictions, repeat/status/checksum behavior, competing migrators and atomic failure recovery. Reference fixtures are adapted from the accepted v1.2 audit and copied here so this application remains independent. Reference functional cases force deferred checks and roll back; the concurrency and Node transaction cases perform real commits.
 
 ## Implemented boundary
 
-This increment implements schema, migrations and the NestJS database foundation. Account/game/payment APIs, provider verification, media/retention/outbox workers and staff authentication/session persistence remain later work. The presence of their tables does not implement those features. Production deployment still needs its actual role/TLS/backup configuration and a restore drill; no production database or provider account was used here.
+This increment implements schema, migrations and the NestJS database foundation. Account/game/payment APIs, provider verification, media/retention/outbox workers and staff-facing dashboard screens beyond staff management and the audit log remain later work. The presence of their tables does not implement those features. Production deployment still needs its actual role/TLS/backup configuration and a restore drill; no production database or provider account was used here.
 
 ## AdminJS
 
-The dashboard runs in this server at `/admin`, with its implementation in `src/admin/`. To enable it, set `ADMIN_ENABLED=true`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` (16+ characters) and `ADMIN_SESSION_SECRET` (32+ characters) in `.env`. Generate the secret with `openssl rand -hex 32`. Restart after changing configuration. Missing credentials prevent startup when admin is enabled.
+The staff dashboard is a separate entrypoint of this package (`src/admin/`, ADR 0021): `pnpm build:admin` compiles it and bundles its React screens once, `pnpm start:admin` serves it (default port 3002, `/admin`, health at `/health`), and `pnpm dev:admin` rebuilds and runs it locally. The gameplay API never mounts it.
 
-Authentication uses an HttpOnly, SameSite=Lax session cookie scoped to `/admin`; production cookies require HTTPS. Configure the Express trusted proxy when terminating HTTPS upstream. The starter has no database resources and uses in-memory sessions; add a persistent session store before production admin use.
+Staff sign in with `staff_accounts` (scrypt hashes) and sessions live in `staff_sessions` (the cookie's session id is stored hashed), so they survive the service sleeping. Set `ADMIN_SESSION_SECRET` (32+ characters); `ADMIN_BOOTSTRAP_EMAIL` and `ADMIN_BOOTSTRAP_PASSWORD` (12+ characters) create the first Super Admin only while no staff account exists. Super Admins add, deactivate, reactivate and change roles of staff and reset passwords (a temporary password is shown once); deactivating or re-roling an account ends its sessions. Every staff change writes a `staff_audit_events` row in the same transaction, and the audit log page reads them. Cookies are HttpOnly, SameSite=Lax, scoped to `/admin` and Secure in production; set `TRUSTED_PROXY_HOPS` behind a proxy. The admin database pool is small (`ADMIN_DATABASE_POOL_MAX`, default 3).
 
-The staff tables now exist, but AdminJS still uses the starter environment login and memory sessions. Database adapters/resources, staff-backed login, authorization and persistent session serialization remain unimplemented. No separate admin installation or server is needed. Middleware still mounts before Nest's body parser and catch-all handlers.
+Database adapters/resources for content, players, shop and messages arrive in later releases.
 
 References: [Drizzle migrations](https://orm.drizzle.team/docs/migrations), [custom SQL migrations](https://orm.drizzle.team/docs/kit-custom-migrations), [node-postgres transactions](https://node-postgres.com/features/transactions), [NestJS databases](https://docs.nestjs.com/techniques/database).
 

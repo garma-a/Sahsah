@@ -51,6 +51,9 @@ export const staffAuditEvents = t.pgTable("staff_audit_events", {
   createdAt: t.timestamp("created_at", { withTimezone: true, mode: "string" }).default(sql`now()`).notNull(),
 }, (table): t.PgTableExtraConfigValue[] => [
   t.index("staff_audit_events_actor_history").on(table.staffAccountId, table.createdAt, table.id),
+  // Audit log page: newest first overall (read backwards), and filtered by action.
+  t.index("staff_audit_events_recent").on(table.createdAt, table.id),
+  t.index("staff_audit_events_action_history").on(table.actionCode, table.createdAt, table.id),
   t.index("staff_audit_events_target_history").on(table.targetKind, table.targetKey, table.createdAt, table.id),
   t.foreignKey({
     name: "staff_audit_events_actor",

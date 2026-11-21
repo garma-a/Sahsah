@@ -202,6 +202,33 @@ _Avoid_: Content Admin, which described an earlier, superseded restriction.
 **Super Admin**:
 An Admin who can also manage staff accounts and staff roles.
 
+**Account ban**:
+A reversible staff suspension of a player account with a recorded reason. The account cannot sign in, host or join new games; a game it is already in may finish, and its token bank is kept.
+_Avoid_: Deletion, which ends the account; Account flag, which restricts nothing.
+
+**Account flag**:
+A staff-only note marking a player account for attention, such as suspected payment abuse. It restricts nothing and is not visible to players.
+_Avoid_: Report, which suggests players reporting each other.
+
+**Bulk grant**:
+Complimentary credit given by staff in one action to many accounts, with one recorded reason, outside any order.
+_Avoid_: Free campaign, which issues tokens through a buyer's zero-cost order.
+
+**Promo code**:
+A typed code giving a percentage discount on an eligible website order. A code that has been redeemed can be deactivated but never removed.
+_Avoid_: Free campaign, which applies without a code.
+
+**Announcement**:
+A dated staff message shown to everyone inside the website and app, with an optional link. It is not a push notification.
+_Avoid_: Notification, which implies delivery to a device while the app is closed.
+
+**Support reply**:
+A staff email answer to a contact message, recorded against that message. The player's answers arrive in the support mailbox, not the dashboard.
+
+**Composed format**:
+A question format staff define as a base (text, image or audio) and an ordered set of media slots, such as each hint stage and the answer. Staff upload every slot as a finished file prepared elsewhere; Sahsah does not alter media. It adds no new gameplay rules.
+_Avoid_: Built-in format, for memory, clue image and charades, whose interaction is defined in code.
+
 **Points**:
 The units used to compare team scores during a game.
 _Avoid_: Tokens, balance, when referring to the competition score.

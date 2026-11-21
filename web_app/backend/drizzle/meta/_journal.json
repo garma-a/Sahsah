@@ -43,6 +43,13 @@
       "when": 1794847916926,
       "tag": "0005_question_formats_clues_charades",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1795175441406,
+      "tag": "0006_admin_audit_log_indexes",
+      "breakpoints": true
     }
   ]
 }
