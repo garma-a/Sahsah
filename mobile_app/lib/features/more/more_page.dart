@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../../core/audio/sound.dart';
 import '../../core/i18n/lang.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/brand_art.dart';
@@ -57,6 +58,7 @@ class MorePage extends StatelessWidget {
               ],
             ),
           ),
+          const _SoundRow(),
         ],
       ),
       _GroupTitle(lang.t('مساعدة', 'Mosa3da')),
@@ -386,4 +388,46 @@ class _Quote extends StatelessWidget {
 double _side(BuildContext context) {
   final size = MediaQuery.sizeOf(context);
   return size.width > size.height ? 0 : 16;
+}
+
+/// Game sounds on or off. Turning them on plays one as a sample.
+class _SoundRow extends StatelessWidget {
+  const _SoundRow();
+
+  @override
+  Widget build(BuildContext context) {
+    final lang = context.lang;
+    final sound = context.sound;
+    return ListenableBuilder(
+      listenable: sound,
+      builder: (context, _) => Padding(
+        padding: const EdgeInsets.fromLTRB(14, 6, 14, 6),
+        child: Row(
+          children: [
+            _RowIcon(sound.enabled ? LucideIcons.volume2 : LucideIcons.volumeX),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                lang.t('أصوات اللعبة', 'Aswat el le3ba'),
+                style: AppText.sans(16, weight: FontWeight.w600),
+              ),
+            ),
+            Semantics(
+              label: lang.t('أصوات اللعبة', 'Aswat el le3ba'),
+              child: Switch(
+                key: const ValueKey('sound-switch'),
+                value: sound.enabled,
+                activeThumbColor: AppColors.deep,
+                activeTrackColor: AppColors.gold,
+                onChanged: (on) {
+                  sound.setEnabled(on);
+                  if (on) sound.play(Sfx.correct);
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

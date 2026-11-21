@@ -182,8 +182,9 @@ class _TopBar extends StatelessWidget {
   }
 }
 
-/// A team's name and score; tap to correct the total.
-class TeamScore extends StatelessWidget {
+/// A team's name and score; tap to correct the total. When the score goes
+/// up the pill pops and the points gained drop out under it.
+class TeamScore extends StatefulWidget {
   const TeamScore({
     super.key,
     required this.game,
@@ -196,12 +197,70 @@ class TeamScore extends StatelessWidget {
   final bool compact;
 
   @override
+  State<TeamScore> createState() => _TeamScoreState();
+}
+
+class _TeamScoreState extends State<TeamScore>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pop = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1500),
+  );
+  // The "+400" chip is drawn in the overlay so it sits on top of whatever
+  // is under the pill.
+  final _link = LayerLink();
+  final _portal = OverlayPortalController();
+  late int _seen;
+  int _gain = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _seen = widget.game.scores[widget.team];
+    _portal.show();
+  }
+
+  /// The game object is the same one each rebuild, so the last score is
+  /// remembered here to notice a rise. A pill covered by another screen
+  /// waits: when its screen is back it shows everything gained meanwhile.
+  void _check() {
+    if (!TickerMode.of(context)) return;
+    final now = widget.game.scores[widget.team];
+    if (now > _seen) {
+      _gain = now - _seen;
+      _pop.forward(from: 0);
+    }
+    _seen = now;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _check();
+  }
+
+  @override
+  void didUpdateWidget(TeamScore old) {
+    super.didUpdateWidget(old);
+    _check();
+  }
+
+  @override
+  void dispose() {
+    _pop.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final lang = context.lang;
+    final game = widget.game;
+    final team = widget.team;
+    final compact = widget.compact;
     final color = teamColors[team];
     final ink = AppColors.inkOn(color);
     final leading = game.leader == team;
-    return Semantics(
+    final pill = Semantics(
       button: !game.finished,
       label: lang.t(
         '${game.teamNames[team]}: ${game.scores[team]} نقطة، عدّل النقط',
@@ -282,6 +341,90 @@ class TeamScore extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+
+    final chip = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.gold,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.deep, width: 2),
+        boxShadow: [cssShadow(const Color(0x66000000), y: 4, blur: 10)],
+      ),
+      child: Text(
+        '+${lang.toAr(_gain)}',
+        textDirection: TextDirection.ltr,
+        style: AppText.num(17, color: AppColors.deep, height: 1.1),
+      ),
+    );
+
+    return OverlayPortal(
+      controller: _portal,
+      // "+400" drops out under the pill, holds, then fades.
+      overlayChildBuilder: (context) => Positioned(
+        left: 0,
+        top: 0,
+        child: CompositedTransformFollower(
+          link: _link,
+          showWhenUnlinked: false,
+          targetAnchor: Alignment.bottomCenter,
+          followerAnchor: Alignment.topCenter,
+          offset: const Offset(0, -8),
+          child: IgnorePointer(
+            child: FadeTransition(
+              opacity: TweenSequence<double>([
+                TweenSequenceItem(
+                  tween: Tween(begin: 0.0, end: 1.0),
+                  weight: 10,
+                ),
+                TweenSequenceItem(tween: ConstantTween(1.0), weight: 65),
+                TweenSequenceItem(
+                  tween: Tween(begin: 1.0, end: 0.0),
+                  weight: 25,
+                ),
+              ]).animate(_pop),
+              child: SlideTransition(
+                position: Tween(begin: const Offset(0, -0.6), end: Offset.zero)
+                    .animate(
+                      CurvedAnimation(
+                        parent: _pop,
+                        curve: const Interval(
+                          0,
+                          0.25,
+                          curve: Curves.easeOutBack,
+                        ),
+                      ),
+                    ),
+                child: chip,
+              ),
+            ),
+          ),
+        ),
+      ),
+      child: CompositedTransformTarget(
+        link: _link,
+        // A quick swell as the points land.
+        child: ScaleTransition(
+          scale: TweenSequence<double>([
+            TweenSequenceItem(
+              tween: Tween(
+                begin: 1.0,
+                end: 1.08,
+              ).chain(CurveTween(curve: Curves.easeOut)),
+              weight: 12,
+            ),
+            TweenSequenceItem(
+              tween: Tween(
+                begin: 1.08,
+                end: 1.0,
+              ).chain(CurveTween(curve: Curves.easeIn)),
+              weight: 18,
+            ),
+            TweenSequenceItem(tween: ConstantTween(1.0), weight: 70),
+          ]).animate(_pop),
+          child: pill,
         ),
       ),
     );

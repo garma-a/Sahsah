@@ -14,6 +14,7 @@ A mobile game lobby built from the prototype's design (`../sahsah_prototype`, li
 - **Join sheet:** six-digit code entry with a QR button. Rooms aren't in the backend yet, so joining shows a notice.
 - **More:** sign-in entry, language switch, contact/feedback/business, mission and vision, socials, in two columns.
 - **Portrait fallback:** if a tablet ignores the lock, the app falls back to a scrolling page with a bottom tab bar.
+- **Sound:** a tick for each of the last ten seconds, a time-up sound, a chime when a team takes the points, a soft note for nobody and a fanfare on the results screen (`lib/core/audio/`). The files in `assets/sfx/` are synthesized placeholders from `tool/make_sfx.py`; a recording with the same name replaces one. Sounds can be turned off under More.
 - **Feel:** buttons and cards give press feedback and haptics, screens fade, and system font scaling is capped at 130%.
 
 ### Playing a game

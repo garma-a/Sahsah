@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sahsah_mobile/app.dart';
+import 'package:sahsah_mobile/core/audio/sound.dart';
 import 'package:sahsah_mobile/core/ui/game_button.dart';
 import 'package:sahsah_mobile/core/i18n/lang.dart';
 import 'package:sahsah_mobile/features/game/game_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'sound_test.dart' show FakeSound;
 
 Future<void> settle(WidgetTester tester) async {
   await tester.pump();
@@ -47,8 +50,13 @@ void main() {
       ),
     );
     final game = GameController();
+    final sounds = FakeSound();
     await tester.pumpWidget(
-      SahsahApp(lang: LangController(Lang.ar), game: game),
+      SahsahApp(
+        lang: LangController(Lang.ar),
+        game: game,
+        sound: SoundController(backend: sounds),
+      ),
     );
     await settle(tester);
 
@@ -137,6 +145,7 @@ void main() {
     expect(game.game!.scores, [400, 0]);
     expect(game.game!.results['general-4']!.team, 0);
     expect(game.game!.turn, 1);
+    expect(sounds.played, [Sfx.correct]);
     expect(find.text('إظهار الإجابة'), findsNothing);
     expect(find.text('اختاروا سؤال'), findsOneWidget);
     expect(find.text('الدور على الجدعان'), findsOneWidget);
@@ -173,6 +182,7 @@ void main() {
     expect(game.game!.results['general-0']!.team, 1);
     expect(game.game!.scores, [400, 200]);
     expect(game.game!.turn, 0);
+    expect(sounds.played, [Sfx.correct, Sfx.correct, Sfx.correct]);
     expect(find.text('اختاروا سؤال'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('pack-back')));
     await settle(tester);
