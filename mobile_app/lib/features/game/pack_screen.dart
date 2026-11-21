@@ -6,6 +6,7 @@ import '../../core/i18n/lang.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/brand_art.dart';
 import '../../core/ui/category_cover.dart';
+import '../../core/ui/motion.dart';
 import '../../core/ui/game_button.dart';
 import '../../core/ui/surfaces.dart';
 import '../../data/categories.dart';
@@ -320,15 +321,18 @@ class _QuestionGrid extends StatelessWidget {
                 for (var k = 0; k < 2; k++) ...[
                   if (k > 0) const SizedBox(width: 12),
                   Expanded(
-                    child: _QuestionTile(
-                      id: '$categoryId-${level * 2 + k}',
-                      number: level * 2 + k + 1,
-                      fill:
-                          AppColors.categoryColors[toneOf(
-                            game.categoryIds.indexOf(categoryId),
-                          )],
-                      game: game,
-                      onPlay: onPlay,
+                    child: Rise(
+                      delay: Rise.step(level * 2 + k, ms: 50),
+                      child: _QuestionTile(
+                        id: '$categoryId-${level * 2 + k}',
+                        number: level * 2 + k + 1,
+                        fill:
+                            AppColors.categoryColors[toneOf(
+                              game.categoryIds.indexOf(categoryId),
+                            )],
+                        game: game,
+                        onPlay: onPlay,
+                      ),
                     ),
                   ),
                 ],
