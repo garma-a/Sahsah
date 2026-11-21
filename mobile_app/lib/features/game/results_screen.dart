@@ -115,9 +115,10 @@ class _ResultsScreenState extends State<ResultsScreen> {
         ],
       ],
     );
-    final breakdown = Glass(
+    // The breakdown is a printed card, like the website's result sheet.
+    final breakdown = Paper(
       radius: 20,
-      shadow: false,
+      drop: 5,
       child: Column(
         children: [
           // Column labels: which team each points column belongs to.
@@ -130,15 +131,23 @@ class _ResultsScreenState extends State<ResultsScreen> {
                   const SizedBox(width: 12),
                   SizedBox(
                     width: 64,
-                    child: Text(
-                      game.teamNames[t],
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppText.sans(
-                        12,
-                        weight: FontWeight.w700,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      decoration: BoxDecoration(
                         color: teamColors[t],
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.ink, width: 2),
+                      ),
+                      child: Text(
+                        game.teamNames[t],
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppText.sans(
+                          12,
+                          weight: FontWeight.w700,
+                          color: AppColors.ink,
+                        ),
                       ),
                     ),
                   ),
@@ -148,7 +157,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
           ),
           for (final (i, id) in game.categoryIds.indexed) ...[
             if (i > 0)
-              Divider(height: 1, color: Colors.white.withValues(alpha: 0.08)),
+              Divider(height: 1, color: AppColors.ink.withValues(alpha: 0.12)),
             _CategoryRow(game: game, categoryId: id),
           ],
         ],
@@ -261,15 +270,17 @@ class _Banner extends StatelessWidget {
           Container(
             width: compact ? 64 : 84,
             height: compact ? 64 : 84,
+            // A sticker in the winner's colour (yellow on a tie).
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: color.withValues(alpha: 0.15),
-              border: Border.all(color: color, width: 2),
+              color: leader == null ? AppColors.sun : color,
+              border: Border.all(color: AppColors.ink, width: 3),
+              boxShadow: [inkDrop(4)],
             ),
             child: Icon(
               leader == null ? LucideIcons.handshake : LucideIcons.trophy,
               size: compact ? 30 : 40,
-              color: color,
+              color: AppColors.ink,
             ),
           ),
           SizedBox(height: compact ? 8 : 12),
@@ -318,23 +329,28 @@ class _ScoreCard extends StatelessWidget {
     final lang = context.lang;
     final color = teamColors[team];
     final winner = game.leader == team;
+    // The website's score card: cream, the name on a ribbon of the team's
+    // colour, a big ink score; the winner sits higher on a deeper drop.
     return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        color: color.withValues(alpha: winner ? 0.2 : 0.08),
-        border: Border.all(
-          color: color.withValues(alpha: winner ? 0.9 : 0.35),
-          width: winner ? 2 : 1,
-        ),
+      padding: const EdgeInsets.all(12),
+      decoration: paperDecoration(
+        radius: BorderRadius.circular(20),
+        drop: winner ? 7 : 3,
       ),
       child: Column(
         children: [
-          Text(
-            game.teamNames[team],
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: AppText.sans(15, weight: FontWeight.w700),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 1),
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              game.teamNames[team],
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppText.display(18, height: 1.3, color: AppColors.ink),
+            ),
           ),
           const SizedBox(height: 6),
           TweenAnimationBuilder<double>(
@@ -346,15 +362,12 @@ class _ScoreCard extends StatelessWidget {
             builder: (context, v, _) => Text(
               v.round() == 0 && lang.ar ? 'صفر' : lang.toAr(v.round()),
               textDirection: TextDirection.ltr,
-              style: AppText.num(36, color: color, height: 1.1),
+              style: AppText.num(36, color: AppColors.ink, height: 1.1),
             ),
           ),
           Text(
             lang.t('نقطة', 'no2ta'),
-            style: AppText.sans(
-              12,
-              color: AppColors.ivory.withValues(alpha: 0.72),
-            ),
+            style: AppText.sans(12, color: AppColors.inkMuted),
           ),
         ],
       ),
@@ -408,7 +421,7 @@ class _CategoryRow extends StatelessWidget {
                 totals[t] == 0 ? '–' : lang.toAr(totals[t]),
                 textAlign: TextAlign.center,
                 textDirection: TextDirection.ltr,
-                style: AppText.num(16, color: teamColors[t]),
+                style: AppText.num(16, color: AppColors.ink),
               ),
             ),
           ],

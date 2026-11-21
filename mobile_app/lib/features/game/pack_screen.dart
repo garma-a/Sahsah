@@ -323,6 +323,10 @@ class _QuestionGrid extends StatelessWidget {
                     child: _QuestionTile(
                       id: '$categoryId-${level * 2 + k}',
                       number: level * 2 + k + 1,
+                      fill:
+                          AppColors.categoryColors[toneOf(
+                            game.categoryIds.indexOf(categoryId),
+                          )],
                       game: game,
                       onPlay: onPlay,
                     ),
@@ -341,10 +345,13 @@ class _QuestionTile extends StatelessWidget {
   const _QuestionTile({
     required this.id,
     required this.number,
+    required this.fill,
     required this.game,
     required this.onPlay,
   });
 
+  /// The category's tile colour.
+  final Color fill;
   final String id;
 
   /// 1–6 inside the pack, so two tiles worth the same can be told apart
@@ -387,12 +394,13 @@ class _QuestionTile extends StatelessWidget {
               height: 24,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: ink.withValues(alpha: 0.12),
+                color: AppColors.paper,
                 shape: BoxShape.circle,
+                border: Border.all(color: AppColors.ink, width: 2),
               ),
               child: Text(
                 context.lang.toAr(number),
-                style: AppText.num(13, color: ink, height: 1),
+                style: AppText.num(13, color: AppColors.ink, height: 1),
               ),
             ),
           ),
@@ -413,7 +421,7 @@ class _QuestionTile extends StatelessWidget {
     if (result != null) {
       final team = result.team;
       final color = team == null ? null : teamColors[team];
-      final ink = color == null ? AppColors.ivory : AppColors.inkOn(color);
+      final ink = color == null ? AppColors.ink : AppColors.inkOn(color);
       return Semantics(
         label: team == null
             ? lang.t('$points — محدش كسبه', '${q.points} — ma7adsh kasabo')
@@ -425,14 +433,16 @@ class _QuestionTile extends StatelessWidget {
         child: Container(
           alignment: Alignment.center,
           padding: const EdgeInsets.symmetric(horizontal: 10),
+          // Played: the winner's colour with an ink edge, as on the
+          // website's board; nobody's tiles fade on grey.
           decoration: BoxDecoration(
-            color: color ?? Colors.white.withValues(alpha: 0.05),
+            color: color ?? const Color(0xFFB9BDB9),
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
               color: color == null
-                  ? Colors.white.withValues(alpha: 0.1)
-                  : AppColors.deep,
-              width: 2,
+                  ? AppColors.ink.withValues(alpha: 0.35)
+                  : AppColors.ink,
+              width: 3,
             ),
           ),
           child: _numbered(
@@ -477,7 +487,10 @@ class _QuestionTile extends StatelessWidget {
     }
 
     final format = _format(q.kind);
-    final face = started ? AppColors.gold : AppColors.cream;
+    // Unplayed tiles take the category's colour, as on the website's
+    // board; one already opened is cream, waiting to be finished.
+    final face = started ? AppColors.paper : fill;
+    final ink = AppColors.inkOn(face);
     return Semantics(
       label: lang.t(
         'سؤال ${lang.toAr(number)}، $points نقطة، ${format.$2}${started ? '، مفتوح' : ''}',
@@ -492,7 +505,7 @@ class _QuestionTile extends StatelessWidget {
         onTap: () => onPlay(id),
         child: _numbered(
           context,
-          AppColors.deep,
+          ink,
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 36),
             child: FittedBox(
@@ -500,10 +513,7 @@ class _QuestionTile extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    points,
-                    style: AppText.num(34, color: AppColors.deep, height: 1),
-                  ),
+                  Text(points, style: AppText.num(34, color: ink, height: 1)),
                   ...[
                     const SizedBox(width: 10),
                     Container(
@@ -512,8 +522,13 @@ class _QuestionTile extends StatelessWidget {
                         vertical: 3,
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.deep.withValues(alpha: 0.1),
+                        color: started
+                            ? AppColors.sun
+                            : ink.withValues(alpha: 0.14),
                         borderRadius: BorderRadius.circular(999),
+                        border: started
+                            ? Border.all(color: AppColors.ink, width: 2)
+                            : null,
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -521,7 +536,7 @@ class _QuestionTile extends StatelessWidget {
                           Icon(
                             started ? LucideIcons600.circlePlay : format.$1,
                             size: 14,
-                            color: AppColors.deep,
+                            color: started ? AppColors.ink : ink,
                           ),
                           const SizedBox(width: 4),
                           Text(
@@ -531,7 +546,7 @@ class _QuestionTile extends StatelessWidget {
                             style: AppText.sans(
                               12,
                               weight: FontWeight.w700,
-                              color: AppColors.deep,
+                              color: started ? AppColors.ink : ink,
                             ),
                           ),
                         ],

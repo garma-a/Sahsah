@@ -166,6 +166,10 @@ class _QuestionScreenState extends State<QuestionScreen> {
           persist: false,
           duration: Duration(seconds: undoable ? 4 : 2),
           backgroundColor: team == null ? AppColors.ui : teamColors[team],
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: const BorderSide(color: AppColors.ink, width: 3),
+          ),
           padding: const EdgeInsetsDirectional.fromSTEB(16, 6, 8, 6),
           content: Row(
             children: [
@@ -399,15 +403,20 @@ class _QuestionCard extends StatelessWidget {
         Positioned.fill(
           child: Container(
             padding: const EdgeInsets.fromLTRB(16, 22, 16, 14),
-            // A card on the TV glass: a shade lighter than the glass, with
-            // an ink outline and drop.
-            decoration: BoxDecoration(
-              color: const Color(0xFF232B29),
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: AppColors.ink, width: 3),
-              boxShadow: [inkDrop(5)],
+            // The website's question card: grained paper with a chunky ink
+            // outline and drop. Text on it is ink.
+            decoration: paperDecoration(
+              radius: BorderRadius.circular(24),
+              border: 4,
+              drop: 7,
             ),
-            child: child,
+            child: DefaultTextStyle.merge(
+              style: const TextStyle(color: AppColors.ink),
+              child: IconTheme.merge(
+                data: const IconThemeData(color: AppColors.ink),
+                child: child,
+              ),
+            ),
           ),
         ),
         Positioned(
@@ -420,17 +429,14 @@ class _QuestionCard extends StatelessWidget {
               decoration: BoxDecoration(
                 color: AppColors.gold,
                 borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: AppColors.deep, width: 2),
+                border: Border.all(color: AppColors.ink, width: 3),
+                boxShadow: [inkDrop(3)],
               ),
               child: Text(
                 badge,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: AppText.sans(
-                  15,
-                  weight: FontWeight.w700,
-                  color: AppColors.deep,
-                ),
+                style: AppText.display(17, height: 1.3, color: AppColors.ink),
               ),
             ),
           ),
@@ -494,7 +500,7 @@ class _QuestionView extends StatelessWidget {
       style: (size) => AppText.display(
         size,
         height: 1.35,
-        color: AppColors.ivory.withValues(alpha: memoryWaiting ? 0.6 : 1),
+        color: context.textColor.withValues(alpha: memoryWaiting ? 0.6 : 1),
       ),
     );
 
@@ -708,7 +714,6 @@ class _TimerBar extends StatelessWidget {
     final secs = (ms / 1000).ceil();
     final low = running && secs <= 10;
     final elapsed = status == TimerStatus.elapsed;
-    final alert = low || elapsed;
     final time =
         '${(secs ~/ 60).toString().padLeft(2, '0')}:${(secs % 60).toString().padLeft(2, '0')}';
     // The screen repaints once a second, so a running bar glides towards
@@ -722,16 +727,16 @@ class _TimerBar extends StatelessWidget {
       child: Pressable(
         onTap: disabled ? null : onTap,
         child: Container(
-          width: 38,
-          height: 38,
+          width: 36,
+          height: 36,
           decoration: BoxDecoration(
-            color: alert ? AppColors.deep : AppColors.ivory,
+            color: elapsed ? Colors.white : AppColors.ink,
             shape: BoxShape.circle,
           ),
           child: Icon(
             icon,
             size: 17,
-            color: alert ? AppColors.ivory : AppColors.deep,
+            color: elapsed ? AppColors.ink : Colors.white,
           ),
         ),
       ),
@@ -743,15 +748,14 @@ class _TimerBar extends StatelessWidget {
         duration: const Duration(milliseconds: 250),
         height: 48,
         padding: const EdgeInsets.symmetric(horizontal: 5),
+        // The website's timer: a white face with an ink edge and drop;
+        // the bar is cyan, amber when paused and red for the last ten
+        // seconds, and the whole face turns red when time is up.
         decoration: BoxDecoration(
-          color: alert ? AppColors.ivory : AppColors.deep,
+          color: elapsed ? AppColors.press : Colors.white,
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-            color: alert
-                ? AppColors.play
-                : AppColors.ivory.withValues(alpha: 0.2),
-            width: alert ? 3 : 1.5,
-          ),
+          border: Border.all(color: AppColors.ink, width: 3),
+          boxShadow: [inkDrop(4)],
         ),
         child: Row(
           children: [
@@ -772,9 +776,9 @@ class _TimerBar extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           const Icon(
-                            LucideIcons600.alarmClock,
+                            LucideIcons600.alarmClockOff,
                             size: 20,
-                            color: AppColors.play,
+                            color: Colors.white,
                           ),
                           const SizedBox(width: 8),
                           Flexible(
@@ -785,7 +789,7 @@ class _TimerBar extends StatelessWidget {
                               style: AppText.display(
                                 20,
                                 height: 1.2,
-                                color: AppColors.play,
+                                color: Colors.white,
                               ),
                             ),
                           ),
@@ -801,7 +805,7 @@ class _TimerBar extends StatelessWidget {
                               textAlign: TextAlign.center,
                               style: AppText.num(
                                 28,
-                                color: alert ? AppColors.deep : Colors.white,
+                                color: low ? AppColors.press : AppColors.ink,
                                 height: 1,
                               ),
                             ),
@@ -816,13 +820,9 @@ class _TimerBar extends StatelessWidget {
                                   fit: StackFit.expand,
                                   children: [
                                     ColoredBox(
-                                      color: alert
-                                          ? AppColors.deep.withValues(
-                                              alpha: 0.15,
-                                            )
-                                          : Colors.white.withValues(
-                                              alpha: 0.16,
-                                            ),
+                                      color: AppColors.ink.withValues(
+                                        alpha: 0.1,
+                                      ),
                                     ),
                                     TweenAnimationBuilder<double>(
                                       tween: Tween(end: left.clamp(0.0, 1.0)),
@@ -836,13 +836,11 @@ class _TimerBar extends StatelessWidget {
                                           widthFactor: v,
                                           heightFactor: 1,
                                           child: ColoredBox(
-                                            color: alert
-                                                ? AppColors.play
+                                            color: low
+                                                ? AppColors.press
                                                 : running
-                                                ? AppColors.gold
-                                                : AppColors.ivory.withValues(
-                                                    alpha: 0.55,
-                                                  ),
+                                                ? AppColors.cyan
+                                                : AppColors.amber,
                                           ),
                                         ),
                                       ),
@@ -919,11 +917,9 @@ class _ActingRules extends StatelessWidget {
                           vertical: 8,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.06),
+                          color: Colors.white,
                           borderRadius: BorderRadius.circular(999),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.12),
-                          ),
+                          border: Border.all(color: AppColors.ink, width: 2),
                         ),
                         child: Row(
                           children: [
@@ -939,7 +935,7 @@ class _ActingRules extends StatelessWidget {
                                 lang.toAr(i + 1),
                                 style: AppText.num(
                                   13,
-                                  color: Colors.white,
+                                  color: AppColors.ink,
                                   height: 1,
                                 ),
                               ),
@@ -990,8 +986,9 @@ class _QrBox extends StatelessWidget {
         width: 150,
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.06),
+          color: AppColors.paperShade,
           borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppColors.ink, width: 2.5),
         ),
         child: Column(
           children: [
@@ -1108,7 +1105,7 @@ class _ActingLive extends StatelessWidget {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Icon(LucideIcons.drama, size: 54, color: AppColors.gold),
+        Icon(LucideIcons.drama, size: 54, color: context.accentText),
         const SizedBox(height: 10),
         Flexible(child: prompt),
         const SizedBox(height: 10),
@@ -1117,10 +1114,7 @@ class _ActingLive extends StatelessWidget {
             'من غير ولا كلمة… والباقي يخمّن',
             'Men gher wala kelma… wel ba2y ykhammen',
           ),
-          style: AppText.sans(
-            15,
-            color: AppColors.ivory.withValues(alpha: 0.7),
-          ),
+          style: AppText.sans(15, color: context.mutedText),
         ),
       ],
     );
@@ -1159,12 +1153,17 @@ class _StageLadder extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: i == stage
                       ? AppColors.gold
-                      : Colors.white.withValues(alpha: i < stage ? 0.04 : 0.08),
+                      : i < stage
+                      ? context.faint
+                      : Colors.white,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: i == stage ? AppColors.deep : Colors.transparent,
-                    width: 2,
+                    color: i < stage
+                        ? AppColors.ink.withValues(alpha: 0.3)
+                        : AppColors.ink,
+                    width: 2.5,
                   ),
+                  boxShadow: i == stage ? [inkDrop(3)] : null,
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -1177,8 +1176,8 @@ class _StageLadder extends StatelessWidget {
                           : LucideIcons.lock,
                       size: 16,
                       color: i == stage
-                          ? AppColors.deep
-                          : AppColors.ivory.withValues(alpha: 0.5),
+                          ? AppColors.ink
+                          : AppColors.ink.withValues(alpha: 0.5),
                     ),
                     const SizedBox(width: 8),
                     Text(
@@ -1187,11 +1186,9 @@ class _StageLadder extends StatelessWidget {
                           AppText.num(
                             20,
                             height: 1,
-                            color: i == stage
-                                ? AppColors.deep
-                                : AppColors.ivory.withValues(
-                                    alpha: i < stage ? 0.35 : 0.8,
-                                  ),
+                            color: AppColors.ink.withValues(
+                              alpha: i < stage ? 0.4 : 1,
+                            ),
                           ).copyWith(
                             decoration: i < stage
                                 ? TextDecoration.lineThrough
@@ -1234,46 +1231,62 @@ class _AnswerView extends StatelessWidget {
     final q = question;
     final asset = q.kind == QuestionKind.staged ? q.answerImage : q.image;
 
+    // The website's answer slab: yellow, ink-edged, turning up from its
+    // top edge once when it appears.
     final answer = Column(
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          lang.t('الإجابة الصحيحة', 'El egaba el sa7ee7a'),
-          textAlign: TextAlign.center,
-          style: AppText.sans(
-            14,
-            weight: FontWeight.w700,
-            color: AppColors.gold,
-          ),
-        ),
-        const SizedBox(height: 4),
         Flexible(
-          child: FitText(
-            lang.t(q.answer, q.answerEn),
-            max: 40,
-            min: 18,
-            textAlign: TextAlign.center,
-            style: (size) => AppText.display(size, height: 1.25),
-          ),
-        ),
-        if (q.color != null) ...[
-          const SizedBox(height: 8),
-          Center(
-            child: Semantics(
-              label: lang.t('اللون الأصلي', 'El loon el asly'),
-              child: Container(
-                width: 64,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: q.color,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppColors.ivory, width: 2),
+          child: _RevealSlab(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  lang.t('الإجابة الصحيحة', 'El egaba el sa7ee7a'),
+                  textAlign: TextAlign.center,
+                  style: AppText.display(
+                    16,
+                    height: 1,
+                    color: AppColors.ink.withValues(alpha: 0.7),
+                  ),
                 ),
-              ),
+                const SizedBox(height: 4),
+                Flexible(
+                  child: FitText(
+                    lang.t(q.answer, q.answerEn),
+                    max: 40,
+                    min: 18,
+                    textAlign: TextAlign.center,
+                    style: (size) => AppText.display(
+                      size,
+                      height: 1.25,
+                      color: AppColors.ink,
+                    ),
+                  ),
+                ),
+                if (q.color != null) ...[
+                  const SizedBox(height: 8),
+                  Center(
+                    child: Semantics(
+                      label: lang.t('اللون الأصلي', 'El loon el asly'),
+                      child: Container(
+                        width: 64,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: q.color,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppColors.ink, width: 3),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
-        ],
+        ),
       ],
     );
 
@@ -1317,10 +1330,14 @@ class _AnswerView extends StatelessWidget {
     );
     final backToQuestion = TextButton.icon(
       onPressed: onBackToQuestion,
-      icon: const Icon(LucideIcons.undo2, size: 16, color: AppColors.gold),
+      icon: Icon(LucideIcons.undo2, size: 16, color: context.accentText),
       label: Text(
         lang.t('ارجع للسؤال', 'Erga3 lel so2al'),
-        style: AppText.sans(14, weight: FontWeight.w700, color: AppColors.gold),
+        style: AppText.sans(
+          14,
+          weight: FontWeight.w700,
+          color: context.accentText,
+        ),
       ),
     );
 
@@ -1381,6 +1398,57 @@ class _AnswerView extends StatelessWidget {
       media: _Photo(question: q, asset: asset, revealed: true),
       top: answer,
       bottom: award,
+    );
+  }
+}
+
+/// The answer slab (the website's `reveal` keyframes): it turns up from
+/// its top edge, overshoots a little and settles, once.
+class _RevealSlab extends StatelessWidget {
+  const _RevealSlab({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final calm = MediaQuery.disableAnimationsOf(context);
+    final slab = Container(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+      decoration: BoxDecoration(
+        color: AppColors.sun,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppColors.ink, width: 4),
+        boxShadow: [inkDrop(7)],
+      ),
+      child: child,
+    );
+    if (calm) return slab;
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 650),
+      curve: Curves.easeOut,
+      child: slab,
+      builder: (context, t, child) {
+        // 0 → 60%: from folded back (-80°) to just past flat (8°); then
+        // settle to flat.
+        final angle = t < 0.6
+            ? -80 + (88 * t / 0.6)
+            : 8 - 8 * ((t - 0.6) / 0.4);
+        final scale = t < 0.6
+            ? 0.92 + 0.1 * t / 0.6
+            : 1.02 - 0.02 * ((t - 0.6) / 0.4);
+        return Opacity(
+          opacity: (t / 0.6).clamp(0.0, 1.0),
+          child: Transform(
+            alignment: Alignment.topCenter,
+            transform: Matrix4.identity()
+              ..setEntry(3, 2, 1 / 900)
+              ..rotateX(angle * math.pi / 180)
+              ..scaleByDouble(scale, scale, 1, 1),
+            child: child,
+          ),
+        );
+      },
     );
   }
 }
@@ -1474,20 +1542,27 @@ class _Framed extends StatelessWidget {
               width: w + _pad * 2,
               height: h + _pad * 2,
               padding: const EdgeInsets.all(_pad),
+              // A white print with an ink edge, pinned a little crooked.
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(8),
-                gradient: const LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [AppColors.ivory, AppColors.cream],
-                ),
-                boxShadow: [
-                  cssShadow(const Color(0x80000000), y: 12, blur: 26),
-                ],
+                color: Colors.white,
+                border: Border.all(color: AppColors.ink, width: 3),
+                boxShadow: [inkDrop(5)],
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(4),
-                child: ColoredBox(color: AppColors.deep, child: child),
+                // Dark behind the picture, so anything drawn there (the
+                // memory round's notes) stays light.
+                child: ColoredBox(
+                  color: AppColors.deep,
+                  child: DefaultTextStyle.merge(
+                    style: const TextStyle(color: AppColors.ivory),
+                    child: IconTheme.merge(
+                      data: const IconThemeData(color: AppColors.ivory),
+                      child: child,
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
@@ -1810,135 +1885,147 @@ class _LeaveDialogState extends State<_LeaveDialog> {
       ),
     );
 
+    // A paper card, like the website's award panel: ink text, ink edge.
     return Dialog(
-      backgroundColor: AppColors.forest,
+      backgroundColor: AppColors.paper,
       insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(24),
-        side: BorderSide(color: AppColors.gold.withValues(alpha: 0.4)),
+        side: const BorderSide(color: AppColors.ink, width: 4),
       ),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                lang.t(
-                  'قبل ما ترجعوا… مين خد النقط؟',
-                  'Abl ma terga3o… meen khad el no2at?',
+      child: DefaultTextStyle.merge(
+        style: const TextStyle(color: AppColors.ink),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  lang.t(
+                    'قبل ما ترجعوا… مين خد النقط؟',
+                    'Abl ma terga3o… meen khad el no2at?',
+                  ),
+                  textAlign: TextAlign.center,
+                  style: AppText.display(24, height: 1.2),
                 ),
-                textAlign: TextAlign.center,
-                style: AppText.display(24, height: 1.2),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                lang.t(
-                  'السؤال لازم يتحسم عشان ترجعوا للوحة.',
-                  'El so2al lazem yet7esem 3ashan terga3o lel lo7a.',
+                const SizedBox(height: 4),
+                Text(
+                  lang.t(
+                    'السؤال لازم يتحسم عشان ترجعوا للوحة.',
+                    'El so2al lazem yet7esem 3ashan terga3o lel lo7a.',
+                  ),
+                  textAlign: TextAlign.center,
+                  style: AppText.sans(13, color: AppColors.inkMuted),
                 ),
-                textAlign: TextAlign.center,
-                style: AppText.sans(
-                  13,
-                  color: AppColors.ivory.withValues(alpha: 0.7),
-                ),
-              ),
-              const SizedBox(height: 10),
-              if (!_shown)
-                Center(
-                  child: OutlinedButton.icon(
-                    key: const ValueKey('leave-show-answer'),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(0, 44),
-                      side: BorderSide(
-                        color: AppColors.ivory.withValues(alpha: 0.3),
+                const SizedBox(height: 10),
+                if (!_shown)
+                  Center(
+                    child: OutlinedButton.icon(
+                      key: const ValueKey('leave-show-answer'),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(0, 44),
+                        backgroundColor: Colors.white,
+                        side: const BorderSide(
+                          color: AppColors.ink,
+                          width: 2.5,
+                        ),
+                        shape: const StadiumBorder(),
                       ),
-                      shape: const StadiumBorder(),
-                    ),
-                    onPressed: () {
-                      widget.onReveal();
-                      setState(() => _shown = true);
-                    },
-                    icon: const Icon(
-                      LucideIcons.eye,
-                      size: 16,
-                      color: AppColors.ivory,
-                    ),
-                    label: Text(
-                      lang.t(
-                        'الإجابة مخفية · اظهروها',
-                        'El egaba makhfeya · ezharooha',
+                      onPressed: () {
+                        widget.onReveal();
+                        setState(() => _shown = true);
+                      },
+                      icon: const Icon(
+                        LucideIcons.eye,
+                        size: 16,
+                        color: AppColors.ink,
                       ),
-                      style: AppText.sans(14, weight: FontWeight.w700),
+                      label: Text(
+                        lang.t(
+                          'الإجابة مخفية · اظهروها',
+                          'El egaba makhfeya · ezharooha',
+                        ),
+                        style: AppText.sans(
+                          14,
+                          weight: FontWeight.w700,
+                          color: AppColors.ink,
+                        ),
+                      ),
                     ),
-                  ),
-                )
-              else
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text.rich(
-                    TextSpan(
-                      children: [
-                        TextSpan(
-                          text: lang.t('الإجابة: ', 'El egaba: '),
-                          style: AppText.sans(
-                            14,
-                            weight: FontWeight.w700,
-                            color: AppColors.gold,
+                  )
+                else
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.sun,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.ink, width: 2.5),
+                    ),
+                    child: Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: lang.t('الإجابة: ', 'El egaba: '),
+                            style: AppText.sans(
+                              14,
+                              weight: FontWeight.w700,
+                              color: AppColors.inkMuted,
+                            ),
                           ),
-                        ),
-                        TextSpan(
-                          text: lang.t(question.answer, question.answerEn),
-                          style: AppText.sans(15, weight: FontWeight.w700),
-                        ),
-                      ],
+                          TextSpan(
+                            text: lang.t(question.answer, question.answerEn),
+                            style: AppText.sans(
+                              15,
+                              weight: FontWeight.w700,
+                              color: AppColors.ink,
+                            ),
+                          ),
+                        ],
+                      ),
+                      textAlign: TextAlign.center,
                     ),
-                    textAlign: TextAlign.center,
+                  ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(child: team(0)),
+                    const SizedBox(width: 10),
+                    Expanded(child: team(1)),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                GlassButton(
+                  height: 50,
+                  icon: LucideIcons.x,
+                  label: lang.t('ولا حد', 'Wala 7ad'),
+                  onTap: () => nav.pop(_LeaveDialog.nobody),
+                ),
+                const SizedBox(height: 4),
+                TextButton.icon(
+                  key: const ValueKey('leave-stay'),
+                  onPressed: () => nav.pop(),
+                  icon: const Icon(
+                    LucideIcons.undo2,
+                    size: 16,
+                    color: AppColors.press,
+                  ),
+                  label: Text(
+                    lang.t('لأ، كمّلوا السؤال', 'La2, kammelo el so2al'),
+                    style: AppText.sans(
+                      14,
+                      weight: FontWeight.w700,
+                      color: AppColors.press,
+                    ),
                   ),
                 ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(child: team(0)),
-                  const SizedBox(width: 10),
-                  Expanded(child: team(1)),
-                ],
-              ),
-              const SizedBox(height: 10),
-              GlassButton(
-                height: 50,
-                icon: LucideIcons.x,
-                label: lang.t('ولا حد', 'Wala 7ad'),
-                onTap: () => nav.pop(_LeaveDialog.nobody),
-              ),
-              const SizedBox(height: 4),
-              TextButton.icon(
-                key: const ValueKey('leave-stay'),
-                onPressed: () => nav.pop(),
-                icon: const Icon(
-                  LucideIcons.undo2,
-                  size: 16,
-                  color: AppColors.gold,
-                ),
-                label: Text(
-                  lang.t('لأ، كمّلوا السؤال', 'La2, kammelo el so2al'),
-                  style: AppText.sans(
-                    14,
-                    weight: FontWeight.w700,
-                    color: AppColors.gold,
-                  ),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
