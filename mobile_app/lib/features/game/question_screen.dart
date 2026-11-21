@@ -240,99 +240,130 @@ class _QuestionScreenState extends State<QuestionScreen> {
       child: content,
     );
 
-    // The back gesture can't leave an open question; it explains why.
+    final status = controller.timerStatus(p);
+    // The clock waits on the memory picture and the acting rules, and
+    // stops with the reveal.
+    final timerOff =
+        p.revealed ||
+        (q.kind == QuestionKind.memory && !p.memoryAsked) ||
+        (q.kind == QuestionKind.acting && status == TimerStatus.ready);
+    final timer = _TimerBar(questionId: id, disabled: timerOff);
+    Widget score(int team) => TeamScore(game: game, team: team, compact: true);
+
+    // Back (button or gesture) asks who took the points first.
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _leave();
       },
       child: GameScaffold(
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: LayoutBuilder(
-                builder: (context, box) {
-                  final landscape = box.maxWidth > box.maxHeight * 1.1;
-                  if (landscape) {
-                    return Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 18, 12, 12),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          SizedBox(width: 190, child: _TeamsColumn(game: game)),
-                          const SizedBox(width: 14),
-                          Expanded(child: card),
-                        ],
-                      ),
-                    );
-                  }
-                  return Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
+        child: LayoutBuilder(
+          builder: (context, box) {
+            final landscape = box.maxWidth > box.maxHeight * 1.1;
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // One slim strip: a score at each corner and the clock
+                  // between them, where the whole table can see it. The
+                  // card below gets the full width.
+                  if (landscape)
+                    Row(
                       children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TeamScore(
-                                game: game,
-                                team: 0,
-                                compact: true,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: TeamScore(
-                                game: game,
-                                team: 1,
-                                compact: true,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 22),
-                        Expanded(child: card),
+                        Expanded(flex: 3, child: score(0)),
+                        const SizedBox(width: 12),
+                        Expanded(flex: 5, child: timer),
+                        const SizedBox(width: 12),
+                        Expanded(flex: 3, child: score(1)),
+                      ],
+                    )
+                  else ...[
+                    Row(
+                      children: [
+                        Expanded(child: score(0)),
+                        const SizedBox(width: 8),
+                        Expanded(child: score(1)),
                       ],
                     ),
-                  );
-                },
+                    const SizedBox(height: 8),
+                    timer,
+                  ],
+                  const SizedBox(height: 22),
+                  Expanded(child: card),
+                ],
               ),
-            ),
-          ],
+            );
+          },
         ),
       ),
     );
   }
 }
 
-/// Team names and scores down the side (tap one to correct it).
-class _TeamsColumn extends StatelessWidget {
-  const _TeamsColumn({required this.game});
+/// Width / height of a question's picture, so its frame can hug it.
+double _photoAspect(Question q) => switch (q.kind) {
+  QuestionKind.staged => 1,
+  QuestionKind.standard => 4 / 5,
+  _ => 4 / 3,
+};
 
-  final Game game;
+/// A picture beside its controls. With room (landscape) the picture takes
+/// the card's full height and [top] / [bottom] stack next to it; otherwise
+/// everything stacks.
+class _MediaLayout extends StatelessWidget {
+  const _MediaLayout({
+    required this.aspect,
+    required this.media,
+    required this.top,
+    required this.bottom,
+  });
+
+  /// Width / height of the picture.
+  final double aspect;
+  final Widget media;
+
+  /// The question or the answer; takes the space that's left.
+  final Widget top;
+
+  /// Buttons; as tall as they need.
+  final Widget bottom;
 
   @override
   Widget build(BuildContext context) {
-    final lang = context.lang;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        TeamScore(game: game, team: 0),
-        const SizedBox(height: 10),
-        TeamScore(game: game, team: 1),
-        const Spacer(),
-        Text(
-          lang.t(
-            '${lang.toAr(game.resolvedCount)} من ${lang.toAr(game.totalQuestions)} سؤال',
-            '${game.resolvedCount} men ${game.totalQuestions} so2al',
-          ),
-          textAlign: TextAlign.center,
-          style: AppText.sans(
-            12,
-            color: AppColors.ivory.withValues(alpha: 0.6),
-          ),
-        ),
-      ],
+    return LayoutBuilder(
+      builder: (context, box) {
+        if (box.maxWidth > box.maxHeight * 1.3) {
+          final width = math.min(box.maxWidth * 0.48, box.maxHeight * aspect);
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(child: top),
+                    const SizedBox(height: 12),
+                    bottom,
+                  ],
+                ),
+              ),
+              const SizedBox(width: 14),
+              SizedBox(width: width, child: media),
+            ],
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(flex: 2, child: top),
+            const SizedBox(height: 8),
+            Expanded(flex: 3, child: media),
+            const SizedBox(height: 12),
+            bottom,
+          ],
+        );
+      },
     );
   }
 }
@@ -432,6 +463,8 @@ class _QuestionView extends StatelessWidget {
         !p.revealed &&
         p.stage < q.pointStages.length - 1;
 
+    // With no picture the question has the whole card, so it can be bigger.
+    final textOnly = q.kind == QuestionKind.standard && q.image == null;
     final prompt = FitText(
       memoryWaiting
           ? lang.t(
@@ -439,7 +472,7 @@ class _QuestionView extends StatelessWidget {
               'Rakkezo fel soora… el so2al gay ba3d ma tekhtefy',
             )
           : lang.t(q.prompt, q.promptEn),
-      max: 38,
+      max: textOnly ? 46 : 38,
       min: 16,
       textAlign: TextAlign.center,
       style: (size) => AppText.display(
@@ -449,63 +482,27 @@ class _QuestionView extends StatelessWidget {
       ),
     );
 
-    final Widget body = switch (q.kind) {
-      QuestionKind.acting =>
-        actingRules ? const _ActingRules() : _ActingLive(prompt: prompt),
-      QuestionKind.staged => Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SizedBox(
-            width: 150,
-            child: _StageLadder(stages: q.pointStages, stage: p.stage),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SizedBox(height: 60, child: Center(child: prompt)),
-                const SizedBox(height: 8),
-                Expanded(
-                  child: _Photo(
-                    question: q,
-                    asset: q.stages[math.min(p.stage, q.stages.length - 1)],
-                    revealed: false,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+    // The picture, when the question has one.
+    final Widget? media = switch (q.kind) {
+      QuestionKind.acting => null,
+      QuestionKind.staged => _Photo(
+        question: q,
+        asset: q.stages[math.min(p.stage, q.stages.length - 1)],
+        revealed: false,
       ),
-      QuestionKind.memory => Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(child: Center(child: prompt)),
-          const SizedBox(width: 14),
-          Expanded(
-            child: _MemoryMedia(
-              question: q,
-              progress: p,
-              questionId: questionId,
-            ),
-          ),
-        ],
+      QuestionKind.memory => _MemoryMedia(
+        question: q,
+        progress: p,
+        questionId: questionId,
       ),
-      _ when q.image != null => Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(child: Center(child: prompt)),
-          const SizedBox(width: 14),
-          Expanded(
-            child: _Photo(question: q, asset: q.image!, revealed: p.revealed),
-          ),
-        ],
+      _ when q.image != null => _Photo(
+        question: q,
+        asset: q.image!,
+        revealed: p.revealed,
       ),
-      _ => Center(child: prompt),
+      _ => null,
     };
 
-    final disabled = memoryWaiting || actingRules;
     final back = SizedBox(
       width: 130,
       child: GlassButton(
@@ -537,39 +534,35 @@ class _QuestionView extends StatelessWidget {
       );
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Center(
-          child: _TimerBar(
-            questionId: questionId,
-            disabled: disabled || p.revealed,
-          ),
-        ),
-        const SizedBox(height: 10),
-        Expanded(child: body),
-        const SizedBox(height: 12),
-        Row(
+    final clarify = canClarify
+        ? GoldButton(
+            height: 50,
+            icon: LucideIcons600.zoomIn,
+            label: lang.t('وضّح الصورة', 'Wada7 el soora'),
+            onTap: () => game.advanceStage(questionId),
+          )
+        : null;
+
+    // Back at the start, the main buttons at the end. Beside a picture
+    // the row is narrow, so "clarify" takes a row of its own there.
+    final actions = LayoutBuilder(
+      builder: (context, box) {
+        final own = clarify != null && box.maxWidth < 520 ? clarify : null;
+        final inline = own == null ? clarify : null;
+        final row = Row(
           children: [
             back,
             const SizedBox(width: 12),
-            // The buttons shrink to share the row on a narrow card
-            // instead of overflowing it.
             Expanded(
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  if (canClarify) ...[
+                  if (inline != null) ...[
                     Flexible(
                       flex: 5,
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 200),
-                        child: GoldButton(
-                          height: 50,
-                          icon: LucideIcons600.zoomIn,
-                          label: lang.t('وضّح الصورة', 'Wada7 el soora'),
-                          onTap: () => game.advanceStage(questionId),
-                        ),
+                        child: inline,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -577,7 +570,9 @@ class _QuestionView extends StatelessWidget {
                   Flexible(
                     flex: 6,
                     child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 240),
+                      constraints: BoxConstraints(
+                        maxWidth: own == null ? 240 : double.infinity,
+                      ),
                       child: primary,
                     ),
                   ),
@@ -585,8 +580,49 @@ class _QuestionView extends StatelessWidget {
               ),
             ),
           ],
-        ),
+        );
+        if (own == null) return row;
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [own, const SizedBox(height: 10), row],
+        );
+      },
+    );
+
+    final bottom = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (q.kind == QuestionKind.staged) ...[
+          _StageLadder(stages: q.pointStages, stage: p.stage),
+          const SizedBox(height: 12),
+        ],
+        actions,
       ],
+    );
+
+    if (media == null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: q.kind != QuestionKind.acting
+                ? Center(child: prompt)
+                : actingRules
+                ? const _ActingRules()
+                : _ActingLive(prompt: prompt),
+          ),
+          const SizedBox(height: 12),
+          bottom,
+        ],
+      );
+    }
+    return _MediaLayout(
+      aspect: _photoAspect(q),
+      media: media,
+      top: Center(child: prompt),
+      bottom: bottom,
     );
   }
 }
@@ -637,6 +673,9 @@ class _GreenButton extends StatelessWidget {
 }
 
 /// Dark pill: pause/continue, the time left, reset (template 6A).
+/// The answering clock: play / pause, the time left, a bar that drains,
+/// and reset. It turns red for the last ten seconds and says so when the
+/// time is up.
 class _TimerBar extends StatelessWidget {
   const _TimerBar({required this.questionId, required this.disabled});
 
@@ -654,8 +693,12 @@ class _TimerBar extends StatelessWidget {
     final secs = (ms / 1000).ceil();
     final low = running && secs <= 10;
     final elapsed = status == TimerStatus.elapsed;
+    final alert = low || elapsed;
     final time =
         '${(secs ~/ 60).toString().padLeft(2, '0')}:${(secs % 60).toString().padLeft(2, '0')}';
+    // The screen repaints once a second, so a running bar glides towards
+    // where it will be at the next tick.
+    final left = (running ? ms - 1000 : ms) / GameController.answerMs;
 
     Widget round(IconData icon, String label, VoidCallback onTap) => Semantics(
       button: true,
@@ -677,49 +720,118 @@ class _TimerBar extends StatelessWidget {
 
     return Opacity(
       opacity: disabled ? 0.55 : 1,
-      child: Container(
-        padding: const EdgeInsets.all(5),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        height: 48,
+        padding: const EdgeInsets.symmetric(horizontal: 5),
         decoration: BoxDecoration(
-          color: low || elapsed ? AppColors.play : AppColors.deep,
+          color: alert ? AppColors.play : AppColors.deep,
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: AppColors.ivory.withValues(alpha: 0.2)),
+          border: Border.all(
+            color: AppColors.ivory.withValues(alpha: alert ? 0.5 : 0.2),
+            width: 1.5,
+          ),
         ),
         child: Row(
-          mainAxisSize: MainAxisSize.min,
           children: [
             round(
               running ? LucideIcons600.pause : LucideIcons600.play,
               running ? lang.t('وقّف', 'Wa22af') : lang.t('كمّل', 'Kammel'),
               () => game.toggleTimer(questionId),
             ),
-            const SizedBox(width: 12),
-            Semantics(
-              label: elapsed
-                  ? lang.t('خلص الوقت', 'El wa2t kheles')
-                  : lang.t('$secs ثانية', '$secs sanya'),
-              excludeSemantics: true,
-              child: SizedBox(
-                width: 84,
+            const SizedBox(width: 10),
+            Expanded(
+              child: Semantics(
+                label: elapsed
+                    ? lang.t('خلص الوقت', 'El wa2t kheles')
+                    : lang.t('$secs ثانية', '$secs sanya'),
+                excludeSemantics: true,
                 child: elapsed
-                    ? Text(
-                        lang.t('خلص الوقت', 'Kheles'),
-                        textAlign: TextAlign.center,
-                        style: AppText.sans(
-                          15,
-                          weight: FontWeight.w700,
-                          color: Colors.white,
-                          height: 1,
-                        ),
+                    ? Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            LucideIcons600.alarmClock,
+                            size: 20,
+                            color: Colors.white,
+                          ),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              lang.t('خلص الوقت!', 'El wa2t kheles!'),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppText.display(
+                                20,
+                                height: 1.2,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
                       )
-                    : Text(
-                        lang.toAr(time),
-                        textDirection: TextDirection.ltr,
-                        textAlign: TextAlign.center,
-                        style: AppText.num(24, color: Colors.white, height: 1),
+                    : Row(
+                        children: [
+                          SizedBox(
+                            width: 80,
+                            child: Text(
+                              lang.toAr(time),
+                              textDirection: TextDirection.ltr,
+                              textAlign: TextAlign.center,
+                              style: AppText.num(
+                                28,
+                                color: Colors.white,
+                                height: 1,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(999),
+                              child: SizedBox(
+                                height: 10,
+                                child: Stack(
+                                  fit: StackFit.expand,
+                                  children: [
+                                    ColoredBox(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.16,
+                                      ),
+                                    ),
+                                    TweenAnimationBuilder<double>(
+                                      tween: Tween(end: left.clamp(0.0, 1.0)),
+                                      duration: Duration(
+                                        milliseconds: running ? 1000 : 250,
+                                      ),
+                                      builder: (context, v, _) => Align(
+                                        alignment:
+                                            AlignmentDirectional.centerStart,
+                                        child: FractionallySizedBox(
+                                          widthFactor: v,
+                                          heightFactor: 1,
+                                          child: ColoredBox(
+                                            color: alert
+                                                ? Colors.white
+                                                : running
+                                                ? AppColors.gold
+                                                : AppColors.ivory.withValues(
+                                                    alpha: 0.55,
+                                                  ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             round(
               LucideIcons.rotateCcw,
               lang.t('إعادة الوقت', 'E3adet el wa2t'),
@@ -992,8 +1104,8 @@ class _ActingLive extends StatelessWidget {
 
 // ---- 6C staged -------------------------------------------------------------
 
-/// Points ladder: done stages fade, the current one glows, later ones are
-/// locked (template 6C).
+/// Points ladder as a row of steps: done ones fade, the current one
+/// glows, later ones are locked (template 6C).
 class _StageLadder extends StatelessWidget {
   const _StageLadder({required this.stages, required this.stage});
 
@@ -1003,64 +1115,66 @@ class _StageLadder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final lang = context.lang;
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
+    return Row(
       children: [
         for (final (i, points) in stages.indexed) ...[
-          if (i > 0) const SizedBox(height: 8),
-          Semantics(
-            label: lang.t(
-              'الصورة ${i + 1}: $points نقطة',
-              'El soora ${i + 1}: $points no2ta',
-            ),
-            selected: i == stage,
-            excludeSemantics: true,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 220),
-              height: 50,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                color: i == stage
-                    ? AppColors.gold
-                    : Colors.white.withValues(alpha: i < stage ? 0.04 : 0.08),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: i == stage ? AppColors.deep : Colors.transparent,
-                  width: 2,
-                ),
+          if (i > 0) const SizedBox(width: 8),
+          Expanded(
+            child: Semantics(
+              label: lang.t(
+                'الصورة ${i + 1}: $points نقطة',
+                'El soora ${i + 1}: $points no2ta',
               ),
-              child: Row(
-                children: [
-                  Text(
-                    lang.toAr(points),
-                    style:
-                        AppText.num(
-                          22,
-                          height: 1,
-                          color: i == stage
-                              ? AppColors.deep
-                              : AppColors.ivory.withValues(
-                                  alpha: i < stage ? 0.35 : 0.8,
-                                ),
-                        ).copyWith(
-                          decoration: i < stage
-                              ? TextDecoration.lineThrough
-                              : null,
-                        ),
+              selected: i == stage,
+              excludeSemantics: true,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                height: 42,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                decoration: BoxDecoration(
+                  color: i == stage
+                      ? AppColors.gold
+                      : Colors.white.withValues(alpha: i < stage ? 0.04 : 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: i == stage ? AppColors.deep : Colors.transparent,
+                    width: 2,
                   ),
-                  const Spacer(),
-                  Icon(
-                    i < stage
-                        ? LucideIcons.check
-                        : i == stage
-                        ? LucideIcons600.eye
-                        : LucideIcons.lock,
-                    size: 17,
-                    color: i == stage
-                        ? AppColors.deep
-                        : AppColors.ivory.withValues(alpha: 0.5),
-                  ),
-                ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      i < stage
+                          ? LucideIcons.check
+                          : i == stage
+                          ? LucideIcons600.eye
+                          : LucideIcons.lock,
+                      size: 16,
+                      color: i == stage
+                          ? AppColors.deep
+                          : AppColors.ivory.withValues(alpha: 0.5),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      lang.toAr(points),
+                      style:
+                          AppText.num(
+                            20,
+                            height: 1,
+                            color: i == stage
+                                ? AppColors.deep
+                                : AppColors.ivory.withValues(
+                                    alpha: i < stage ? 0.35 : 0.8,
+                                  ),
+                          ).copyWith(
+                            decoration: i < stage
+                                ? TextDecoration.lineThrough
+                                : null,
+                          ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -1171,67 +1285,78 @@ class _AnswerView extends StatelessWidget {
       ),
     );
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Expanded(
-          child: asset == null
-              ? answer
-              : Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(child: answer),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: _Photo(question: q, asset: asset, revealed: true),
-                    ),
-                  ],
-                ),
-        ),
-        const SizedBox(height: 10),
-        Text(
-          lang.t('مين جاوب صح؟', 'Meen gaweb sa7?'),
-          textAlign: TextAlign.center,
-          style: AppText.display(22, height: 1.2),
-        ),
-        const SizedBox(height: 8),
-        Row(
+    final nobody = GlassButton(
+      height: 52,
+      icon: LucideIcons.x,
+      label: lang.t('ولا حد', 'Wala 7ad'),
+      onTap: () => onAward(null),
+    );
+    final backToQuestion = TextButton.icon(
+      onPressed: onBackToQuestion,
+      icon: const Icon(LucideIcons.undo2, size: 16, color: AppColors.gold),
+      label: Text(
+        lang.t('ارجع للسؤال', 'Erga3 lel so2al'),
+        style: AppText.sans(14, weight: FontWeight.w700, color: AppColors.gold),
+      ),
+    );
+
+    // "Who got it?" — both teams, then nobody. Beside a picture the row
+    // is narrow, so "nobody" drops to the line below.
+    final award = LayoutBuilder(
+      builder: (context, box) {
+        final tight = box.maxWidth < 420;
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Expanded(child: teamButton(0)),
-            const SizedBox(width: 10),
-            Expanded(child: teamButton(1)),
-            const SizedBox(width: 10),
-            SizedBox(
-              width: 120,
-              child: GlassButton(
-                height: 52,
-                icon: LucideIcons.x,
-                label: lang.t('ولا حد', 'Wala 7ad'),
-                onTap: () => onAward(null),
-              ),
+            Text(
+              lang.t('مين جاوب صح؟', 'Meen gaweb sa7?'),
+              textAlign: TextAlign.center,
+              style: AppText.display(22, height: 1.2),
             ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(child: teamButton(0)),
+                const SizedBox(width: 10),
+                Expanded(child: teamButton(1)),
+                if (!tight) ...[
+                  const SizedBox(width: 10),
+                  SizedBox(width: 120, child: nobody),
+                ],
+              ],
+            ),
+            const SizedBox(height: 4),
+            if (tight)
+              Row(
+                children: [
+                  Expanded(child: nobody),
+                  const SizedBox(width: 10),
+                  Expanded(child: backToQuestion),
+                ],
+              )
+            else
+              Center(child: backToQuestion),
           ],
-        ),
-        const SizedBox(height: 4),
-        Center(
-          child: TextButton.icon(
-            onPressed: onBackToQuestion,
-            icon: const Icon(
-              LucideIcons.undo2,
-              size: 16,
-              color: AppColors.gold,
-            ),
-            label: Text(
-              lang.t('ارجع للسؤال', 'Erga3 lel so2al'),
-              style: AppText.sans(
-                14,
-                weight: FontWeight.w700,
-                color: AppColors.gold,
-              ),
-            ),
-          ),
-        ),
-      ],
+        );
+      },
+    );
+
+    if (asset == null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(child: answer),
+          const SizedBox(height: 10),
+          award,
+        ],
+      );
+    }
+    return _MediaLayout(
+      aspect: _photoAspect(q),
+      media: _Photo(question: q, asset: asset, revealed: true),
+      top: answer,
+      bottom: award,
     );
   }
 }
@@ -1260,12 +1385,13 @@ class _Photo extends StatelessWidget {
       revealed: revealed,
       fit: full ? BoxFit.contain : null,
     );
-    return Semantics(
-      button: true,
-      label: lang.t('كبّر الصورة', 'Kabbar el soora'),
-      child: GestureDetector(
-        onTap: () => showPhotoViewer(context, (_) => picture(full: true)),
-        child: _Polaroid(
+    return _Framed(
+      aspect: _photoAspect(question),
+      child: Semantics(
+        button: true,
+        label: lang.t('كبّر الصورة', 'Kabbar el soora'),
+        child: GestureDetector(
+          onTap: () => showPhotoViewer(context, (_) => picture(full: true)),
           child: Stack(
             fit: StackFit.expand,
             children: [
@@ -1295,32 +1421,54 @@ class _Photo extends StatelessWidget {
   }
 }
 
-class _Polaroid extends StatelessWidget {
-  const _Polaroid({required this.child});
+/// A cream photo frame, turned a little, sized to a picture of [aspect]
+/// (width / height): it grows as large as its box allows and leaves no
+/// empty bars around the picture.
+class _Framed extends StatelessWidget {
+  const _Framed({required this.aspect, required this.child});
 
+  final double aspect;
   final Widget child;
+
+  static const _pad = 6.0;
 
   @override
   Widget build(BuildContext context) {
-    // Cream frame with a deeper bottom edge, turned a little.
-    return Transform.rotate(
-      angle: -0.015,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(8, 8, 8, 20),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(6),
-          gradient: const LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [AppColors.ivory, AppColors.cream],
+    return LayoutBuilder(
+      builder: (context, box) {
+        var w = math.max(0.0, box.maxWidth - _pad * 2);
+        var h = w / aspect;
+        final maxH = math.max(0.0, box.maxHeight - _pad * 2);
+        if (h > maxH) {
+          h = maxH;
+          w = h * aspect;
+        }
+        return Center(
+          child: Transform.rotate(
+            angle: -0.012,
+            child: Container(
+              width: w + _pad * 2,
+              height: h + _pad * 2,
+              padding: const EdgeInsets.all(_pad),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                gradient: const LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [AppColors.ivory, AppColors.cream],
+                ),
+                boxShadow: [
+                  cssShadow(const Color(0x80000000), y: 12, blur: 26),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: ColoredBox(color: AppColors.deep, child: child),
+              ),
+            ),
           ),
-          boxShadow: [cssShadow(const Color(0x80000000), y: 12, blur: 26)],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(3),
-          child: ColoredBox(color: AppColors.deep, child: child),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -1363,9 +1511,11 @@ class _Picture extends StatelessWidget {
         height: double.infinity,
       );
     }
-    final crop = q.kind == QuestionKind.person && !revealed
+    const none = (0.0, 0.0, 0.0, 0.0);
+    final strip = q.kind == QuestionKind.person
         ? _insets[q.crop ?? PersonCrop.eyes]!
-        : (0.0, 0.0, 0.0, 0.0);
+        : none;
+    final crop = revealed ? none : strip;
     final gray = q.kind == QuestionKind.color && !revealed;
 
     return TweenAnimationBuilder<double>(
@@ -1377,9 +1527,21 @@ class _Picture extends StatelessWidget {
       child: Center(
         child: AspectRatio(
           aspectRatio: 4 / 3,
-          child: _AnimatedInsetClip(
-            insets: crop,
-            child: Image.asset(asset, fit: BoxFit.contain),
+          // Until the reveal the visible strip is zoomed to the frame's
+          // width, around its own centre; then it eases back.
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(end: 1 / (1 - crop.$2 - crop.$4)),
+            duration: const Duration(milliseconds: 700),
+            curve: easeBrand,
+            builder: (context, scale, child) => Transform.scale(
+              scale: scale,
+              alignment: Alignment(strip.$4 - strip.$2, strip.$1 - strip.$3),
+              child: child,
+            ),
+            child: _AnimatedInsetClip(
+              insets: crop,
+              child: Image.asset(asset, fit: BoxFit.contain),
+            ),
           ),
         ),
       ),
@@ -1465,7 +1627,8 @@ class _MemoryMedia extends StatelessWidget {
                   asset: question.image!,
                   revealed: true,
                 )
-              : _Polaroid(
+              : _Framed(
+                  aspect: _photoAspect(question),
                   child: _MemoryPlaceholder(
                     ready: phase == MemoryPhase.ready,
                     onShow: () => game.showMemory(questionId),
