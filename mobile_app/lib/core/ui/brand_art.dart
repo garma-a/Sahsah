@@ -19,7 +19,11 @@ abstract final class BrandImages {
   static const music = 'assets/img/music.webp';
   static const ramadan = 'assets/img/ramadan.webp';
 
-  static String category(String id) => 'assets/img/$id.webp';
+  /// Cover art per category. The acting pack borrows the cinema poster
+  /// until it has its own artwork.
+  static String category(String id) => 'assets/img/${_coverFor[id] ?? id}.webp';
+
+  static const _coverFor = {'acting': 'cinema'};
 }
 
 /// The brand mark: the stacked retro "صح صح" ([RetroLogo]), [size] tall.

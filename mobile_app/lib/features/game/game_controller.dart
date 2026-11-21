@@ -23,6 +23,7 @@ class QuestionProgress {
     this.memory = MemoryPhase.ready,
     this.memoryAsked = false,
     this.resumeOnReopen = false,
+    this.stage = 0,
   });
 
   factory QuestionProgress.fromJson(Map<String, dynamic> j) => QuestionProgress(
@@ -35,6 +36,7 @@ class QuestionProgress {
     memory: MemoryPhase.values.byName(j['memory'] as String),
     memoryAsked: j['memoryAsked'] as bool,
     resumeOnReopen: j['resumeOnReopen'] as bool,
+    stage: j['stage'] as int? ?? 0,
   );
 
   /// Time left at the last start/pause checkpoint.
@@ -50,6 +52,9 @@ class QuestionProgress {
   /// The clock was paused by leaving to the board, not by the host.
   bool resumeOnReopen;
 
+  /// How many times a staged picture has been made clearer (template 6C).
+  int stage;
+
   Map<String, dynamic> toJson() => {
     'remainingMs': remainingMs,
     'status': status.name,
@@ -58,6 +63,7 @@ class QuestionProgress {
     'memory': memory.name,
     'memoryAsked': memoryAsked,
     'resumeOnReopen': resumeOnReopen,
+    'stage': stage,
   };
 }
 
@@ -222,9 +228,11 @@ class GameController extends ChangeNotifier {
     g.activeId = id;
     final p = progressOf(id);
     final q = question(id);
+    // Memory starts on the first hide (Q53); acting starts on Ready (6B).
     if (p.status == TimerStatus.ready &&
         !p.revealed &&
-        q.kind != QuestionKind.memory) {
+        q.kind != QuestionKind.memory &&
+        q.kind != QuestionKind.acting) {
       _run(p, answerMs); // Automatic 60 s clock (Q49).
     } else if (p.resumeOnReopen && p.status == TimerStatus.paused) {
       _run(p, p.remainingMs); // Restore time saved by navigation (Q54).
@@ -288,6 +296,25 @@ class GameController extends ChangeNotifier {
     _commit();
   }
 
+  /// Makes a staged picture clearer; the answer is now worth less (6C).
+  void advanceStage(String id) {
+    final q = question(id);
+    final p = progressOf(id);
+    if (q.kind != QuestionKind.staged ||
+        p.revealed ||
+        p.stage >= q.pointStages.length - 1) {
+      return;
+    }
+    p.stage++;
+    _commit();
+  }
+
+  /// What a correct answer is worth right now.
+  int availablePoints(String id) {
+    final stages = question(id).pointStages;
+    return stages[math.min(progressOf(id).stage, stages.length - 1)];
+  }
+
   void showMemory(String id) {
     progressOf(id).memory = MemoryPhase.viewing;
     _commit();
@@ -309,7 +336,7 @@ class GameController extends ChangeNotifier {
   void award(String id, int? team) {
     final g = _game!;
     if (g.results.containsKey(id)) return;
-    final points = team == null ? 0 : question(id).points;
+    final points = team == null ? 0 : availablePoints(id);
     _stop(progressOf(id));
     g.results[id] = TileResult(team, points);
     if (team != null) g.scores[team] += points;

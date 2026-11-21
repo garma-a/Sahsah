@@ -16,6 +16,14 @@ enum QuestionKind {
 
   /// "ركز معايا": show the picture, hide it, then ask.
   memory,
+
+  /// "مثّلها" (template 6B): one player acts out the hidden answer. The
+  /// timer starts when the host taps Ready, not when the question opens.
+  acting,
+
+  /// "وضّح الصورة" (template 6C): a picture that gets clearer in stages;
+  /// each stage lowers the points the answer is worth.
+  staged,
 }
 
 /// Which strip of a portrait stays visible before the reveal.
@@ -37,6 +45,8 @@ class Question {
     this.imageAlignment = Alignment.center,
     this.crop,
     this.color,
+    this.stages = const [],
+    this.answerImage,
   });
 
   final String categoryId;
@@ -59,9 +69,25 @@ class Question {
   /// Original colour, shown with the answer of colour questions.
   final Color? color;
 
+  /// Staged pictures, blurriest or closest first (staged questions only).
+  final List<String> stages;
+
+  /// The full picture shown with the answer (staged questions).
+  final String? answerImage;
+
   String get id => '$categoryId-$row';
   int get points => tilePoints[row];
 
   /// Picture rounds show the artwork whole (letterboxed) rather than cropped.
   bool get isPictureRound => kind != QuestionKind.standard;
+
+  /// Points available at each stage of a staged question, from the
+  /// prototype's `defaultPointStages`. Other questions have one stage.
+  List<int> get pointStages => kind != QuestionKind.staged
+      ? [points]
+      : switch (points) {
+          600 => const [600, 400, 200],
+          400 => const [400, 250, 150],
+          _ => const [200, 150, 50],
+        };
 }

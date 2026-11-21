@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sahsah_mobile/features/game/game_controller.dart';
+import 'package:sahsah_mobile/features/game/model/question.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const categories = ['cinema', 'music', 'football', 'person', 'color', 'memory'];
@@ -127,8 +128,58 @@ void main() {
     expect(recent.game!.results.keys, ['cinema-0']);
   });
 
+  test('acting (6B): the clock waits for Ready', () {
+    final acting = GameController(now: () => now)
+      ..start(
+        categoryIds: [
+          'acting',
+          'music',
+          'football',
+          'person',
+          'color',
+          'memory',
+        ],
+        teams: ['A', 'B'],
+      );
+    acting.open('acting-2');
+    final p = acting.progressOf('acting-2');
+    expect(acting.question('acting-2').kind, QuestionKind.acting);
+    expect(acting.timerStatus(p), TimerStatus.ready);
+    acting.toggleTimer('acting-2'); // "جاهز"
+    expect(acting.timerStatus(p), TimerStatus.running);
+    expect(acting.remainingMs(p), GameController.answerMs);
+  });
+
+  test('staged (6C): each clearer picture lowers the points', () {
+    // football-0 is a blur picture worth 200 → 150 → 50.
+    expect(game.question('football-0').kind, QuestionKind.staged);
+    game.open('football-0');
+    expect(game.availablePoints('football-0'), 200);
+    game.advanceStage('football-0');
+    expect(game.availablePoints('football-0'), 150);
+    game.advanceStage('football-0');
+    game.advanceStage('football-0'); // Already the clearest: no change.
+    expect(game.availablePoints('football-0'), 50);
+    expect(game.progressOf('football-0').stage, 2);
+
+    // The stage survives a save, and the award uses it.
+    final saved = Game.fromJson(game.game!.toJson());
+    expect(saved.progress['football-0']!.stage, 2);
+    game.reveal('football-0');
+    game.advanceStage('football-0'); // Ignored after the reveal.
+    game.award('football-0', 1);
+    expect(game.game!.scores, [0, 50]);
+  });
+
+  test('other questions have one stage and ignore clarify', () {
+    game.open('cinema-4');
+    game.advanceStage('cinema-4');
+    expect(game.progressOf('cinema-4').stage, 0);
+    expect(game.availablePoints('cinema-4'), 600);
+  });
+
   test('every board slot has a question', () {
-    for (final c in categories) {
+    for (final c in [...categories, 'acting', 'general', 'travel']) {
       for (var r = 0; r < 6; r++) {
         final q = game.question('$c-$r');
         expect(q.prompt, isNotEmpty);
