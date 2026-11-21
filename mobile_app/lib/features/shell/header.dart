@@ -180,7 +180,7 @@ class TokenWallet extends StatelessWidget {
               const SizedBox(width: 10),
               free
                   ? Text(
-                      lang.t('مجاني', 'Magany'),
+                      lang.t('اللعب مجاني', 'El le3b magany'),
                       style: AppText.sans(
                         15,
                         weight: FontWeight.w700,
@@ -193,23 +193,29 @@ class TokenWallet extends StatelessWidget {
                       textDirection: TextDirection.ltr,
                       style: AppText.num(20, height: 1),
                     ),
-              const SizedBox(width: 10),
-              Container(
-                width: 26,
-                height: 26,
-                decoration: BoxDecoration(
-                  color: AppColors.gold.withValues(alpha: 0.18),
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: AppColors.gold.withValues(alpha: 0.5),
+              // "+" (buy more) only when there's a balance to add to; while
+              // play is free it would promise something that isn't there.
+              if (free)
+                const SizedBox(width: 12)
+              else ...[
+                const SizedBox(width: 10),
+                Container(
+                  width: 26,
+                  height: 26,
+                  decoration: BoxDecoration(
+                    color: AppColors.gold.withValues(alpha: 0.18),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: AppColors.gold.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  child: const Icon(
+                    LucideIcons600.plus,
+                    size: 15,
+                    color: AppColors.gold,
                   ),
                 ),
-                child: const Icon(
-                  LucideIcons600.plus,
-                  size: 15,
-                  color: AppColors.gold,
-                ),
-              ),
+              ],
             ],
           ),
         ),
