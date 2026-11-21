@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/brand_background.dart';
+import '../account/account_page.dart';
 import '../categories/categories_page.dart';
+import '../contact/contact_page.dart';
 import '../game/setup_screen.dart';
 import '../home/home_page.dart';
 import '../join/join_sheet.dart';
 import '../more/more_page.dart';
-import '../placeholder/coming_soon_page.dart';
+import '../shop/shop_page.dart';
 import 'app_route.dart';
 import 'bottom_nav.dart';
 import 'header.dart';
@@ -65,7 +67,14 @@ class _AppShellState extends State<AppShell> with TickerProviderStateMixin {
     AppRoute.home => HomePage(tokens: _tokens),
     AppRoute.categories => const CategoriesPage(),
     AppRoute.more => const MorePage(),
-    _ => ComingSoonPage(route: _route),
+    AppRoute.shop => const ShopPage(),
+    AppRoute.gift => const ShopPage(gift: true),
+    AppRoute.account => const AccountPage(),
+    AppRoute.contact => const ContactPage(),
+    AppRoute.experience => const ContactPage(tab: ContactTab.experience),
+    AppRoute.business => const ContactPage(tab: ContactTab.business),
+    // Play opens the game setup over the tabs (see [_go]); never shown.
+    AppRoute.play => const SizedBox.shrink(),
   };
 
   /// Lobby and shelf fill the screen; other pages scroll as a panel.

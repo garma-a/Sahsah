@@ -27,7 +27,13 @@ The backend has no rooms or game endpoints yet, so a game runs **on the host's p
 
 Rules follow `docs/database/gameplay-design.md` (Q49–Q60): timeout never reveals or awards on its own, the 36th answer finishes the game, scores lock at the end. "Whose voice" needs audio playback and is marked coming soon. Questions come from the prototype's content (`lib/data/standard_bank.dart` is generated from `standard-bank.ts`).
 
-Shop, gift, account and contact open a placeholder until their stage is built.
+### Shop, account and contact
+
+These follow the prototype's pages. Payments, sign-in and the support inbox aren't in the backend yet, so each screen works up to its final button, which then explains that the feature is coming and offers to start a game (or open the socials).
+
+- **Shop** (`lib/features/shop/`): "for you" and "gift" tabs, packs of 1, 2 (most popular) and 5 games at 100 EGP a game (the production price in `docs/database/commerce-design.md`), gifts 10% off with the recipient's Egyptian mobile number checked first. Prices and phone rules live in `lib/data/shop.dart`.
+- **Account** (`lib/features/account/`): playing as a guest, sign-in with name and WhatsApp number, and the unfinished game on this phone.
+- **Contact** (`lib/features/contact/`): a problem, feedback (five faces) or business/influencers, each with its own checks, beside the social accounts.
 
 Fonts (Lalezar, Readex Pro, Reem Kufi) are bundled in `assets/fonts/`; images and logos are copied from the prototype into `assets/`. Icons use the same Lucide set as the web.
 
@@ -47,13 +53,17 @@ lib/
   features/categories/            # grid, poster rows, details sheet
   features/join/                  # join-with-code sheet
   features/more/
-  features/placeholder/           # pages not built yet
+  features/shop/                  # token packs and gifts
+  features/account/               # guest, sign-in, your games
+  features/contact/               # support, feedback, business
+  features/shared/                # form fields, choice pills, notice sheet
 docs/mobile-game-design.md
 test/
   sahsah_api_test.dart
   home_test.dart
   game_controller_test.dart       # timer, award, finish, save/expiry rules
   game_flow_test.dart             # setup → board → question → award
+  pages_test.dart                 # shop/phone rules, shop, account, contact
 ```
 
 ## Backend API
