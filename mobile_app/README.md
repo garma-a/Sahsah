@@ -22,6 +22,8 @@ A mobile game lobby laid out as a phone game, first built from the prototype (`.
 - **Sound:** a tick for each of the last ten seconds, a time-up sound, a chime when a team takes the points, a soft note for nobody and a fanfare on the results screen (`lib/core/audio/`). The files in `assets/sfx/` are synthesized placeholders from `tool/make_sfx.py`; a recording with the same name replaces one. Sounds can be turned off under More.
 - **Readability rules:** no text is smaller than 12 px (`test/text_size_test.dart` enforces it). The teams are cyan and yellow everywhere, as on the website, so red only means the main button and the clock's alarm.
 - **Feel:** buttons and cards give press feedback and haptics, screens fade, and system font scaling is capped at 130%.
+- **Motion** (`lib/core/ui/motion.dart`), after the website's keyframes: cards rise 22px and fade in one after another (board packs, pack tiles, shelf and setup posters, the lobby's posters, which settle a little crooked); a picked poster's sticker pops; the answer slab turns up. With the system's animations off, everything simply appears. The lobby's headings are printed strips stuck on at a tilt, like the website's hero.
+- **Contrast:** every text-and-fill pair of the website's look clears WCAG AA, and `test/contrast_test.dart` keeps it so. Small red text on paper uses the deeper press red, since the button red is 4.4:1 there.
 
 ### Playing a game
 

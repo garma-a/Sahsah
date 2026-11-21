@@ -2013,14 +2013,14 @@ class _LeaveDialogState extends State<_LeaveDialog> {
                   icon: const Icon(
                     LucideIcons.undo2,
                     size: 16,
-                    color: AppColors.press,
+                    color: AppColors.pressDeep,
                   ),
                   label: Text(
                     lang.t('لأ، كمّلوا السؤال', 'La2, kammelo el so2al'),
                     style: AppText.sans(
                       14,
                       weight: FontWeight.w700,
-                      color: AppColors.press,
+                      color: AppColors.pressDeep,
                     ),
                   ),
                 ),
