@@ -45,7 +45,7 @@ class SectionHeader extends StatelessWidget {
                         style: AppText.sans(
                           14,
                           weight: FontWeight.w600,
-                          color: AppColors.gold,
+                          color: context.accentText,
                         ),
                       ),
                       const SizedBox(width: 2),
@@ -54,7 +54,7 @@ class SectionHeader extends StatelessWidget {
                             ? LucideIcons.chevronLeft
                             : LucideIcons.chevronRight,
                         size: 18,
-                        color: AppColors.gold,
+                        color: context.accentText,
                       ),
                     ],
                   ),

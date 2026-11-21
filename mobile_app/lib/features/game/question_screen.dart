@@ -272,6 +272,7 @@ class _QuestionScreenState extends State<QuestionScreen> {
         if (!didPop) _leave();
       },
       child: GameScaffold(
+        tv: true,
         child: LayoutBuilder(
           builder: (context, box) {
             final landscape = box.maxWidth > box.maxHeight * 1.1;
@@ -398,16 +399,13 @@ class _QuestionCard extends StatelessWidget {
         Positioned.fill(
           child: Container(
             padding: const EdgeInsets.fromLTRB(16, 22, 16, 14),
-            // The website's TV glass (`.screen-glass`): deep, with an
-            // ink, teal and ink trim.
+            // A card on the TV glass: a shade lighter than the glass, with
+            // an ink outline and drop.
             decoration: BoxDecoration(
-              color: const Color(0xFF151B19),
-              borderRadius: BorderRadius.circular(26),
+              color: const Color(0xFF232B29),
+              borderRadius: BorderRadius.circular(22),
               border: Border.all(color: AppColors.ink, width: 3),
-              boxShadow: const [
-                BoxShadow(color: AppColors.ink, spreadRadius: 6),
-                BoxShadow(color: Color(0xFF4FBDBA), spreadRadius: 3),
-              ],
+              boxShadow: [inkDrop(5)],
             ),
             child: child,
           ),

@@ -19,7 +19,7 @@ class MorePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final lang = context.lang;
     final nav = ShellNav.of(context);
-    final muted = AppColors.ivory.withValues(alpha: 0.6);
+    final muted = context.mutedText;
 
     final title = Text(
       lang.t('المزيد', 'Aktar'),
@@ -117,9 +117,10 @@ class MorePage extends StatelessWidget {
                 child: Container(
                   width: 48,
                   height: 48,
-                  decoration: glassDecoration(
+                  decoration: paperDecoration(
                     shape: BoxShape.circle,
-                    shadow: false,
+                    border: 2.5,
+                    drop: 3,
                   ),
                   alignment: Alignment.center,
                   child: SocialIcon(social, size: 20),
@@ -185,7 +186,11 @@ class _GroupTitle extends StatelessWidget {
       padding: const EdgeInsetsDirectional.fromSTEB(4, 24, 4, 8),
       child: Text(
         text,
-        style: AppText.sans(13, weight: FontWeight.w700, color: AppColors.gold),
+        style: AppText.sans(
+          13,
+          weight: FontWeight.w700,
+          color: context.accentText,
+        ),
       ),
     );
   }

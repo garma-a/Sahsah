@@ -47,7 +47,11 @@ class ShellHeaderDelegate extends SliverPersistentHeaderDelegate {
         child: Container(
           // The sliver hands us loose constraints; fill the whole bar.
           height: headerBarHeight,
-          color: AppColors.deep.withValues(alpha: 0.8),
+          // The website's red header bar, with an ink rule under it.
+          decoration: const BoxDecoration(
+            color: AppColors.press,
+            border: Border(bottom: BorderSide(color: AppColors.ink, width: 3)),
+          ),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(

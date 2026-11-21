@@ -95,6 +95,9 @@ abstract final class AppFonts {
 
 /// Text style helpers. Heights follow Tailwind v4's default line heights so
 /// spacing matches the web build.
+///
+/// Without a [color], text takes the surface's colour from the nearest
+/// [DefaultTextStyle]: cream on dark screens, ink on paper (see `Paper`).
 abstract final class AppText {
   /// Line height Tailwind pairs with each named size.
   static double? _tailwindHeight(double size) => switch (size) {
@@ -111,7 +114,7 @@ abstract final class AppText {
   static TextStyle sans(
     double size, {
     FontWeight weight = FontWeight.w400,
-    Color color = AppColors.ivory,
+    Color? color,
     double? height,
   }) => TextStyle(
     fontFamily: AppFonts.sans,
@@ -122,18 +125,15 @@ abstract final class AppText {
     leadingDistribution: TextLeadingDistribution.even,
   );
 
-  static TextStyle display(
-    double size, {
-    Color color = AppColors.ivory,
-    double? height,
-  }) => TextStyle(
-    fontFamily: AppFonts.display,
-    fontSize: size,
-    fontWeight: FontWeight.w400,
-    color: color,
-    height: height ?? _tailwindHeight(size),
-    leadingDistribution: TextLeadingDistribution.even,
-  );
+  static TextStyle display(double size, {Color? color, double? height}) =>
+      TextStyle(
+        fontFamily: AppFonts.display,
+        fontSize: size,
+        fontWeight: FontWeight.w400,
+        color: color,
+        height: height ?? _tailwindHeight(size),
+        leadingDistribution: TextLeadingDistribution.even,
+      );
 
   /// Numbers in the heading face, as on the website's scores. Lalezar has
   /// one weight, so [weight] only matters to fallback fonts.
@@ -153,18 +153,15 @@ abstract final class AppText {
   );
 
   /// Poster titles, hand-lettered in Rakkas.
-  static TextStyle poster(
-    double size, {
-    Color color = AppColors.ivory,
-    double? height,
-  }) => TextStyle(
-    fontFamily: AppFonts.poster,
-    fontSize: size,
-    fontWeight: FontWeight.w400,
-    color: color,
-    height: height ?? 1.05,
-    leadingDistribution: TextLeadingDistribution.even,
-  );
+  static TextStyle poster(double size, {Color? color, double? height}) =>
+      TextStyle(
+        fontFamily: AppFonts.poster,
+        fontSize: size,
+        fontWeight: FontWeight.w400,
+        color: color,
+        height: height ?? 1.05,
+        leadingDistribution: TextLeadingDistribution.even,
+      );
 }
 
 abstract final class AppTheme {
@@ -185,6 +182,12 @@ abstract final class AppTheme {
       scaffoldBackgroundColor: AppColors.deep,
       splashFactory: NoSplash.splashFactory,
       highlightColor: Colors.transparent,
+      snackBarTheme: SnackBarThemeData(
+        contentTextStyle: TextStyle(
+          fontFamily: AppFonts.sans,
+          color: AppColors.ivory,
+        ),
+      ),
       textSelectionTheme: const TextSelectionThemeData(
         selectionColor: AppColors.gold,
         cursorColor: AppColors.gold,
@@ -198,4 +201,28 @@ abstract final class AppTheme {
       ),
     );
   }
+}
+
+/// The surface a widget sits on, read from the text colour it inherits:
+/// light text means a dark surface, dark text means paper.
+extension SurfaceColors on BuildContext {
+  /// The text colour here.
+  Color get textColor =>
+      DefaultTextStyle.of(this).style.color ?? AppColors.ivory;
+
+  /// True on paper (dark text).
+  bool get onPaper => textColor.computeLuminance() < 0.3;
+
+  /// Secondary text: a little lighter than [textColor], still AA.
+  Color get mutedText =>
+      onPaper ? AppColors.inkMuted : AppColors.ivory.withValues(alpha: 0.72);
+
+  /// The accent for small headings and links: yellow on dark, red on paper
+  /// (yellow on cream fails contrast).
+  Color get accentText => onPaper ? AppColors.press : AppColors.gold;
+
+  /// Hairlines and faint fills.
+  Color get faint => onPaper
+      ? AppColors.ink.withValues(alpha: 0.14)
+      : Colors.white.withValues(alpha: 0.1);
 }

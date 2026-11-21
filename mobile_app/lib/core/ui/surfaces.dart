@@ -79,6 +79,43 @@ BoxDecoration paperDecoration({
   );
 }
 
+/// The website's shelf sheet (`home-view.tsx`): warmer cream paper pinned
+/// to the poster wall, with a chunky ink outline and a bright cyan offset
+/// shadow.
+BoxDecoration sheetDecoration({BorderRadiusGeometry? radius}) => BoxDecoration(
+  borderRadius: radius,
+  color: const Color(0xFFF3E6C8),
+  image: grainImage,
+  border: Border.all(color: AppColors.ink, width: 4),
+  boxShadow: const [BoxShadow(color: AppColors.cyan, offset: Offset(7, 8))],
+);
+
+/// A paper sheet ([sheetDecoration]) whose text defaults to ink.
+class PaperSheet extends StatelessWidget {
+  const PaperSheet({super.key, required this.child, this.radius = 26});
+
+  final Widget child;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    final r = BorderRadius.circular(radius);
+    return DecoratedBox(
+      decoration: sheetDecoration(radius: r),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(radius - 4),
+        child: DefaultTextStyle.merge(
+          style: const TextStyle(color: AppColors.ink),
+          child: IconTheme.merge(
+            data: const IconThemeData(color: AppColors.ink),
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// A dark card (see [glassDecoration]).
 class Glass extends StatelessWidget {
   const Glass({
@@ -108,7 +145,14 @@ class Glass extends StatelessWidget {
         shadow: shadow,
         borderColor: borderColor,
       ),
-      child: Padding(padding: padding ?? EdgeInsets.zero, child: child),
+      // Light text by default, also when the card sits on paper.
+      child: DefaultTextStyle.merge(
+        style: const TextStyle(color: AppColors.ivory),
+        child: IconTheme.merge(
+          data: const IconThemeData(color: AppColors.ivory),
+          child: Padding(padding: padding ?? EdgeInsets.zero, child: child),
+        ),
+      ),
     );
   }
 }

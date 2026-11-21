@@ -119,7 +119,10 @@ class _PlayButtonState extends State<PlayButton> {
               AnimatedPadding(
                 duration: const Duration(milliseconds: 90),
                 curve: easeBrand,
-                padding: EdgeInsets.only(top: sink, bottom: widget.depth - sink),
+                padding: EdgeInsets.only(
+                  top: sink,
+                  bottom: widget.depth - sink,
+                ),
                 child: face,
               ),
             ],

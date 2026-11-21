@@ -30,10 +30,20 @@ abstract final class BrandImages {
 class Logo extends StatelessWidget {
   const Logo({super.key, this.size = 40});
 
+  /// Height of the mark.
   final double size;
 
+  /// The client's retro logo, as the website shows it
+  /// (`public/brand/logo-retro.svg`), turned a little like a sticker.
   @override
-  Widget build(BuildContext context) => RetroLogo(fontSize: size * 0.72);
+  Widget build(BuildContext context) => Transform.rotate(
+    angle: -0.05,
+    child: SvgPicture.asset(
+      'assets/logo/logo-retro.svg',
+      height: size,
+      semanticsLabel: 'صحصح',
+    ),
+  );
 }
 
 /// Decorative arch outline drawn behind the page.
@@ -196,7 +206,11 @@ class Poster extends StatelessWidget {
                 textAlign: TextAlign.center,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: AppText.display(titleSize, height: 1.25),
+                style: AppText.display(
+                  titleSize,
+                  height: 1.25,
+                  color: AppColors.ivory,
+                ),
               ),
             ),
           ],

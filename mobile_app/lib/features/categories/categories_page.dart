@@ -34,10 +34,7 @@ class CategoriesPage extends StatelessWidget {
               '${lang.toAr(allCategories.length)} فئة · اختاروا ${lang.toAr(boardCategories)} للوحة',
               '${allCategories.length} fe2a · ekhtaro $boardCategories lel lo7a',
             ),
-            style: AppText.sans(
-              14,
-              color: AppColors.ivory.withValues(alpha: 0.65),
-            ),
+            style: AppText.sans(14, color: context.mutedText),
           ),
           for (final section in categorySections) ...[
             const SizedBox(height: 24),
@@ -189,7 +186,8 @@ class _SectionTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final lang = context.lang;
-    final color = selected ? AppColors.forest : AppColors.ivory;
+    final paper = context.onPaper;
+    final color = selected || paper ? AppColors.ink : AppColors.ivory;
     return Semantics(
       button: true,
       selected: selected,
@@ -202,9 +200,15 @@ class _SectionTab extends StatelessWidget {
               ? BoxDecoration(
                   color: AppColors.gold,
                   borderRadius: BorderRadius.circular(999),
-                  boxShadow: [
-                    cssShadow(const Color(0x40FFD233), y: 6, blur: 14),
-                  ],
+                  border: Border.all(color: AppColors.ink, width: 2.5),
+                  boxShadow: [inkDrop(3)],
+                )
+              : paper
+              ? paperDecoration(
+                  radius: BorderRadius.circular(999),
+                  color: Colors.white,
+                  border: 2.5,
+                  drop: 0,
                 )
               : glassDecoration(
                   radius: BorderRadius.circular(999),

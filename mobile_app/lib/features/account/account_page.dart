@@ -98,10 +98,7 @@ class _AccountPageState extends State<AccountPage> {
                     ),
                     Text(
                       lang.t('سجّل دخولك عشان:', 'Sagel dokhoolak 3ashan:'),
-                      style: AppText.sans(
-                        13,
-                        color: AppColors.ivory.withValues(alpha: 0.65),
-                      ),
+                      style: AppText.sans(13, color: context.mutedText),
                     ),
                   ],
                 ),
@@ -130,7 +127,7 @@ class _AccountPageState extends State<AccountPage> {
               padding: const EdgeInsets.only(bottom: 6),
               child: Row(
                 children: [
-                  Icon(icon, size: 16, color: AppColors.gold),
+                  Icon(icon, size: 16, color: context.accentText),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -272,10 +269,7 @@ class _YourGames extends StatelessWidget {
                       'مفيش لعبة شغالة. أول لعبة هتظهر هنا.',
                       'Mafeesh le3ba shaghala. Awel le3ba hatezhar hena.',
                     ),
-                    style: AppText.sans(
-                      14,
-                      color: AppColors.ivory.withValues(alpha: 0.65),
-                    ),
+                    style: AppText.sans(14, color: context.mutedText),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -356,10 +350,7 @@ class _GameRow extends StatelessWidget {
                 '${lang.toAr(game.resolvedCount)} من ${lang.toAr(game.totalQuestions)}',
                 '${game.resolvedCount} men ${game.totalQuestions}',
               ),
-              style: AppText.sans(
-                12,
-                color: AppColors.ivory.withValues(alpha: 0.7),
-              ),
+              style: AppText.sans(12, color: context.mutedText),
             ),
           ],
         ),

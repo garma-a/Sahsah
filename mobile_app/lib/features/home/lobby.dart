@@ -132,15 +132,7 @@ class _Stage extends StatelessWidget {
     return Container(
       // The website's shelf sheet: cream paper pinned to the wall with an
       // ink outline and a bright cyan offset shadow.
-      decoration: BoxDecoration(
-        borderRadius: radius,
-        color: const Color(0xFFF3E6C8),
-        image: grainImage,
-        border: Border.all(color: AppColors.ink, width: 4),
-        boxShadow: const [
-          BoxShadow(color: AppColors.cyan, offset: Offset(7, 8)),
-        ],
-      ),
+      decoration: sheetDecoration(radius: radius),
       child: ClipRRect(
         borderRadius: radius,
         child: Stack(
