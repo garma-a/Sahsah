@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../data/categories.dart';
 import '../i18n/lang.dart';
 import '../theme/app_theme.dart';
+import 'category_cover.dart';
 import 'retro.dart';
 
 abstract final class BrandImages {
@@ -115,107 +116,185 @@ class SocialIcon extends StatelessWidget {
   );
 }
 
-/// Category poster: A4-portrait artwork with a gold-ruled title strip.
+/// A category poster on the shelf, after the website (`home/poster.tsx`):
+/// the film-still cover in a frame of its tone colour, with the corner
+/// sticker. Picked posters lift, tilt a little and cast an ink shadow;
+/// coming-soon ones are greyed under a stamp.
 class Poster extends StatelessWidget {
   const Poster({
     super.key,
     required this.category,
-    this.titleSize = 18,
-    this.radius = 18,
+    this.tone,
     this.showNewBadge = true,
+    this.badge = true,
+    this.selected = false,
+    this.order,
+    this.soon = false,
   });
 
   final Category category;
-  final double titleSize;
-  final double radius;
+
+  /// Tone index; derived from the category when null.
+  final int? tone;
 
   /// Shows "جديد" on the new challenge formats.
   final bool showNewBadge;
 
-  /// `min-h-[3.5rem]` (border-box, so it includes the 3px rule).
-  static const stripMinHeight = 56.0;
+  /// The corner sticker ("؟", or green when [selected]).
+  final bool badge;
+  final bool selected;
 
-  /// Space to reserve below the artwork: a two-line title is 3 + 12 + 45,
-  /// plus 2px for text-metric rounding.
-  static const stripMaxHeight = 62.0;
+  /// Place in the pick, shown on the sticker when [selected].
+  final String? order;
+
+  /// Not playable yet: greyed with a "قريبًا" stamp.
+  final bool soon;
+
+  /// Cover proportions (the website's 4:5).
+  static const aspect = 4 / 5;
+
+  /// Room the corner sticker takes beyond the frame.
+  static const badgeRoom = 10.0;
+
+  /// The height a poster of [width] needs, sticker included.
+  static double heightFor(double width) =>
+      (width - badgeRoom) / aspect + badgeRoom;
+
+  /// The width a poster gets in [height], sticker included.
+  static double widthFor(double height) =>
+      (height - badgeRoom) * aspect + badgeRoom;
 
   @override
   Widget build(BuildContext context) {
     final lang = context.lang;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(radius),
-      child: ColoredBox(
-        color: AppColors.poster,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            AspectRatio(
-              aspectRatio: 210 / 297,
-              child: ColoredBox(
-                color: AppColors.card,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    Image.asset(
-                      BrandImages.category(category.id),
-                      fit: BoxFit.cover,
-                    ),
-                    if (showNewBadge && category.isNew)
-                      PositionedDirectional(
-                        top: 8,
-                        start: 8,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.gold,
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Text(
-                            lang.t('جديد', 'Gdeed'),
-                            style: AppText.sans(
-                              12,
-                              weight: FontWeight.w700,
-                              color: AppColors.forest,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
+    final t = tone ?? toneFor(category.id);
+    final frame = AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      decoration: BoxDecoration(
+        color: AppColors.paper,
+        border: Border.all(color: coverBorders[toneOf(t)], width: 4),
+        borderRadius: BorderRadius.circular(4),
+        boxShadow: selected
+            ? [const BoxShadow(color: AppColors.ink, offset: Offset(6, 6))]
+            : const [
+                BoxShadow(
+                  color: Color(0x8C1D2321),
+                  offset: Offset(0, 10),
+                  blurRadius: 14,
+                  spreadRadius: -8,
                 ),
+                BoxShadow(color: Color(0x401D2321), offset: Offset(0, 2)),
+              ],
+      ),
+      child: AspectRatio(
+        aspectRatio: aspect,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            ColorFiltered(
+              colorFilter: soon
+                  ? const ColorFilter.matrix(_greyscale)
+                  : const ColorFilter.mode(Color(0x00000000), BlendMode.dst),
+              child: CategoryCover(
+                image: BrandImages.category(category.id),
+                name: lang.t(category.name, category.nameEn),
+                tone: t,
               ),
             ),
-            Container(
-              constraints: const BoxConstraints(minHeight: stripMinHeight),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.poster,
-                border: Border(
-                  top: BorderSide(
-                    color: AppColors.gold.withValues(alpha: 0.7),
-                    width: 3,
+            if (selected)
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  border: Border.fromBorderSide(
+                    BorderSide(color: Color(0xCC1D2321), width: 3),
                   ),
                 ),
               ),
-              alignment: Alignment.center,
-              child: Text(
-                lang.t(category.name, category.nameEn),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: AppText.display(
-                  titleSize,
-                  height: 1.25,
-                  color: AppColors.ivory,
+            if (soon)
+              ColoredBox(
+                color: AppColors.ink.withValues(alpha: 0.55),
+                child: Center(
+                  child: Transform.rotate(
+                    angle: -0.1,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: AppColors.ivory, width: 3),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        lang.t('قريبًا', '2orayeban'),
+                        style: AppText.display(20, color: AppColors.ivory),
+                      ),
+                    ),
+                  ),
+                ),
+              )
+            else if (showNewBadge && category.isNew)
+              PositionedDirectional(
+                top: 6,
+                start: 6,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 1,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.press,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: AppColors.ink, width: 2),
+                  ),
+                  child: Text(
+                    lang.t('جديد', 'Gdeed'),
+                    style: AppText.sans(
+                      12,
+                      weight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
                 ),
               ),
-            ),
           ],
         ),
       ),
     );
+
+    return Padding(
+      // The sticker hangs off the bottom corner, inside this padding.
+      padding: const EdgeInsetsDirectional.only(
+        end: badgeRoom,
+        bottom: badgeRoom,
+      ),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          AnimatedSlide(
+            duration: const Duration(milliseconds: 200),
+            offset: selected ? const Offset(0, -0.03) : Offset.zero,
+            child: AnimatedRotation(
+              duration: const Duration(milliseconds: 200),
+              turns: selected ? -1 / 360 : 0,
+              child: frame,
+            ),
+          ),
+          if (badge && !soon)
+            PositionedDirectional(
+              end: -badgeRoom,
+              bottom: -badgeRoom,
+              child: PosterBadge(selected: selected, order: order),
+            ),
+        ],
+      ),
+    );
   }
 }
+
+/// Luminance-weighted greyscale.
+const _greyscale = <double>[
+  0.2126, 0.7152, 0.0722, 0, 0, //
+  0.2126, 0.7152, 0.0722, 0, 0, //
+  0.2126, 0.7152, 0.0722, 0, 0, //
+  0, 0, 0, 1, 0,
+];

@@ -486,12 +486,13 @@ class _CategoryStep extends StatelessWidget {
               spacing: gap,
               runSpacing: gap,
               children: [
-                for (final c in section.categories)
+                for (final (t, c) in section.categories.indexed)
                   SizedBox(
                     width: width,
-                    height: width * 297 / 210 + Poster.stripMaxHeight,
+                    height: Poster.heightFor(width),
                     child: _SelectablePoster(
                       category: c,
+                      tone: t,
                       order: selected.indexOf(c.id),
                       full: selected.length == boardCategories,
                       onTap: () => onToggle(c.id),
@@ -561,12 +562,14 @@ class _QuickPick extends StatelessWidget {
 class _SelectablePoster extends StatelessWidget {
   const _SelectablePoster({
     required this.category,
+    required this.tone,
     required this.order,
     required this.full,
     required this.onTap,
   });
 
   final Category category;
+  final int tone;
 
   /// Position in the selection, or -1.
   final int order;
@@ -578,7 +581,6 @@ class _SelectablePoster extends StatelessWidget {
     final lang = context.lang;
     final selected = order >= 0;
     final available = isPlayable(category.id);
-    final dimmed = !available || (full && !selected);
     return Semantics(
       button: true,
       selected: selected,
@@ -587,83 +589,20 @@ class _SelectablePoster extends StatelessWidget {
       excludeSemantics: true,
       child: Pressable(
         onTap: onTap,
+        // Once six are picked the rest rest, as on the website.
         child: AnimatedOpacity(
           duration: const Duration(milliseconds: 160),
-          opacity: dimmed ? 0.4 : 1,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Positioned.fill(
-                child: Align(
-                  alignment: Alignment.topCenter,
-                  child: Poster(
-                    category: category,
-                    titleSize: 14,
-                    radius: 16,
-                    showNewBadge: !selected && available,
-                  ),
-                ),
-              ),
-              // Selection frame drawn over the poster.
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 160),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: selected ? AppColors.gold : Colors.transparent,
-                        width: 3,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              if (selected)
-                PositionedDirectional(
-                  top: 6,
-                  start: 6,
-                  child: Container(
-                    width: 30,
-                    height: 30,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: AppColors.gold,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        cssShadow(const Color(0x66000000), y: 2, blur: 8),
-                      ],
-                    ),
-                    child: Text(
-                      lang.toAr(order + 1),
-                      style: AppText.num(16, color: AppColors.forest),
-                    ),
-                  ),
-                ),
-              if (!available)
-                PositionedDirectional(
-                  top: 6,
-                  start: 6,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.deep.withValues(alpha: 0.85),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      lang.t('قريبًا', '2orayeban'),
-                      style: AppText.sans(
-                        12,
-                        weight: FontWeight.w700,
-                        color: AppColors.gold,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
+          opacity: available && full && !selected ? 0.6 : 1,
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: Poster(
+              category: category,
+              tone: tone,
+              showNewBadge: !selected,
+              selected: selected,
+              order: selected ? lang.toAr(order + 1) : null,
+              soon: !available,
+            ),
           ),
         ),
       ),
