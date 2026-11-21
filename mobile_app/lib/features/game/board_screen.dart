@@ -7,6 +7,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import '../../core/i18n/lang.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/brand_art.dart';
+import '../../core/ui/category_cover.dart';
 import '../../core/ui/pressable.dart';
 import '../../core/ui/surfaces.dart';
 import '../../data/categories.dart';
@@ -772,8 +773,6 @@ class _CategoryCard extends StatelessWidget {
     final lang = context.lang;
     final category = allCategories.firstWhere((c) => c.id == categoryId);
     final slot = game.categoryIds.indexOf(categoryId);
-    final frame =
-        AppColors.categoryColors[slot % AppColors.categoryColors.length];
     final ids = [for (var r = 0; r < tilePoints.length; r++) '$categoryId-$r'];
     final left = ids.where((id) => !game.results.containsKey(id)).length;
     final done = left == 0;
@@ -785,7 +784,7 @@ class _CategoryCard extends StatelessWidget {
               game.progress[id]?.revealed == true,
         );
     final name = lang.t(category.name, category.nameEn);
-    final radius = BorderRadius.circular(18);
+    final winner = done ? _winner(ids) : null;
 
     return Semantics(
       button: !done,
@@ -799,18 +798,28 @@ class _CategoryCard extends StatelessWidget {
       child: Pressable(
         scale: 0.97,
         onTap: done ? null : () => onOpen(categoryId),
+        // The website's board card: the film-still cover in its tone's
+        // frame, a count chip, and a "done" stamp in the winner's colour.
         child: Container(
           decoration: BoxDecoration(
-            borderRadius: radius,
-            border: Border.all(color: frame, width: 3),
-            boxShadow: [cssShadow(const Color(0x66000000), y: 10, blur: 24)],
+            color: AppColors.paper,
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(color: coverBorders[toneOf(slot)], width: 4),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x8C000000),
+                offset: Offset(0, 10),
+                blurRadius: 14,
+                spreadRadius: -8,
+              ),
+            ],
           ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(15),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                ColorFiltered(
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Opacity(
+                opacity: done ? 0.5 : 1,
+                child: ColorFiltered(
                   colorFilter: done
                       ? const ColorFilter.matrix([
                           0.2126, 0.7152, 0.0722, 0, 0, //
@@ -822,77 +831,91 @@ class _CategoryCard extends StatelessWidget {
                           Colors.transparent,
                           BlendMode.dst,
                         ),
-                  child: Image.asset(
-                    BrandImages.category(categoryId),
-                    fit: BoxFit.cover,
-                    alignment: const Alignment(0, -0.35),
+                  child: CategoryCover(
+                    image: BrandImages.category(categoryId),
+                    name: name,
+                    tone: slot,
+                    footInset: 12,
                   ),
                 ),
-                const DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.bottomCenter,
-                      end: Alignment.center,
-                      colors: [Color(0xF02B3230), Color(0x002B3230)],
-                    ),
-                  ),
-                ),
-                if (done)
-                  ColoredBox(color: AppColors.deep.withValues(alpha: 0.45)),
+              ),
+              if (!done)
                 PositionedDirectional(
-                  top: 8,
-                  start: 8,
+                  top: 6,
+                  start: 6,
                   child: _Badge(
-                    color: done ? AppColors.green : AppColors.deep,
-                    ink: Colors.white,
-                    icon: done ? LucideIcons600.check : null,
-                    label: done
-                        ? lang.t('خلصت', 'Khelset')
-                        : lang.t('باقي ${lang.toAr(left)}', 'Ba2y $left'),
-                  ),
-                ),
-                if (open && !done)
-                  PositionedDirectional(
-                    top: 8,
-                    end: 8,
-                    child: _Badge(
-                      color: AppColors.gold,
-                      ink: AppColors.deep,
-                      icon: LucideIcons600.circlePlay,
-                      label: lang.t('سؤال مفتوح', 'So2al maftoo7'),
+                    color: AppColors.paper,
+                    ink: AppColors.ink,
+                    label: lang.t(
+                      '${lang.toAr(left)}/${lang.toAr(ids.length)} باقي',
+                      '$left/${ids.length} ba2y',
                     ),
                   ),
-                Positioned(
-                  left: 10,
-                  right: 10,
-                  bottom: 8,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppText.display(20, height: 1.25),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          for (final (i, id) in ids.indexed) ...[
-                            if (i > 0) const SizedBox(width: 4),
-                            Expanded(child: _Pip(result: game.results[id])),
-                          ],
-                        ],
-                      ),
-                    ],
+                ),
+              if (open && !done)
+                PositionedDirectional(
+                  top: 6,
+                  end: 6,
+                  child: _Badge(
+                    color: AppColors.gold,
+                    ink: AppColors.ink,
+                    icon: LucideIcons600.circlePlay,
+                    label: lang.t('سؤال مفتوح', 'So2al maftoo7'),
                   ),
                 ),
-              ],
-            ),
+              Positioned(
+                left: 8,
+                right: 8,
+                bottom: 7,
+                child: Row(
+                  children: [
+                    for (final (i, id) in ids.indexed) ...[
+                      if (i > 0) const SizedBox(width: 4),
+                      Expanded(child: _Pip(result: game.results[id])),
+                    ],
+                  ],
+                ),
+              ),
+              if (done)
+                Center(
+                  child: Transform.rotate(
+                    angle: -14 * 3.14159 / 180,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: winner == null
+                            ? AppColors.paper
+                            : teamColors[winner],
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.ink, width: 3),
+                        boxShadow: [inkDrop(4)],
+                      ),
+                      child: Text(
+                        lang.t('خلصت', 'Khelset'),
+                        style: AppText.display(26, color: AppColors.ink),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
       ),
     );
+  }
+
+  /// The team that took more of this pack's points, or null on a tie.
+  int? _winner(List<String> ids) {
+    final points = [0, 0];
+    for (final id in ids) {
+      final r = game.results[id];
+      if (r?.team != null) points[r!.team!] += r.points;
+    }
+    if (points[0] == points[1]) return null;
+    return points[0] > points[1] ? 0 : 1;
   }
 }
 
@@ -916,6 +939,7 @@ class _Badge extends StatelessWidget {
       decoration: BoxDecoration(
         color: color,
         borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.ink, width: 2),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

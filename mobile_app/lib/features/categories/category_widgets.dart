@@ -77,7 +77,7 @@ class PosterRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: width * 297 / 210 + Poster.stripMaxHeight,
+      height: Poster.heightFor(width),
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -85,7 +85,7 @@ class PosterRow extends StatelessWidget {
         separatorBuilder: (_, _) => const SizedBox(width: 12),
         itemBuilder: (context, i) => SizedBox(
           width: width,
-          child: CategoryPosterButton(category: categories[i], titleSize: 15),
+          child: CategoryPosterButton(category: categories[i], tone: i),
         ),
       ),
     );
@@ -94,14 +94,12 @@ class PosterRow extends StatelessWidget {
 
 /// A poster that opens the category's details sheet.
 class CategoryPosterButton extends StatelessWidget {
-  const CategoryPosterButton({
-    super.key,
-    required this.category,
-    this.titleSize = 15,
-  });
+  const CategoryPosterButton({super.key, required this.category, this.tone});
 
   final Category category;
-  final double titleSize;
+
+  /// Tone index on the shelf; derived from the category when null.
+  final int? tone;
 
   @override
   Widget build(BuildContext context) {
@@ -114,7 +112,7 @@ class CategoryPosterButton extends StatelessWidget {
         onTap: () => showCategorySheet(context, category),
         child: Align(
           alignment: Alignment.topCenter,
-          child: Poster(category: category, titleSize: titleSize, radius: 16),
+          child: Poster(category: category, tone: tone),
         ),
       ),
     );

@@ -53,13 +53,13 @@ class CategoriesPage extends StatelessWidget {
                   spacing: gap,
                   runSpacing: gap,
                   children: [
-                    for (final category in section.categories)
+                    for (final (i, category) in section.categories.indexed)
                       SizedBox(
                         width: width,
-                        height: width * 297 / 210 + Poster.stripMaxHeight,
+                        height: Poster.heightFor(width),
                         child: CategoryPosterButton(
                           category: category,
-                          titleSize: 14,
+                          tone: i,
                         ),
                       ),
                   ],
@@ -144,7 +144,7 @@ class _ShelfState extends State<_Shelf> {
       builder: (context, box) {
         // Posters as tall as the space allows.
         final height = box.maxHeight;
-        final width = (height - Poster.stripMaxHeight) * 210 / 297;
+        final width = Poster.widthFor(height);
         return AnimatedSwitcher(
           duration: const Duration(milliseconds: 200),
           child: ListView.separated(
@@ -160,7 +160,7 @@ class _ShelfState extends State<_Shelf> {
               height: height,
               child: CategoryPosterButton(
                 category: section.categories[i],
-                titleSize: 15,
+                tone: i,
               ),
             ),
           ),
