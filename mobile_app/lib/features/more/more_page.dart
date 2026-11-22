@@ -110,22 +110,22 @@ class MorePage extends StatelessWidget {
         children: [
           for (final social in Social.values) ...[
             if (social != Social.values.first) const SizedBox(width: 10),
-            Semantics(
+            // One named link: a label wrapped around the button split
+            // them, so a screen reader could read it but not open it.
+            Pressable(
+              semanticLabel: social.label,
               link: true,
-              label: social.label,
-              child: Pressable(
-                onTap: () => openExternal(social.url),
-                child: Container(
-                  width: 48,
-                  height: 48,
-                  decoration: paperDecoration(
-                    shape: BoxShape.circle,
-                    border: 2.5,
-                    drop: 3,
-                  ),
-                  alignment: Alignment.center,
-                  child: SocialIcon(social, size: 20),
+              onTap: () => openExternal(social.url),
+              child: Container(
+                width: 48,
+                height: 48,
+                decoration: paperDecoration(
+                  shape: BoxShape.circle,
+                  border: 2.5,
+                  drop: 3,
                 ),
+                alignment: Alignment.center,
+                child: SocialIcon(social, size: 20),
               ),
             ),
           ],
@@ -412,10 +412,13 @@ class _SoundRow extends StatelessWidget {
           children: [
             _RowIcon(sound.enabled ? LucideIcons.volume2 : LucideIcons.volumeX),
             const SizedBox(width: 14),
+            // The switch carries the name; read once, not twice.
             Expanded(
-              child: Text(
-                lang.t('أصوات اللعبة', 'Aswat el le3ba'),
-                style: AppText.sans(16, weight: FontWeight.w600),
+              child: ExcludeSemantics(
+                child: Text(
+                  lang.t('أصوات اللعبة', 'Aswat el le3ba'),
+                  style: AppText.sans(16, weight: FontWeight.w600),
+                ),
               ),
             ),
             Semantics(

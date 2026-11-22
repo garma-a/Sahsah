@@ -15,6 +15,7 @@ class Pressable extends StatefulWidget {
     this.scale = 0.96,
     this.semanticLabel,
     this.selected,
+    this.link = false,
   });
 
   final Widget child;
@@ -30,6 +31,9 @@ class Pressable extends StatefulWidget {
 
   /// For a choice among several: whether this one is picked.
   final bool? selected;
+
+  /// Announced as a link (it leaves the app), not a button.
+  final bool link;
 
   @override
   State<Pressable> createState() => _PressableState();
@@ -69,7 +73,8 @@ class _PressableState extends State<Pressable> {
     if (label == null) return pressable;
     return Semantics(
       container: true,
-      button: true,
+      button: !widget.link,
+      link: widget.link,
       enabled: tap != null,
       selected: widget.selected,
       label: label,

@@ -8,6 +8,7 @@ import 'core/audio/sound.dart';
 import 'core/i18n/lang.dart';
 import 'core/theme/app_theme.dart';
 import 'core/ui/orientation.dart';
+import 'core/ui/tablet_scale.dart';
 import 'features/game/game_controller.dart';
 import 'features/shell/app_shell.dart';
 
@@ -86,11 +87,13 @@ class _SahsahAppState extends State<SahsahApp> {
                   localizationsDelegates: GlobalMaterialLocalizations.delegates,
                   theme: AppTheme.dark(),
                   // Respect large system fonts, but cap them so game layouts hold.
-                  builder: (context, child) =>
-                      MediaQuery.withClampedTextScaling(
-                        maxScaleFactor: 1.3,
-                        child: child!,
-                      ),
+                  // On a tablet, the phone's game scaled up to fill it.
+                  builder: (context, child) => TabletScale(
+                    child: MediaQuery.withClampedTextScaling(
+                      maxScaleFactor: 1.3,
+                      child: child!,
+                    ),
+                  ),
                   home: AppShell(launchPromo: widget.launchPromo),
                 ),
               ),

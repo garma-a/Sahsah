@@ -298,15 +298,29 @@ class _Rating extends StatelessWidget {
 
   static const _faces = ['😕', '😐', '🙂', '😄', '🤩'];
 
+  /// What each face says, for screen readers.
+  static const _moods = [
+    ('وحشة', 'we7sha'),
+    ('مش أوي', 'mesh awy'),
+    ('حلوة', '7elwa'),
+    ('حلوة أوي', '7elwa awy'),
+    ('تحفة', 'to7fa'),
+  ];
+
   @override
   Widget build(BuildContext context) {
+    final lang = context.lang;
     return Row(
       children: [
         for (final (i, face) in _faces.indexed) ...[
           if (i > 0) const SizedBox(width: 8),
           Expanded(
             child: Pressable(
-              semanticLabel: '${i + 1}/5',
+              // "٢ من ٥، مش أوي", not "2/5".
+              semanticLabel: lang.t(
+                '${lang.toAr(i + 1)} من ٥، ${_moods[i].$1}',
+                '${i + 1} men 5, ${_moods[i].$2}',
+              ),
               selected: value == i + 1,
               onTap: () => onChanged(i + 1),
               child: AnimatedContainer(
@@ -385,46 +399,66 @@ class _ReachUs extends StatelessWidget {
                       color: AppColors.ivory,
                     ),
                   ),
-                  Text(
-                    lang.t(
-                      'كل رسالة بتوصل لفريق صح صح.',
-                      'Kol resala btewsal le team Sa7Sa7.',
-                    ),
-                    style: AppText.sans(
-                      13,
-                      color: AppColors.ivory.withValues(alpha: 0.75),
+                  // Sending isn't open yet (the form says so), so this points
+                  // at the icons just below instead of promising. It gives
+                  // up lines first when the panel is short.
+                  Flexible(
+                    child: Text(
+                      lang.t(
+                        'لحد ما صندوق الرسايل يشتغل، كلمنا على السوشيال.',
+                        'Le7ad ma sandoo2 el rasayel yeshtaghal, kallemna 3al social.',
+                      ),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppText.sans(
+                        13,
+                        color: AppColors.ivory.withValues(alpha: 0.75),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      for (final social in Social.values) ...[
-                        if (social != Social.values.first)
-                          const SizedBox(width: 8),
-                        Semantics(
-                          link: true,
-                          label: social.label,
-                          child: Pressable(
-                            onTap: () => openExternal(social.url),
-                            child: Container(
-                              width: 42,
-                              height: 42,
-                              alignment: Alignment.center,
-                              decoration: paperDecoration(
-                                shape: BoxShape.circle,
-                                border: 2.5,
-                                drop: 3,
+                  // Full 48px circles; the gaps give way first on a narrow panel.
+                  LayoutBuilder(
+                    builder: (context, box) {
+                      final gap =
+                          ((box.maxWidth - Social.values.length * 48) /
+                                  (Social.values.length - 1))
+                              .clamp(0.0, 8.0);
+                      return FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: AlignmentDirectional.centerStart,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            for (final social in Social.values) ...[
+                              if (social != Social.values.first)
+                                SizedBox(width: gap),
+                              // One named link, a full 48px target.
+                              Pressable(
+                                semanticLabel: social.label,
+                                link: true,
+                                onTap: () => openExternal(social.url),
+                                child: Container(
+                                  width: 48,
+                                  height: 48,
+                                  alignment: Alignment.center,
+                                  decoration: paperDecoration(
+                                    shape: BoxShape.circle,
+                                    border: 2.5,
+                                    drop: 3,
+                                  ),
+                                  child: SocialIcon(
+                                    social,
+                                    size: 20,
+                                    color: AppColors.ink,
+                                  ),
+                                ),
                               ),
-                              child: SocialIcon(
-                                social,
-                                size: 18,
-                                color: AppColors.ink,
-                              ),
-                            ),
-                          ),
+                            ],
+                          ],
                         ),
-                      ],
-                    ],
+                      );
+                    },
                   ),
                 ],
               ),
