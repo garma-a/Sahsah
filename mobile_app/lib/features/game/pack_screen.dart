@@ -24,6 +24,10 @@ class PackScreen extends StatelessWidget {
 
   final String categoryId;
 
+  /// The side panel (landscape), where the award's confirmation sits so
+  /// it doesn't cover the tiles. One pack screen is open at a time.
+  static final coverKey = GlobalKey(debugLabel: 'pack-cover');
+
   Future<void> _play(BuildContext context, String id) async {
     await playQuestion(context, id);
     if (!context.mounted) return;
@@ -137,6 +141,7 @@ class PackScreen extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             SizedBox(
+                              key: coverKey,
                               width: box.maxWidth * 0.3,
                               child: _PackCover(
                                 category: category,
@@ -313,6 +318,14 @@ class _QuestionGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // A format chip on each tile only says something when the pack mixes
+    // formats; otherwise the side panel already names it, once.
+    final mixed =
+        {
+          for (var i = 0; i < tilePoints.length; i++)
+            context.game.question('$categoryId-$i').kind,
+        }.length >
+        1;
     return Column(
       children: [
         for (var level = 0; level < 3; level++) ...[
@@ -334,6 +347,7 @@ class _QuestionGrid extends StatelessWidget {
                               game.categoryIds.indexOf(categoryId),
                             )],
                         game: game,
+                        showFormat: mixed,
                         onPlay: onPlay,
                       ),
                     ),
@@ -354,8 +368,12 @@ class _QuestionTile extends StatelessWidget {
     required this.number,
     required this.fill,
     required this.game,
+    required this.showFormat,
     required this.onPlay,
   });
+
+  /// Whether to show the question's format (packs that mix formats).
+  final bool showFormat;
 
   /// The category's tile colour.
   final Color fill;
@@ -519,7 +537,7 @@ class _QuestionTile extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(points, style: AppText.num(34, color: ink, height: 1)),
-                ...[
+                if (started || showFormat) ...[
                   const SizedBox(width: 10),
                   Container(
                     padding: const EdgeInsets.symmetric(

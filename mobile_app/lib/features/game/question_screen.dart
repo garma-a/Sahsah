@@ -17,6 +17,7 @@ import '../../data/categories.dart';
 import 'board_screen.dart' show TeamScore;
 import 'game_controller.dart';
 import 'model/question.dart';
+import 'pack_screen.dart' show PackScreen;
 import 'ui/fit_text.dart';
 import 'ui/game_ui.dart';
 import 'ui/photo_viewer.dart';
@@ -156,13 +157,28 @@ class _QuestionScreenState extends State<QuestionScreen> {
     // A wrong tap can be taken back for a few seconds (not on the tile
     // that ends the game: its scores lock).
     final undoable = game.canUndoAward;
+    // Over the foot of the pack's side panel, clear of the tiles; centred
+    // at the bottom if the pack has no side panel (portrait).
+    final screen = MediaQuery.sizeOf(context);
+    final panel = PackScreen.coverKey.currentContext?.findRenderObject();
+    final Rect? over = panel is RenderBox && panel.hasSize
+        ? panel.localToGlobal(Offset.zero) & panel.size
+        : null;
     navigator.pop();
     messenger
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
-          width: 460,
+          width: over == null ? 460 : null,
+          margin: over == null
+              ? null
+              : EdgeInsets.fromLTRB(
+                  over.left + 8,
+                  0,
+                  screen.width - over.right + 8,
+                  screen.height - over.bottom + 8,
+                ),
           persist: false,
           duration: Duration(seconds: undoable ? 4 : 2),
           backgroundColor: team == null ? AppColors.ui : teamColors[team],
@@ -170,15 +186,23 @@ class _QuestionScreenState extends State<QuestionScreen> {
             borderRadius: BorderRadius.circular(14),
             side: const BorderSide(color: AppColors.ink, width: 3),
           ),
-          padding: const EdgeInsetsDirectional.fromSTEB(16, 6, 8, 6),
-          content: Row(
+          padding: const EdgeInsetsDirectional.fromSTEB(14, 8, 10, 8),
+          // Narrow over the panel: the words, then the undo under them.
+          content: Flex(
+            direction: over == null ? Axis.horizontal : Axis.vertical,
+            crossAxisAlignment: over == null
+                ? CrossAxisAlignment.center
+                : CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Expanded(
+              Flexible(
+                fit: over == null ? FlexFit.tight : FlexFit.loose,
                 child: Text(
                   message,
                   style: AppText.sans(15, weight: FontWeight.w700, color: ink),
                 ),
               ),
+              if (undoable && over != null) const SizedBox(height: 6),
               if (undoable)
                 TextButton.icon(
                   key: const ValueKey('award-undo'),
@@ -500,7 +524,8 @@ class _QuestionView extends StatelessWidget {
       style: (size) => AppText.display(
         size,
         height: 1.35,
-        color: context.textColor.withValues(alpha: memoryWaiting ? 0.6 : 1),
+        // An instruction, not a disabled line: full ink.
+        color: context.textColor,
       ),
     );
 
@@ -548,11 +573,21 @@ class _QuestionView extends StatelessWidget {
         label: lang.t('جاهز', 'Gahez'),
         onTap: () => game.toggleTimer(questionId),
       );
+    } else if (memoryWaiting) {
+      // Nothing to reveal yet: say when the answer comes, rather than show
+      // a faded button with no reason.
+      primary = _Hint(
+        icon: LucideIcons600.eyeOff,
+        label: lang.t(
+          'الإجابة بتظهر بعد السؤال',
+          'El egaba btezhar ba3d el so2al',
+        ),
+      );
     } else {
       primary = _GreenButton(
         icon: LucideIcons600.eye,
         label: lang.t('إظهار الإجابة', 'Ezhar el egaba'),
-        onTap: memoryWaiting ? null : () => game.reveal(questionId),
+        onTap: () => game.reveal(questionId),
       );
     }
 
@@ -697,6 +732,50 @@ class _GreenButton extends StatelessWidget {
 /// The answering clock: play / pause, the time left, a bar that drains,
 /// and reset. It turns red for the last ten seconds and says so when the
 /// time is up.
+/// Where a button will be once it means something: a dashed-feeling ink
+/// outline with the reason, not a faded button.
+class _Hint extends StatelessWidget {
+  const _Hint({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 50,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.ink.withValues(alpha: 0.35),
+          width: 2,
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 18, color: AppColors.inkMuted),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: AppText.sans(
+                14,
+                weight: FontWeight.w700,
+                color: AppColors.inkMuted,
+                height: 1.2,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _TimerBar extends StatelessWidget {
   const _TimerBar({required this.questionId, required this.disabled});
 
@@ -720,20 +799,28 @@ class _TimerBar extends StatelessWidget {
     // where it will be at the next tick.
     final left = (running ? ms - 1000 : ms) / GameController.answerMs;
 
+    // A 48×48 target (the platforms' minimum) around a 38px button, so a
+    // hurried thumb mid-game still lands.
     Widget round(IconData icon, String label, VoidCallback onTap) => Pressable(
       semanticLabel: label,
       onTap: disabled ? null : onTap,
-      child: Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          color: elapsed ? Colors.white : AppColors.ink,
-          shape: BoxShape.circle,
-        ),
-        child: Icon(
-          icon,
-          size: 17,
-          color: elapsed ? AppColors.ink : Colors.white,
+      child: SizedBox(
+        width: 48,
+        height: 48,
+        child: Center(
+          child: Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: elapsed ? Colors.white : AppColors.ink,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              icon,
+              size: 19,
+              color: elapsed ? AppColors.ink : Colors.white,
+            ),
+          ),
         ),
       ),
     );
@@ -743,15 +830,19 @@ class _TimerBar extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 250),
         height: 48,
-        padding: const EdgeInsets.symmetric(horizontal: 5),
         // The website's timer: a white face with an ink edge and drop;
         // the bar is cyan, amber when paused and red for the last ten
         // seconds, and the whole face turns red when time is up.
         decoration: BoxDecoration(
           color: elapsed ? AppColors.press : Colors.white,
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: AppColors.ink, width: 3),
           boxShadow: [inkDrop(4)],
+        ),
+        // The edge is painted over the face, not around it, so the
+        // buttons keep their full 48px targets in a 48px bar.
+        foregroundDecoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: AppColors.ink, width: 3),
         ),
         child: Row(
           children: [

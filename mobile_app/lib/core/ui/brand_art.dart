@@ -199,6 +199,8 @@ class Poster extends StatelessWidget {
                 image: BrandImages.category(category.id),
                 name: lang.t(category.name, category.nameEn),
                 tone: t,
+                // The title sits clear of the corner sticker.
+                footInset: badge && !soon ? 36 - badgeRoom : 0,
               ),
             ),
             if (selected)
