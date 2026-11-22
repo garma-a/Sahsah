@@ -153,8 +153,11 @@ void main() {
     expect(find.text('ادخل بكود'), findsOneWidget);
     expect(find.text('ضيف'), findsOneWidget);
 
-    // The banners turn on their own: free play, then how to play, whose
-    // button opens the steps.
+    // The banners turn on their own: the gift discount, free play, then
+    // how to play, whose button opens the steps.
+    await tester.pump(PromoCarousel.interval);
+    await settle(tester);
+    expect(find.text('خصم ٢٠٪ على كل الهدايا'), findsOneWidget);
     await tester.pump(PromoCarousel.interval);
     await settle(tester);
     expect(find.text('العبوا ببلاش'), findsOneWidget);
@@ -203,6 +206,19 @@ void main() {
     await settle(tester);
     expect(popup, findsNothing);
     expect(find.text('مصر وتراثها'), findsOneWidget);
+  });
+
+  testWidgets('with a screen reader on, the banners hold still', (
+    tester,
+  ) async {
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        const FakeAccessibilityFeatures(accessibleNavigation: true);
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+    await pumpApp(tester, size: const Size(892, 412));
+    expect(find.text('تحديات جديدة للشلة'), findsOneWidget);
+    await tester.pump(PromoCarousel.interval * 2);
+    await settle(tester);
+    expect(find.text('تحديات جديدة للشلة'), findsOneWidget);
   });
 
   testWidgets('the launch pop-up closes and stays closed', (tester) async {

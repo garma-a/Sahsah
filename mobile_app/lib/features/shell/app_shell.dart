@@ -60,6 +60,8 @@ class _AppShellState extends State<AppShell> with TickerProviderStateMixin {
     switch (chosen.action) {
       case PromoAction.newPack:
         _go(AppRoute.categories);
+      case PromoAction.gifts:
+        _go(AppRoute.gift);
       case PromoAction.play:
         _go(AppRoute.play);
       case PromoAction.howTo:
