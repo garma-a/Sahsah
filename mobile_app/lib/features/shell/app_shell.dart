@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 
+import '../../core/i18n/lang.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/brand_background.dart';
 import '../../core/ui/surfaces.dart';
+import '../../data/promos.dart';
 import '../account/account_page.dart';
 import '../categories/categories_page.dart';
 import '../contact/contact_page.dart';
 import '../game/setup_screen.dart';
 import '../home/home_page.dart';
+import '../home/promo_banner.dart';
 import '../join/join_sheet.dart';
 import '../more/more_page.dart';
 import '../shop/shop_page.dart';
@@ -20,7 +23,11 @@ import 'hud.dart';
 /// lobby or the current screen. Portrait fallback: floating top bar, the
 /// scrolling page and the floating bottom bar. See `docs/mobile-game-design.md`.
 class AppShell extends StatefulWidget {
-  const AppShell({super.key});
+  const AppShell({super.key, this.launchPromo = false});
+
+  /// Pops up the featured promo once the lobby shows (`main` turns it on;
+  /// tests leave it off so it doesn't cover what they tap).
+  final bool launchPromo;
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -32,6 +39,33 @@ class _AppShellState extends State<AppShell> with TickerProviderStateMixin {
 
   /// Local balance until the backend exposes accounts and tokens.
   final int _tokens = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.launchPromo) {
+      // Once per launch, a moment after the lobby has come in.
+      Future.delayed(const Duration(milliseconds: 700), _showLaunchPromo);
+    }
+  }
+
+  Future<void> _showLaunchPromo() async {
+    if (!mounted || _route != AppRoute.home) return;
+    // Not over a game, the setup or another sheet.
+    if (ModalRoute.of(context)?.isCurrent != true) return;
+    final promo = homePromos(context.lang).where((p) => p.popup).firstOrNull;
+    if (promo == null) return;
+    final chosen = await showPromoPopup(context, promo);
+    if (!mounted || chosen == null) return;
+    switch (chosen.action) {
+      case PromoAction.newPack:
+        _go(AppRoute.categories);
+      case PromoAction.play:
+        _go(AppRoute.play);
+      case PromoAction.howTo:
+        break; // The lobby's banner shows the steps.
+    }
+  }
 
   @override
   void dispose() {

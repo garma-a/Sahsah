@@ -67,6 +67,7 @@ class _PressableState extends State<Pressable> {
     final label = widget.semanticLabel;
     if (label == null) return pressable;
     return Semantics(
+      container: true,
       button: true,
       enabled: tap != null,
       selected: widget.selected,

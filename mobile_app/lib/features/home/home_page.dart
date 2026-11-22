@@ -7,19 +7,19 @@ import 'package:lucide_icons_flutter/lucide_icons_600.dart';
 import '../../core/i18n/lang.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/brand_art.dart';
-import '../../core/ui/category_cover.dart';
 import '../../core/ui/game_button.dart';
 import '../../core/ui/motion.dart';
 import '../../core/ui/play_button.dart';
 import '../../core/ui/pressable.dart';
-import '../../core/ui/retro.dart';
 import '../../core/ui/surfaces.dart';
 import '../../data/categories.dart';
+import '../../data/promos.dart';
 import '../categories/category_widgets.dart';
 import '../game/board_screen.dart';
 import '../game/game_controller.dart';
 import '../game/ui/game_ui.dart';
 import '../shell/app_route.dart';
+import 'promo_banner.dart';
 
 part 'lobby.dart';
 
