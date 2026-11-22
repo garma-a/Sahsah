@@ -15,12 +15,22 @@ class SahsahApp extends StatefulWidget {
   /// [lang], [game], [api] and [sound] can be injected (tests); otherwise
   /// defaults are created. The default [sound] is silent: `main` passes the
   /// one that plays through the phone.
-  const SahsahApp({super.key, this.lang, this.game, this.api, this.sound});
+  const SahsahApp({
+    super.key,
+    this.lang,
+    this.game,
+    this.api,
+    this.sound,
+    this.launchPromo = false,
+  });
 
   final LangController? lang;
   final GameController? game;
   final SahsahApi? api;
   final SoundController? sound;
+
+  /// Pop up the featured promo when the app opens (`main` turns it on).
+  final bool launchPromo;
 
   @override
   State<SahsahApp> createState() => _SahsahAppState();
@@ -81,7 +91,7 @@ class _SahsahAppState extends State<SahsahApp> {
                         maxScaleFactor: 1.3,
                         child: child!,
                       ),
-                  home: const AppShell(),
+                  home: AppShell(launchPromo: widget.launchPromo),
                 ),
               ),
             ),

@@ -14,5 +14,5 @@ Future<void> main() async {
     await GameController.load(),
     await SoundController.load(DeviceSound()),
   );
-  runApp(SahsahApp(lang: lang, game: game, sound: sound));
+  runApp(SahsahApp(lang: lang, game: game, sound: sound, launchPromo: true));
 }

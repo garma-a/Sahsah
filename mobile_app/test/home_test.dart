@@ -5,12 +5,14 @@ import 'package:http/testing.dart';
 import 'package:sahsah_mobile/app.dart';
 import 'package:sahsah_mobile/core/api/sahsah_api.dart';
 import 'package:sahsah_mobile/core/i18n/lang.dart';
+import 'package:sahsah_mobile/features/home/promo_banner.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 Future<void> pumpApp(
   WidgetTester tester, {
   Lang lang = Lang.ar,
   Size size = const Size(412, 892),
+  bool launchPromo = false,
 }) async {
   // A phone-sized screen (portrait fallback unless a landscape size is given).
   tester.view.physicalSize = size * 3;
@@ -23,6 +25,7 @@ Future<void> pumpApp(
         baseUrl: 'http://example.test/api',
         client: MockClient((_) async => http.Response('{}', 200)),
       ),
+      launchPromo: launchPromo,
     ),
   );
   await settle(tester);
@@ -142,14 +145,24 @@ void main() {
     // (left in Arabic), menu tiles at the start side.
     expect(find.byType(CustomScrollView), findsNothing);
     final play = tester.getCenter(find.text('ابدأ لعبة'));
-    final title = tester.getCenter(find.text('يلا نلعب؟'));
+    // The stage is a banner carousel, opening on the new challenges.
+    final title = tester.getCenter(find.text('تحديات جديدة للشلة'));
     final menu = tester.getCenter(find.text('الفئات'));
     expect(play.dx, lessThan(title.dx));
     expect(menu.dx, greaterThan(title.dx));
     expect(find.text('ادخل بكود'), findsOneWidget);
     expect(find.text('ضيف'), findsOneWidget);
 
-    // Help pop-up.
+    // The banners turn on their own: free play, then how to play, whose
+    // button opens the steps.
+    await tester.pump(PromoCarousel.interval);
+    await settle(tester);
+    expect(find.text('العبوا ببلاش'), findsOneWidget);
+    await tester.pump(PromoCarousel.interval);
+    await settle(tester);
+    // Let the slide finish: a page ignores taps while it moves.
+    await settle(tester);
+    expect(find.text('أول مرة تلعبوا؟'), findsOneWidget);
     await tester.tap(find.bySemanticsLabel('إزاي نلعب؟'));
     await settle(tester);
     expect(find.text('سمّوا الفريقين'), findsOneWidget);
@@ -172,5 +185,41 @@ void main() {
 
     await tapText(tester, 'ادخل بكود');
     expect(find.text('ادخل اللعبة بالكود'), findsOneWidget);
+  });
+
+  testWidgets('opening the app pops up the new challenges once', (
+    tester,
+  ) async {
+    await pumpApp(tester, size: const Size(892, 412), launchPromo: true);
+    await tester.pump(const Duration(milliseconds: 700));
+    await settle(tester);
+    final popup = find.byKey(const ValueKey('promo-popup'));
+    expect(popup, findsOneWidget);
+
+    // Its button goes to the categories, where the new section comes first.
+    await tester.tap(
+      find.descendant(of: popup, matching: find.bySemanticsLabel('شوفوها')),
+    );
+    await settle(tester);
+    expect(popup, findsNothing);
+    expect(find.text('مصر وتراثها'), findsOneWidget);
+  });
+
+  testWidgets('the launch pop-up closes and stays closed', (tester) async {
+    await pumpApp(tester, size: const Size(892, 412), launchPromo: true);
+    await tester.pump(const Duration(milliseconds: 700));
+    await settle(tester);
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const ValueKey('promo-popup')),
+        matching: find.bySemanticsLabel('اقفل'),
+      ),
+    );
+    await settle(tester);
+    expect(find.byKey(const ValueKey('promo-popup')), findsNothing);
+    // The lobby is back, and nothing pops up again.
+    await tester.pump(const Duration(seconds: 3));
+    expect(find.byKey(const ValueKey('promo-popup')), findsNothing);
+    expect(find.text('ادخل بكود'), findsOneWidget);
   });
 }

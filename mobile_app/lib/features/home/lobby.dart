@@ -31,13 +31,17 @@ class _Lobby extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
+    // The stage's cyan shadow juts 7px to the right, so that side gets the
+    // shadow's width on top of the gap: both sides then read as 14px.
+    final rtl = Directionality.of(context) == TextDirection.rtl;
+    const gap = 14.0, shadow = 8.0;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const _MenuColumn(),
-        const SizedBox(width: 12),
+        SizedBox(width: gap + (rtl ? shadow : 0)),
         const Expanded(child: _Stage()),
-        const SizedBox(width: 12),
+        SizedBox(width: gap + (rtl ? 0 : shadow)),
         SizedBox(
           width: (width * 0.27).clamp(200.0, 280.0),
           child: _PlayColumn(tokens: tokens, active: active),
@@ -119,166 +123,43 @@ class _MenuColumn extends StatelessWidget {
   }
 }
 
-/// Centre stage: the game's art and name, and the newest challenges.
+/// Centre stage: the banner space. The promos (new challenges, free play,
+/// how to play) turn on the website's paper sheet; a button on each acts on
+/// it.
 class _Stage extends StatelessWidget {
   const _Stage();
 
   @override
   Widget build(BuildContext context) {
-    final lang = context.lang;
-    final radius = BorderRadius.circular(26);
-    final featured = categorySections.first;
-
-    return Container(
-      // The website's shelf sheet: cream paper pinned to the wall with an
-      // ink outline and a bright cyan offset shadow.
-      decoration: sheetDecoration(radius: radius),
-      child: ClipRRect(
-        borderRadius: radius,
-        child: Stack(
-          children: [
-            // Small rainbow sweep in the top corner (decoration only).
-            const PositionedDirectional(
-              top: 0,
-              end: 0,
-              width: 84,
-              height: 84,
-              child: Rainbow(corner: RainbowCorner.topEnd, band: 7),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-              child: LayoutBuilder(
-                builder: (context, box) {
-                  // The title, chips and row label take about 160px; the
-                  // records get what's left.
-                  final rowHeight = (box.maxHeight - 160).clamp(72.0, 150.0);
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // The website's hero labels: printed strips stuck on
-                      // crooked, each with an ink offset shadow.
-                      Rise(
-                        delay: const Duration(milliseconds: 60),
-                        turn: -3,
-                        child: _Label(
-                          text: lang.t('يلا نلعب؟', 'Yalla nel3ab?'),
-                          size: 30,
-                          fill: AppColors.press,
-                          ink: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Rise(
-                        delay: const Duration(milliseconds: 160),
-                        turn: 1.5,
-                        child: _Label(
-                          text: lang.t('مستنيين مين؟', 'Mestanyeen meen?'),
-                          size: 19,
-                          fill: AppColors.cyan,
-                          ink: AppColors.ink,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      _HelpChip(onTap: () => _showHowTo(context)),
-                      const Spacer(),
-                      Row(
-                        children: [
-                          const Icon(
-                            LucideIcons600.sparkles,
-                            size: 15,
-                            color: AppColors.pressDeep,
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              lang.t(featured.name, featured.nameEn),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: AppText.sans(
-                                14,
-                                weight: FontWeight.w700,
-                                color: AppColors.pressDeep,
-                              ),
-                            ),
-                          ),
-                          _SeeAll(
-                            onTap: () =>
-                                ShellNav.of(context).go(AppRoute.categories),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      SizedBox(
-                        height: rowHeight,
-                        child: ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          // The shell already keeps clear of cutouts.
-                          padding: EdgeInsets.zero,
-                          itemCount: featured.categories.length,
-                          separatorBuilder: (_, _) => const SizedBox(width: 12),
-                          // Pasted up one by one, a little crooked, like the
-                          // website's poster fan.
-                          itemBuilder: (context, i) => Rise(
-                            delay:
-                                Rise.step(i, ms: 90) +
-                                const Duration(milliseconds: 250),
-                            turn: const [-2.0, 1.5, -1.0, 2.0][i % 4],
-                            child: _MiniPack(
-                              category: featured.categories[i],
-                              tone: i,
-                              height: rowHeight,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ),
-          ],
+    return Rise(
+      delay: const Duration(milliseconds: 60),
+      child: Container(
+        // The website's shelf sheet: an ink outline and a cyan offset
+        // shadow, here framing the banners.
+        decoration: sheetDecoration(radius: BorderRadius.circular(26)),
+        child: ClipRRect(
+          // Inside the sheet's 4px outline.
+          borderRadius: BorderRadius.circular(22),
+          child: PromoCarousel(
+            promos: homePromos(context.lang),
+            onAction: (promo) => runPromo(context, promo),
+          ),
         ),
       ),
     );
   }
 }
 
-/// A category as a small pack card: its photo in a coloured frame, with
-/// the name over the bottom.
-class _MiniPack extends StatelessWidget {
-  const _MiniPack({
-    required this.category,
-    required this.tone,
-    required this.height,
-  });
-
-  final Category category;
-  final int tone;
-  final double height;
-
-  @override
-  Widget build(BuildContext context) {
-    final lang = context.lang;
-    return Semantics(
-      button: true,
-      child: Pressable(
-        onTap: () => showCategorySheet(context, category),
-        child: Container(
-          width: height * 0.78,
-          // A small poster: the website's lobby strip, name on a slab.
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(4),
-            border: Border.all(color: coverBorders[toneOf(tone)], width: 3),
-            boxShadow: [inkDrop(4)],
-          ),
-          child: CategoryCover(
-            image: BrandImages.category(category.id),
-            name: lang.t(category.name, category.nameEn),
-            tone: tone,
-          ),
-        ),
-      ),
-    );
+/// Does what [promo]'s button says, from a context under the shell.
+void runPromo(BuildContext context, Promo promo) {
+  final nav = ShellNav.of(context);
+  switch (promo.action) {
+    case PromoAction.newPack:
+      nav.go(AppRoute.categories);
+    case PromoAction.play:
+      nav.go(AppRoute.play);
+    case PromoAction.howTo:
+      _showHowTo(context);
   }
 }
 
@@ -474,122 +355,4 @@ Future<void> _showHowTo(BuildContext context) {
       ),
     ),
   );
-}
-
-/// "How to play" as a chip that reads as a button.
-class _HelpChip extends StatelessWidget {
-  const _HelpChip({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final lang = context.lang;
-    final label = lang.t('إزاي نلعب؟', 'Ezay nel3ab?');
-    return Pressable(
-      semanticLabel: label,
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(999),
-          color: AppColors.gold,
-          border: Border.all(color: AppColors.ink, width: 2.5),
-          boxShadow: [inkDrop(3)],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              LucideIcons600.circleHelp,
-              size: 15,
-              color: AppColors.deep,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: AppText.sans(
-                13,
-                weight: FontWeight.w700,
-                color: AppColors.deep,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Small "see all" link with a chevron.
-class _SeeAll extends StatelessWidget {
-  const _SeeAll({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final lang = context.lang;
-    return Semantics(
-      button: true,
-      child: Pressable(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                lang.t('الكل', 'El kol'),
-                style: AppText.sans(
-                  13,
-                  weight: FontWeight.w700,
-                  color: AppColors.ink,
-                ),
-              ),
-              Icon(
-                lang.ar ? LucideIcons.chevronLeft : LucideIcons.chevronRight,
-                size: 16,
-                color: AppColors.ink,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// A heading printed on a strip of colour, with an ink offset shadow, like
-/// the website's hero labels.
-class _Label extends StatelessWidget {
-  const _Label({
-    required this.text,
-    required this.size,
-    required this.fill,
-    required this.ink,
-  });
-
-  final String text;
-  final double size;
-  final Color fill;
-  final Color ink;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 1),
-      decoration: BoxDecoration(
-        color: fill,
-        boxShadow: const [
-          BoxShadow(color: AppColors.ink, offset: Offset(4, 4)),
-        ],
-      ),
-      child: Text(
-        text,
-        maxLines: 1,
-        style: AppText.display(size, height: 1.3, color: ink),
-      ),
-    );
-  }
 }
