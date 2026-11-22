@@ -14,8 +14,8 @@ import 'package:flutter/painting.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// The website's theme colour (`layout.tsx`), the app's charcoal.
-const charcoal = Color(0xFF2B3230);
+/// The cream paper the app's sheets are printed on (`AppColors.paper`).
+const paper = Color(0xFFFFF8EA);
 
 /// The header's sticker tilt (`Logo` in `brand_art.dart`).
 const tilt = -0.05;
@@ -165,17 +165,17 @@ void main() {
       };
       for (final MapEntry(key: name, value: x) in dpi.entries) {
         final dir = '$android/mipmap-$name';
-        // Before Android 8: a rounded charcoal tile.
+        // Before Android 8: a rounded paper tile.
         await draw(
           '$dir/ic_launcher.png',
           (48 * x).round(),
           art: logo,
           scale: 0.7,
-          fill: charcoal,
+          fill: paper,
           radius: 0.22,
         );
         // Android 8+: the logo on its own layer, inside the 66dp safe circle
-        // every launcher mask keeps; the charcoal is a colour resource.
+        // every launcher mask keeps; the paper is a colour resource.
         await draw(
           '$dir/ic_launcher_foreground.png',
           (108 * x).round(),
@@ -214,7 +214,7 @@ void main() {
           size,
           art: logo,
           scale: 0.7,
-          fill: charcoal,
+          fill: paper,
           opaque: true,
         );
       }

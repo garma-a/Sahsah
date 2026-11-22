@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- The website's theme colour, the app's charcoal: behind the icon,
+    <!-- The cream paper the app's sheets are printed on: behind the icon,
          the launch screen and the window before Flutter's first frame. -->
-    <color name="brand_charcoal">#2B3230</color>
+    <color name="brand_paper">#FFF8EA</color>
 </resources>
