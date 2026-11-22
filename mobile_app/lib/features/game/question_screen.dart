@@ -166,11 +166,14 @@ class _QuestionScreenState extends State<QuestionScreen> {
     final undoable = game.canUndoAward;
     // Over the foot of the pack's side panel, clear of the tiles; centred
     // at the bottom if the pack has no side panel (portrait).
-    final screen = MediaQuery.sizeOf(context);
+    // Measured against the app's own overlay, the space the snack bar is
+    // laid out in (on a tablet the app is scaled, so screen pixels differ).
+    final root = Overlay.of(context).context.findRenderObject();
     final panel = PackScreen.coverKey.currentContext?.findRenderObject();
-    final Rect? over = panel is RenderBox && panel.hasSize
-        ? panel.localToGlobal(Offset.zero) & panel.size
+    final Rect? over = panel is RenderBox && panel.hasSize && root is RenderBox
+        ? panel.localToGlobal(Offset.zero, ancestor: root) & panel.size
         : null;
+    final screen = root is RenderBox ? root.size : MediaQuery.sizeOf(context);
     navigator.pop();
     messenger
       ..hideCurrentSnackBar()
@@ -181,10 +184,10 @@ class _QuestionScreenState extends State<QuestionScreen> {
           margin: over == null
               ? null
               : EdgeInsets.fromLTRB(
-                  over.left + 8,
+                  math.max(0, over.left + 8),
                   0,
-                  screen.width - over.right + 8,
-                  screen.height - over.bottom + 8,
+                  math.max(0, screen.width - over.right + 8),
+                  math.max(0, screen.height - over.bottom + 8),
                 ),
           persist: false,
           duration: Duration(seconds: undoable ? 4 : 2),
@@ -1000,55 +1003,71 @@ class _ActingRules extends StatelessWidget {
               const _QrBox(team: 0),
               const SizedBox(width: 14),
               Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    for (final (i, rule) in rules.indexed) ...[
-                      if (i > 0) const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(color: AppColors.ink, width: 2),
-                        ),
-                        child: Row(
+                // The three rules keep the full width and shrink together
+                // when the card is short (a phone's), rather than spill
+                // under the buttons.
+                child: LayoutBuilder(
+                  builder: (context, box) => Center(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: SizedBox(
+                        width: box.maxWidth,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Container(
-                              width: 26,
-                              height: 26,
-                              alignment: Alignment.center,
-                              decoration: const BoxDecoration(
-                                color: AppColors.orange,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Text(
-                                lang.toAr(i + 1),
-                                style: AppText.num(
-                                  13,
-                                  color: AppColors.ink,
-                                  height: 1,
+                            for (final (i, rule) in rules.indexed) ...[
+                              if (i > 0) const SizedBox(height: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(999),
+                                  border: Border.all(
+                                    color: AppColors.ink,
+                                    width: 2,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 26,
+                                      height: 26,
+                                      alignment: Alignment.center,
+                                      decoration: const BoxDecoration(
+                                        color: AppColors.orange,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Text(
+                                        lang.toAr(i + 1),
+                                        style: AppText.num(
+                                          13,
+                                          color: AppColors.ink,
+                                          height: 1,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        rule,
+                                        style: AppText.sans(
+                                          14,
+                                          weight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                rule,
-                                style: AppText.sans(
-                                  14,
-                                  weight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
+                            ],
                           ],
                         ),
                       ),
-                    ],
-                  ],
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 14),
@@ -1235,7 +1254,7 @@ class _StageLadder extends StatelessWidget {
           Expanded(
             child: Semantics(
               label: lang.t(
-                'الصورة ${i + 1}: $points نقطة',
+                'الصورة ${lang.toAr(i + 1)}: ${lang.toAr(points)} نقطة',
                 'El soora ${i + 1}: $points no2ta',
               ),
               selected: i == stage,
