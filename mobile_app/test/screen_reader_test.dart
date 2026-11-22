@@ -83,4 +83,52 @@ void main() {
 
     semantics.dispose();
   });
+
+  testWidgets('the shop says which pack each button buys', (tester) async {
+    final semantics = tester.ensureSemantics();
+    tester.view.physicalSize = const Size(892 * 3, 412 * 3);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      SahsahApp(
+        lang: LangController(Lang.ar),
+        game: GameController(),
+        sound: SoundController(backend: FakeSound()),
+      ),
+    );
+    await settle(tester);
+    await press(tester, 'المتجر');
+
+    // Three buttons, three different things, none just "buy".
+    expect(find.bySemanticsLabel('اشتري'), findsNothing);
+    for (final label in [
+      'اشتري لعبة واحدة، ١٠٠ جنيه',
+      'اشتري ٢ ألعاب، ٢٠٠ جنيه، الأكثر طلبًا',
+      'اشتري ٥ ألعاب، ٥٠٠ جنيه',
+    ]) {
+      final node = tester.getSemantics(find.bySemanticsLabel(label));
+      expect(
+        node.getSemanticsData().hasAction(SemanticsAction.tap),
+        isTrue,
+        reason: label,
+      );
+    }
+
+    // Gifts say their discount against the full price.
+    await press(tester, RegExp('^هدية'));
+    expect(find.bySemanticsLabel('اهدي'), findsNothing);
+    expect(
+      find.bySemanticsLabel('اهدي ٢ ألعاب، ١٦٠ جنيه بدل ٢٠٠، الأكثر طلبًا'),
+      findsOneWidget,
+    );
+
+    // The gift form's fields carry their names, and can be typed into.
+    final phone = tester
+        .getSemantics(find.byKey(const ValueKey('gift-phone')))
+        .getSemanticsData();
+    expect(phone.label, contains('رقم المستلم'));
+    expect(phone.flagsCollection.isTextField, isTrue);
+    expect(phone.hasAction(SemanticsAction.tap), isTrue);
+    semantics.dispose();
+  });
 }

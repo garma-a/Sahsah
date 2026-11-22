@@ -266,6 +266,23 @@ class _PackCard extends StatelessWidget {
     const muted = AppColors.inkMuted;
     final price = packPrice(count, gift: gift);
     final list = packListPrice(count);
+    final money = _money(lang, price);
+    final was = price < list ? lang.toAr(list) : null;
+    // The button says the whole card, so three buttons don't all read as
+    // "buy": what, how many, the price (and what it was), and the ribbon.
+    // The card's loose figures are hidden from screen readers to match.
+    final label = [
+      lang.t(
+        '${gift ? 'اهدي' : 'اشتري'} '
+            '${count == 1 ? 'لعبة واحدة' : '${lang.toAr(count)} ألعاب'}',
+        '${gift ? 'Ehdy' : 'Eshtery'} $count ${count == 1 ? 'le3ba' : 'al3ab'}',
+      ),
+      lang.t(
+        '$money جنيه${was == null ? '' : ' بدل $was'}',
+        '$money geneih${was == null ? '' : ' badal $list'}',
+      ),
+      if (featured) lang.t('الأكثر طلبًا', 'El aktar talaban'),
+    ].join(lang.t('، ', ', '));
 
     final card = Container(
       padding: const EdgeInsets.fromLTRB(12, 18, 12, 12),
@@ -276,55 +293,74 @@ class _PackCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Icon(
-            LucideIcons600.coins,
-            size: 22,
-            color: featured ? AppColors.ink : AppColors.press,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            lang.toAr(count),
-            style: AppText.num(44, color: ink, height: 1.1),
-          ),
-          Text(
-            count == 1 ? lang.t('لعبة', 'Le3ba') : lang.t('ألعاب', 'Al3ab'),
-            style: AppText.sans(13, weight: FontWeight.w600, color: muted),
-          ),
-          const SizedBox(height: 8),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              textBaseline: TextBaseline.alphabetic,
+          ExcludeSemantics(
+            child: Column(
               children: [
-                Text(
-                  _money(lang, price),
-                  style: AppText.num(26, color: ink, height: 1),
+                Icon(
+                  LucideIcons600.coins,
+                  size: 22,
+                  color: featured ? AppColors.ink : AppColors.press,
                 ),
-                const SizedBox(width: 4),
+                const SizedBox(height: 4),
                 Text(
-                  lang.t('ج.م', 'EGP'),
-                  style: AppText.sans(12, weight: FontWeight.w600, color: ink),
+                  lang.toAr(count),
+                  style: AppText.num(44, color: ink, height: 1.1),
                 ),
-                if (price < list) ...[
-                  const SizedBox(width: 6),
-                  Text(
-                    lang.toAr(list),
-                    style: AppText.num(14, color: muted, height: 1).copyWith(
-                      decoration: TextDecoration.lineThrough,
-                      decorationColor: muted,
-                    ),
+                Text(
+                  count == 1
+                      ? lang.t('لعبة', 'Le3ba')
+                      : lang.t('ألعاب', 'Al3ab'),
+                  style: AppText.sans(
+                    13,
+                    weight: FontWeight.w600,
+                    color: muted,
                   ),
-                ],
+                ),
+                const SizedBox(height: 8),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Text(
+                        money,
+                        style: AppText.num(26, color: ink, height: 1),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        lang.t('ج.م', 'EGP'),
+                        style: AppText.sans(
+                          12,
+                          weight: FontWeight.w600,
+                          color: ink,
+                        ),
+                      ),
+                      if (was != null) ...[
+                        const SizedBox(width: 6),
+                        Text(
+                          was,
+                          style: AppText.num(14, color: muted, height: 1)
+                              .copyWith(
+                                decoration: TextDecoration.lineThrough,
+                                decorationColor: muted,
+                              ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
           const SizedBox(height: 12),
           GameButton(
+            key: ValueKey('pack-$count'),
             height: 48,
             radius: 14,
             depth: 5,
             color: AppColors.play,
+            semanticLabel: label,
             onTap: onBuy,
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -363,19 +399,22 @@ class _PackCard extends StatelessWidget {
         card,
         Positioned(
           top: -11,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-            decoration: BoxDecoration(
-              color: AppColors.press,
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: AppColors.ink, width: 2.5),
-            ),
-            child: Text(
-              lang.t('الأكثر طلبًا', 'El aktar talaban'),
-              style: AppText.sans(
-                12,
-                weight: FontWeight.w700,
-                color: Colors.white,
+          // Said on the button.
+          child: ExcludeSemantics(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+              decoration: BoxDecoration(
+                color: AppColors.press,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: AppColors.ink, width: 2.5),
+              ),
+              child: Text(
+                lang.t('الأكثر طلبًا', 'El aktar talaban'),
+                style: AppText.sans(
+                  12,
+                  weight: FontWeight.w700,
+                  color: Colors.white,
+                ),
               ),
             ),
           ),
