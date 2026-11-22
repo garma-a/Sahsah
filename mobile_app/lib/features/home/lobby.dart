@@ -232,8 +232,10 @@ class _PlayColumn extends StatelessWidget {
                         if (game == null)
                           Text(
                             lang.t(
-                              '${lang.toAr(boardCategories)} فئات · ${lang.toAr(boardQuestions)} سؤال',
-                              '$boardCategories fe2at · $boardQuestions so2al',
+                              // "و", not "·": next to "٣٦" a dot reads as a
+                              // zero ("٣٦٠").
+                              '${lang.toAr(boardCategories)} فئات و${lang.toAr(boardQuestions)} سؤال',
+                              '$boardCategories fe2at w $boardQuestions so2al',
                             ),
                             style: sub,
                           )
@@ -241,7 +243,8 @@ class _PlayColumn extends StatelessWidget {
                           // Where the game stands.
                           Text(
                             '${game.teamNames[0]} ${score(game.scores[0])}'
-                            '  ·  '
+                            // A dash: a dot after a score reads as a zero.
+                            '  –  '
                             '${game.teamNames[1]} ${score(game.scores[1])}',
                             style: sub,
                           ),

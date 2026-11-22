@@ -329,7 +329,7 @@ class _GameRow extends StatelessWidget {
                 TextSpan(
                   children: [
                     for (var t = 0; t < 2; t++) ...[
-                      if (t > 0) const TextSpan(text: '  ·  '),
+                      if (t > 0) const TextSpan(text: '  –  '),
                       TextSpan(
                         text: '${game.teamNames[t]} ',
                         style: AppText.sans(14, weight: FontWeight.w700),

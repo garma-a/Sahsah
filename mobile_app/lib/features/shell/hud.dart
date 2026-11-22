@@ -38,35 +38,64 @@ class GameHud extends StatelessWidget {
         border: Border.all(color: AppColors.ink, width: 3),
         boxShadow: [inkDrop(5)],
       ),
-      child: Row(
-        children: [
-          if (home) ...[
-            const Logo(size: 50),
-            const SizedBox(width: 12),
-            const _PlayerBadge(),
-            const Spacer(),
-          ] else ...[
-            RoundIconButton(
-              key: const ValueKey('hud-back'),
-              icon: lang.ar ? LucideIcons.arrowRight : LucideIcons.arrowLeft,
-              label: lang.t('رجوع', 'Rogoo3'),
-              onTap: () => nav.go(AppRoute.home),
+      child: home
+          // Two groups at either end; each shrinks only when they'd meet
+          // (long Franco words, big system text).
+          ? Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Flexible(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Logo(size: 50),
+                      SizedBox(width: 12),
+                      Flexible(child: _PlayerBadge()),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Flexible(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(child: TokenWallet(tokens: tokens)),
+                      const SizedBox(width: 8),
+                      const LangToggle(),
+                    ],
+                  ),
+                ),
+              ],
+            )
+          // Elsewhere the title takes the room and shortens itself.
+          : Row(
+              children: [
+                RoundIconButton(
+                  key: const ValueKey('hud-back'),
+                  icon: lang.ar
+                      ? LucideIcons.arrowRight
+                      : LucideIcons.arrowLeft,
+                  label: lang.t('رجوع', 'Rogoo3'),
+                  onTap: () => nav.go(AppRoute.home),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    routeTitle(lang, route),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppText.display(
+                      28,
+                      height: 1.1,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                TokenWallet(tokens: tokens),
+                const SizedBox(width: 8),
+                const LangToggle(),
+              ],
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                routeTitle(lang, route),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: AppText.display(28, height: 1.1, color: Colors.white),
-              ),
-            ),
-          ],
-          TokenWallet(tokens: tokens),
-          const SizedBox(width: 8),
-          const LangToggle(),
-        ],
-      ),
     );
   }
 }
@@ -123,23 +152,35 @@ class _PlayerBadge extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    lang.t('ضيف', 'Deif'),
-                    style: AppText.sans(
-                      13,
-                      weight: FontWeight.w700,
-                      height: 1.2,
-                    ),
+              // Two lines in a 44px pill: with big system text they shrink
+              // to fit rather than spill out.
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        lang.t('ضيف', 'Deif'),
+                        style: AppText.sans(
+                          13,
+                          weight: FontWeight.w700,
+                          height: 1.2,
+                        ),
+                      ),
+                      Text(
+                        lang.t('سجّل دخولك', 'Sagel dokhoolak'),
+                        style: AppText.sans(
+                          12,
+                          color: AppColors.gold,
+                          height: 1.2,
+                        ),
+                      ),
+                    ],
                   ),
-                  Text(
-                    lang.t('سجّل دخولك', 'Sagel dokhoolak'),
-                    style: AppText.sans(12, color: AppColors.gold, height: 1.2),
-                  ),
-                ],
+                ),
               ),
             ],
           ),

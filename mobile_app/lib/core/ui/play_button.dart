@@ -84,6 +84,8 @@ class _PlayButtonState extends State<PlayButton> {
     );
 
     return Semantics(
+      // Its own stop for screen readers, even inside a labelled area.
+      container: true,
       button: true,
       enabled: enabled,
       label: widget.semanticLabel,

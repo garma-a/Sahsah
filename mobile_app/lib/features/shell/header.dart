@@ -175,21 +175,27 @@ class TokenWallet extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            free
-                ? Text(
-                    lang.t('اللعب مجاني', 'El le3b magany'),
-                    style: AppText.sans(
-                      15,
-                      weight: FontWeight.w700,
-                      color: AppColors.gold,
-                      height: 1,
-                    ),
-                  )
-                : Text(
-                    lang.toAr(tokens),
-                    textDirection: TextDirection.ltr,
-                    style: AppText.num(20, height: 1),
-                  ),
+            // Shrinks rather than overflowing a crowded top bar.
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: free
+                    ? Text(
+                        lang.t('اللعب مجاني', 'El le3b magany'),
+                        style: AppText.sans(
+                          15,
+                          weight: FontWeight.w700,
+                          color: AppColors.gold,
+                          height: 1,
+                        ),
+                      )
+                    : Text(
+                        lang.toAr(tokens),
+                        textDirection: TextDirection.ltr,
+                        style: AppText.num(20, height: 1),
+                      ),
+              ),
+            ),
             // "+" (buy more) only when there's a balance to add to; while
             // play is free it would promise something that isn't there.
             if (free)

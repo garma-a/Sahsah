@@ -197,8 +197,8 @@ Future<void> showCategorySheet(BuildContext context, Category category) {
                         const SizedBox(height: 10),
                         Text(
                           lang.t(
-                            '٦ أسئلة · ٢٠٠ لـ٦٠٠ نقطة',
-                            '6 as2ela · 200 le 600 no2ta',
+                            '٦ أسئلة، من ٢٠٠ لـ٦٠٠ نقطة',
+                            '6 as2ela, men 200 le 600 no2ta',
                           ),
                           style: AppText.sans(
                             12,

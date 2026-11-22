@@ -261,10 +261,17 @@ class _SetupScreenState extends State<SetupScreen> {
               Text.rich(
                 TextSpan(
                   children: [
-                    TextSpan(
-                      text: lang.toAr(n),
-                      style: AppText.num(22, height: 1.1),
-                    ),
+                    // A lone Arabic zero is a dot, so it's said in words,
+                    // as on the board.
+                    n == 0 && lang.ar
+                        ? TextSpan(
+                            text: 'صفر',
+                            style: AppText.sans(16, weight: FontWeight.w700),
+                          )
+                        : TextSpan(
+                            text: lang.toAr(n),
+                            style: AppText.num(22, height: 1.1),
+                          ),
                     TextSpan(
                       text: lang.t(
                         ' من ${lang.toAr(boardCategories)} فئات',
@@ -395,11 +402,18 @@ class _CategoryStep extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final lang = context.lang;
-    final intro = [
-      Text(
+    // One line, shrinking to fit: with big system text it would otherwise
+    // take two tall lines and push the quick picks off a small screen.
+    final title = FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: AlignmentDirectional.centerStart,
+      child: Text(
         lang.t('اختاروا ٦ فئات', 'Ekhtaro 6 fe2at'),
         style: AppText.display(32, height: 1.15),
       ),
+    );
+    final intro = [
+      title,
       const SizedBox(height: 4),
       Text(
         lang.t(
@@ -434,13 +448,17 @@ class _CategoryStep extends StatelessWidget {
                 width: 230,
                 child: ListView(
                   padding: const EdgeInsetsDirectional.fromSTEB(16, 8, 0, 16),
+                  // The quick picks right under the title, where a short
+                  // screen still shows them; the explanation follows.
                   children: [
-                    ...intro,
-                    const SizedBox(height: 16),
+                    title,
+                    const SizedBox(height: 14),
                     for (final pick in picks) ...[
                       pick,
                       const SizedBox(height: 8),
                     ],
+                    const SizedBox(height: 4),
+                    ...intro.skip(2),
                   ],
                 ),
               ),

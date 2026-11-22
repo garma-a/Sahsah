@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -7,6 +9,7 @@ import '../../core/audio/sound.dart';
 import '../../core/i18n/lang.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/brand_art.dart';
+import '../../core/ui/motion.dart';
 import '../../core/ui/play_button.dart';
 import '../../core/ui/surfaces.dart';
 import '../../data/categories.dart';
@@ -172,72 +175,80 @@ class _ResultsScreenState extends State<ResultsScreen> {
     final landscape =
         MediaQuery.orientationOf(context) == Orientation.landscape;
 
+    final screen = landscape
+        ? GameScaffold(
+            tv: true,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    flex: 5,
+                    child: Column(
+                      children: [
+                        Expanded(
+                          child: Center(
+                            child: SingleChildScrollView(
+                              child: _Banner(
+                                game: game,
+                                leader: leader,
+                                compact: true,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        scores,
+                        const SizedBox(height: 12),
+                        actions,
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    flex: 5,
+                    child: ListView(
+                      children: [
+                        breakdownTitle,
+                        const SizedBox(height: 10),
+                        breakdown,
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )
+        : GameScaffold(
+            tv: true,
+            bottom: actions,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
+              children: [
+                _Banner(game: game, leader: leader),
+                const SizedBox(height: 18),
+                scores,
+                const SizedBox(height: 22),
+                breakdownTitle,
+                const SizedBox(height: 10),
+                breakdown,
+              ],
+            ),
+          );
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _home();
       },
-      child: landscape
-          ? GameScaffold(
-              tv: true,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(
-                      flex: 5,
-                      child: Column(
-                        children: [
-                          Expanded(
-                            child: Center(
-                              child: SingleChildScrollView(
-                                child: _Banner(
-                                  game: game,
-                                  leader: leader,
-                                  compact: true,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          scores,
-                          const SizedBox(height: 12),
-                          actions,
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      flex: 5,
-                      child: ListView(
-                        children: [
-                          breakdownTitle,
-                          const SizedBox(height: 10),
-                          breakdown,
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            )
-          : GameScaffold(
-              tv: true,
-              bottom: actions,
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
-                children: [
-                  _Banner(game: game, leader: leader),
-                  const SizedBox(height: 18),
-                  scores,
-                  const SizedBox(height: 22),
-                  breakdownTitle,
-                  const SizedBox(height: 10),
-                  breakdown,
-                ],
-              ),
-            ),
+      child: Stack(
+        children: [
+          Positioned.fill(child: screen),
+          // A winner gets a burst of confetti; a tie doesn't.
+          if (leader != null) const Positioned.fill(child: _Confetti()),
+        ],
+      ),
     );
   }
 }
@@ -330,11 +341,13 @@ class _ScoreCard extends StatelessWidget {
     final color = teamColors[team];
     final winner = game.leader == team;
     // The website's score card: cream, the name on a ribbon of the team's
-    // colour, a big ink score; the winner sits higher on a deeper drop.
-    return Container(
+    // colour, a big ink score. The winner's card is the night's poster:
+    // printed in their colour, stuck on crooked, with a crown sticker.
+    final card = Container(
       padding: const EdgeInsets.all(12),
       decoration: paperDecoration(
         radius: BorderRadius.circular(20),
+        color: winner ? color : AppColors.paper,
         drop: winner ? 7 : 3,
       ),
       child: Column(
@@ -342,14 +355,19 @@ class _ScoreCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 1),
             decoration: BoxDecoration(
-              color: color,
+              // On their own colour, the winner's name goes on ink.
+              color: winner ? AppColors.ink : color,
               borderRadius: BorderRadius.circular(10),
             ),
             child: Text(
               game.teamNames[team],
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: AppText.display(18, height: 1.3, color: AppColors.ink),
+              style: AppText.display(
+                18,
+                height: 1.3,
+                color: winner ? color : AppColors.ink,
+              ),
             ),
           ),
           const SizedBox(height: 6),
@@ -367,12 +385,159 @@ class _ScoreCard extends StatelessWidget {
           ),
           Text(
             lang.t('نقطة', 'no2ta'),
-            style: AppText.sans(12, color: AppColors.inkMuted),
+            style: AppText.sans(
+              12,
+              weight: winner ? FontWeight.w700 : FontWeight.w400,
+              color: winner ? AppColors.ink : AppColors.inkMuted,
+            ),
+          ),
+        ],
+      ),
+    );
+    if (!winner) return card;
+    return Transform.rotate(
+      angle: -2 * math.pi / 180,
+      child: Stack(
+        // The row's width passes straight to the card, as for the other.
+        fit: StackFit.passthrough,
+        clipBehavior: Clip.none,
+        children: [
+          card,
+          PositionedDirectional(
+            top: -14,
+            start: -10,
+            child: Pop(
+              trigger: true,
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.sun,
+                  border: Border.all(color: AppColors.ink, width: 3),
+                  boxShadow: [inkDrop(3)],
+                ),
+                child: const Icon(
+                  LucideIcons600.crown,
+                  size: 18,
+                  color: AppColors.ink,
+                ),
+              ),
+            ),
           ),
         ],
       ),
     );
   }
+}
+
+/// One burst of paper confetti in the brand's colours, falling once when
+/// the result comes in. Nothing with the system's animations off.
+class _Confetti extends StatefulWidget {
+  const _Confetti();
+
+  @override
+  State<_Confetti> createState() => _ConfettiState();
+}
+
+class _ConfettiState extends State<_Confetti>
+    with SingleTickerProviderStateMixin {
+  late final _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2800),
+  );
+  final _pieces = List.generate(70, (i) => _Piece(math.Random(i * 7919)));
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_c.isAnimating &&
+        _c.value == 0 &&
+        !MediaQuery.disableAnimationsOf(context)) {
+      _c.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (MediaQuery.disableAnimationsOf(context)) return const SizedBox();
+    return IgnorePointer(
+      child: ExcludeSemantics(
+        child: RepaintBoundary(
+          child: CustomPaint(
+            size: Size.infinite,
+            painter: _ConfettiPainter(_c, _pieces),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Piece {
+  _Piece(math.Random r)
+    : x = r.nextDouble(),
+      delay = r.nextDouble() * 0.25,
+      drift = (r.nextDouble() - 0.5) * 0.25,
+      fall = 0.75 + r.nextDouble() * 0.5,
+      spin = (r.nextDouble() - 0.5) * 18,
+      size = 6 + r.nextDouble() * 6,
+      color = const [
+        AppColors.press,
+        AppColors.cyan,
+        AppColors.sun,
+        AppColors.green,
+        AppColors.pinkPress,
+        AppColors.logoBlue,
+      ][r.nextInt(6)];
+
+  final double x, delay, drift, fall, spin, size;
+  final Color color;
+}
+
+class _ConfettiPainter extends CustomPainter {
+  _ConfettiPainter(this.t, this.pieces) : super(repaint: t);
+
+  final Animation<double> t;
+  final List<_Piece> pieces;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (t.value == 0 || t.value == 1) return;
+    final paint = Paint();
+    for (final p in pieces) {
+      final local = ((t.value - p.delay) / (1 - p.delay)).clamp(0.0, 1.0);
+      if (local == 0) continue;
+      // Falls from above the top with a little sway, fading at the end.
+      final y = -0.1 + local * local * p.fall * 1.3;
+      final x = p.x + p.drift * local + math.sin(local * 9 + p.x * 6) * 0.02;
+      paint.color = p.color.withValues(
+        alpha: 1 - ((local - 0.8) / 0.2).clamp(0.0, 1.0),
+      );
+      canvas
+        ..save()
+        ..translate(x * size.width, y * size.height)
+        ..rotate(p.spin * local)
+        ..drawRect(
+          Rect.fromCenter(
+            center: Offset.zero,
+            width: p.size,
+            height: p.size * 0.6,
+          ),
+          paint,
+        )
+        ..restore();
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ConfettiPainter old) => false;
 }
 
 class _CategoryRow extends StatelessWidget {

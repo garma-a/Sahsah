@@ -110,6 +110,7 @@ class _BoardScreenState extends State<BoardScreen> {
         'El nateega hat2fel 3ala keda, w mesh hate2daro tkammelo el as2ela el ba2ya.',
       ),
       confirm: lang.t('أنهي اللعبة', 'Anhy el le3ba'),
+      cancel: lang.t('كمّلوا اللعب', 'Kammelo el le3b'),
       destructive: true,
     );
     if (!ok || !mounted) return;
@@ -368,38 +369,45 @@ class _TeamScoreState extends State<TeamScore>
             ),
             const SizedBox(width: 8),
             // The unit sits under the score so it takes no width from the
-            // name.
-            Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                TweenAnimationBuilder<double>(
-                  tween: Tween(end: game.scores[team].toDouble()),
-                  duration: const Duration(milliseconds: 600),
-                  curve: Curves.easeOutCubic,
-                  // A lone Arabic zero is a small dot, so say it.
-                  builder: (context, v, _) => Text(
-                    v.round() == 0 && lang.ar ? 'صفر' : lang.toAr(v.round()),
-                    textDirection: TextDirection.ltr,
-                    // The word is wider and has a tail, so it's set smaller.
-                    style: AppText.num(
-                      v.round() == 0 && lang.ar
-                          ? (compact ? 16 : 21)
-                          : (compact ? 20 : 26),
-                      color: ink,
-                      height: 1.05,
+            // name; with big system text the pair shrinks to the pill.
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    TweenAnimationBuilder<double>(
+                      tween: Tween(end: game.scores[team].toDouble()),
+                      duration: const Duration(milliseconds: 600),
+                      curve: Curves.easeOutCubic,
+                      // A lone Arabic zero is a small dot, so say it.
+                      builder: (context, v, _) => Text(
+                        v.round() == 0 && lang.ar
+                            ? 'صفر'
+                            : lang.toAr(v.round()),
+                        textDirection: TextDirection.ltr,
+                        // The word is wider and has a tail, so it's set smaller.
+                        style: AppText.num(
+                          v.round() == 0 && lang.ar
+                              ? (compact ? 16 : 21)
+                              : (compact ? 20 : 26),
+                          color: ink,
+                          height: 1.05,
+                        ),
+                      ),
                     ),
-                  ),
+                    Text(
+                      lang.t('نقطة', 'no2ta'),
+                      style: AppText.sans(
+                        12,
+                        weight: FontWeight.w700,
+                        color: AppColors.inkMuted,
+                        height: 1.1,
+                      ),
+                    ),
+                  ],
                 ),
-                Text(
-                  lang.t('نقطة', 'no2ta'),
-                  style: AppText.sans(
-                    12,
-                    weight: FontWeight.w700,
-                    color: AppColors.inkMuted,
-                    height: 1.1,
-                  ),
-                ),
-              ],
+              ),
             ),
           ],
         ),
