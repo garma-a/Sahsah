@@ -132,11 +132,14 @@ class _ResultsScreenState extends State<ResultsScreen> {
               children: [
                 const Spacer(),
                 for (var t = 0; t < 2; t++) ...[
-                  const SizedBox(width: 12),
+                  const SizedBox(width: _CategoryRow.gap),
                   SizedBox(
-                    width: 64,
+                    width: _CategoryRow.slot,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: teamColors[t],
                         borderRadius: BorderRadius.circular(8),
@@ -148,7 +151,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: AppText.sans(
-                          12,
+                          14,
                           weight: FontWeight.w700,
                           color: AppColors.ink,
                         ),
@@ -541,8 +544,14 @@ class _ConfettiPainter extends CustomPainter {
   bool shouldRepaint(_ConfettiPainter old) => false;
 }
 
+/// One category's points per team. Each team's number sits in a slot of
+/// its colour, under its name: solid for the team that took the category,
+/// a tint for the other, a plain dash where a team scored nothing.
 class _CategoryRow extends StatelessWidget {
   const _CategoryRow({required this.game, required this.categoryId});
+
+  static const slot = 68.0;
+  static const gap = 8.0;
 
   final Game game;
   final String categoryId;
@@ -572,25 +581,64 @@ class _CategoryRow extends StatelessWidget {
           Expanded(
             child: Text(
               lang.t(category.name, category.nameEn),
-              maxLines: 1,
+              // Two lines before an ellipsis: the slots leave the name
+              // less room than one line of "مين في الصورة؟".
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: AppText.sans(15, weight: FontWeight.w600),
+              style: AppText.sans(16, weight: FontWeight.w600, height: 1.25),
             ),
           ),
           for (var t = 0; t < 2; t++) ...[
-            const SizedBox(width: 12),
+            const SizedBox(width: gap),
             SizedBox(
-              width: 64,
-              // No points in a category reads as a dash, not a lone dot.
-              child: Text(
-                totals[t] == 0 ? '–' : lang.toAr(totals[t]),
-                textAlign: TextAlign.center,
-                textDirection: TextDirection.ltr,
-                style: AppText.num(16, color: AppColors.ink),
+              width: slot,
+              child: _Slot(
+                points: totals[t],
+                color: teamColors[t],
+                took: totals[t] > totals[1 - t],
               ),
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _Slot extends StatelessWidget {
+  const _Slot({required this.points, required this.color, required this.took});
+
+  final int points;
+  final Color color;
+  final bool took;
+
+  @override
+  Widget build(BuildContext context) {
+    final lang = context.lang;
+    // No points reads as a dash, not a lone dot or an empty box.
+    if (points == 0) {
+      return Text(
+        '–',
+        textAlign: TextAlign.center,
+        style: AppText.num(22, color: AppColors.inkMuted),
+      );
+    }
+    return Container(
+      constraints: const BoxConstraints(minHeight: 40),
+      alignment: Alignment.center,
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: took ? color : color.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.ink, width: took ? 2.5 : 1.5),
+      ),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          lang.toAr(points),
+          textDirection: TextDirection.ltr,
+          style: AppText.num(24, color: AppColors.ink),
+        ),
       ),
     );
   }
