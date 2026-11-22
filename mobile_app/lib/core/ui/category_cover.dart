@@ -6,6 +6,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/app_theme.dart';
 import 'surfaces.dart';
 import 'motion.dart';
+import 'cover_image.dart';
 
 /// The second ink of each category tone, in the website's order
 /// (`components/brand/cover.tsx`): the title's offset shadow.
@@ -15,7 +16,7 @@ const coverAccents = [
   Color(0xFFE9C46A),
   Color(0xFFF6A5BF),
   Color(0xFFF0B323),
-  Color(0xFFF6D64A),
+  AppColors.slabYellow,
 ];
 
 /// The poster frame colour of each tone (`components/brand/tones.ts`).
@@ -96,16 +97,15 @@ class CategoryCover extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              const ColoredBox(color: Color(0xFF22160E)),
-              Image.asset(
+              const ColoredBox(color: AppColors.card),
+              CoverAsset(
                 image,
-                fit: BoxFit.cover,
                 alignment: const Alignment(0, -0.3),
                 errorBuilder: (_, _, _) => const DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: RadialGradient(
                       center: Alignment(0, -0.4),
-                      colors: [Color(0xFF7A2E22), Color(0xFF22160E)],
+                      colors: [Color(0xFF7A2E22), AppColors.card],
                     ),
                   ),
                 ),
@@ -163,7 +163,7 @@ class CategoryCover extends StatelessWidget {
                       style: AppText.display(
                         math.max(12, width * 0.12),
                         height: 1.15,
-                        color: const Color(0xFFF6D64A),
+                        color: AppColors.slabYellow,
                       ),
                     ),
                   ),
@@ -187,11 +187,11 @@ class CategoryCover extends StatelessWidget {
                               AppText.poster(
                                 size,
                                 height: 1.05,
-                                color: const Color(0xFFFBF1DC),
+                                color: AppColors.filmCream,
                               ).copyWith(
                                 shadows: [
                                   Shadow(
-                                    color: const Color(0xFF120A06),
+                                    color: AppColors.soot,
                                     offset: Offset(0, unit * 0.4),
                                   ),
                                   Shadow(

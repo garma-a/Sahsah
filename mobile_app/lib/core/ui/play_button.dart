@@ -64,7 +64,7 @@ class _PlayButtonState extends State<PlayButton> {
     final face = Container(
       decoration: BoxDecoration(
         borderRadius: radius,
-        color: enabled ? AppColors.press : const Color(0xFF6F7471),
+        color: enabled ? AppColors.press : AppColors.disabled,
         border: widget.ringWidth > 0
             ? Border.all(
                 color: enabled

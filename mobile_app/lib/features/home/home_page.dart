@@ -20,6 +20,7 @@ import '../game/ui/game_ui.dart';
 import '../shell/app_route.dart';
 import 'promo_banner.dart';
 import '../../core/ui/motion.dart';
+import '../../core/ui/cover_image.dart';
 
 part 'lobby.dart';
 
@@ -134,9 +135,8 @@ class _PlayCard extends StatelessWidget {
         child: Stack(
           children: [
             Positioned.fill(
-              child: Image.asset(
+              child: CoverAsset(
                 BrandImages.herowide,
-                fit: BoxFit.cover,
                 alignment: const Alignment(-0.6, -0.4),
               ),
             ),

@@ -84,7 +84,7 @@ BoxDecoration paperDecoration({
 /// shadow.
 BoxDecoration sheetDecoration({BorderRadiusGeometry? radius}) => BoxDecoration(
   borderRadius: radius,
-  color: const Color(0xFFF3E6C8),
+  color: AppColors.sheet,
   image: grainImage,
   border: Border.all(color: AppColors.ink, width: 4),
   boxShadow: const [BoxShadow(color: AppColors.cyan, offset: Offset(7, 8))],
