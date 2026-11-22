@@ -4,7 +4,6 @@ import '../../../core/i18n/lang.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/brand_background.dart';
 import '../../../core/ui/game_button.dart';
-import '../../../core/ui/play_button.dart';
 import '../../../core/ui/pressable.dart';
 import '../../../core/ui/surfaces.dart';
 
@@ -112,76 +111,101 @@ class RoundIconButton extends StatelessWidget {
   }
 }
 
-/// Branded yes/no dialog. Returns true when confirmed.
+/// Branded yes/no dialog on paper, like the question's leave dialog.
+/// Returns true when confirmed.
+///
+/// A [destructive] one leads with the safe choice: [cancel] ("keep
+/// playing") is the yellow button, and the confirm is an outline with red
+/// words, so the inviting button never ends anything.
 Future<bool> confirmDialog(
   BuildContext context, {
   required String title,
   required String message,
   required String confirm,
+  String? cancel,
   bool destructive = false,
 }) async {
   final lang = context.lang;
+  final cancelLabel = cancel ?? lang.t('لأ', 'La2');
   final result = await showDialog<bool>(
     context: context,
     barrierColor: Colors.black.withValues(alpha: 0.6),
-    builder: (dialogContext) => Dialog(
-      backgroundColor: AppColors.forest,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
-        side: BorderSide(color: AppColors.gold.withValues(alpha: 0.3)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(22),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(title, style: AppText.display(26, height: 1.2)),
-            const SizedBox(height: 8),
-            Text(
-              message,
-              style: AppText.sans(
-                15,
-                height: 1.6,
-                color: AppColors.ivory.withValues(alpha: 0.75),
+    builder: (dialogContext) {
+      final nav = Navigator.of(dialogContext);
+      final Widget no = destructive
+          ? GoldButton(
+              key: const ValueKey('confirm-cancel'),
+              label: cancelLabel,
+              onTap: () => nav.pop(false),
+            )
+          : GlassButton(
+              key: const ValueKey('confirm-cancel'),
+              label: cancelLabel,
+              onTap: () => nav.pop(false),
+            );
+      final Widget yes = destructive
+          ? GameButton(
+              key: const ValueKey('confirm-ok'),
+              height: 52,
+              color: AppColors.paper,
+              borderColor: AppColors.pressDeep,
+              semanticLabel: confirm,
+              onTap: () => nav.pop(true),
+              child: Text(
+                confirm,
+                style: AppText.sans(
+                  16,
+                  weight: FontWeight.w700,
+                  color: AppColors.pressDeep,
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
-            Row(
+            )
+          : GoldButton(
+              key: const ValueKey('confirm-ok'),
+              label: confirm,
+              onTap: () => nav.pop(true),
+            );
+      return Dialog(
+        backgroundColor: AppColors.paper,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: const BorderSide(color: AppColors.ink, width: 4),
+        ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: Padding(
+            padding: const EdgeInsets.all(22),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
-                  child: GlassButton(
-                    label: lang.t('لأ', 'La2'),
-                    onTap: () => Navigator.of(dialogContext).pop(false),
+                Text(
+                  title,
+                  style: AppText.display(26, height: 1.2, color: AppColors.ink),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  message,
+                  style: AppText.sans(
+                    15,
+                    height: 1.6,
+                    color: AppColors.inkMuted,
                   ),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: destructive
-                      ? PlayButton(
-                          height: 52,
-                          onPressed: () =>
-                              Navigator.of(dialogContext).pop(true),
-                          child: Text(
-                            confirm,
-                            style: AppText.sans(
-                              16,
-                              weight: FontWeight.w700,
-                              color: Colors.white,
-                            ),
-                          ),
-                        )
-                      : GoldButton(
-                          label: confirm,
-                          onTap: () => Navigator.of(dialogContext).pop(true),
-                        ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(child: no),
+                    const SizedBox(width: 10),
+                    Expanded(child: yes),
+                  ],
                 ),
               ],
             ),
-          ],
+          ),
         ),
-      ),
-    ),
+      );
+    },
   );
   return result ?? false;
 }

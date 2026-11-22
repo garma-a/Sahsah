@@ -254,14 +254,17 @@ class _PackCover extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 6),
-                Text(
-                  lang.t(category.help, category.helpEn),
-                  maxLines: 3,
-                  textAlign: TextAlign.center,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppText.sans(
-                    12,
-                    color: AppColors.ivory.withValues(alpha: 0.8),
+                // Gives up lines first when the panel is short.
+                Flexible(
+                  child: Text(
+                    lang.t(category.help, category.helpEn),
+                    maxLines: 3,
+                    textAlign: TextAlign.center,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppText.sans(
+                      12,
+                      color: AppColors.ivory.withValues(alpha: 0.8),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 8),
