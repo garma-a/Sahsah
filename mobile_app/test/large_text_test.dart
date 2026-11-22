@@ -33,7 +33,7 @@ void main() {
   }
 
   Future<void> everyBanner(WidgetTester tester) async {
-    for (var i = 0; i < 3; i++) {
+    for (var i = 0; i < 4; i++) {
       await tester.pump(PromoCarousel.interval);
       await settle(tester);
       await settle(tester);

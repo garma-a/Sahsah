@@ -156,6 +156,8 @@ void runPromo(BuildContext context, Promo promo) {
   switch (promo.action) {
     case PromoAction.newPack:
       nav.go(AppRoute.categories);
+    case PromoAction.gifts:
+      nav.go(AppRoute.gift);
     case PromoAction.play:
       nav.go(AppRoute.play);
     case PromoAction.howTo:

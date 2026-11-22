@@ -10,6 +10,9 @@ enum PromoAction {
   /// Open the categories, where the new section comes first.
   newPack,
 
+  /// Open the shop's gift tab.
+  gifts,
+
   /// Start setting up a game.
   play,
 
@@ -19,9 +22,8 @@ enum PromoAction {
 
 /// A banner on the lobby's stage, and possibly the one that pops up when
 /// the app opens. Only what is true in the app today: the backend has no
-/// announcements yet, so they live here until it does. A discount goes in
-/// once its figure is settled (the website's ticker says 20% off gifts,
-/// the shop's gift tab 10%).
+/// announcements yet, so they live here until it does. The gift discount
+/// is the website ticker's "خصم ٢٠٪ على كل الهدايا", from [giftDiscount].
 class Promo {
   const Promo({
     required this.id,
@@ -33,6 +35,7 @@ class Promo {
     this.imageAlignment = Alignment.center,
     this.textAtStart = true,
     this.posters = const [],
+    this.stamp,
     this.popup = false,
   });
 
@@ -55,6 +58,9 @@ class Promo {
   /// Categories fanned out as posters on the art side.
   final List<Category> posters;
 
+  /// A big figure printed on a ticket on the art side (a discount).
+  final String? stamp;
+
   /// The one shown in a pop-up when the app opens.
   final bool popup;
 }
@@ -68,6 +74,7 @@ List<Promo> homePromos(LangController lang) {
       if (isPlayable(c.id)) c,
   ];
   String name(Category c) => lang.t(c.name, c.nameEn);
+  final off = (giftDiscount * 100).round();
   return [
     Promo(
       id: 'new-pack',
@@ -82,6 +89,20 @@ List<Promo> homePromos(LangController lang) {
       action: PromoAction.newPack,
       posters: playable.take(3).toList(),
       popup: true,
+    ),
+    Promo(
+      id: 'gift-discount',
+      title: lang.t(
+        'خصم ${lang.toAr(off)}٪ على كل الهدايا',
+        '$off% off kol el hadaya',
+      ),
+      body: lang.t(
+        'اهدوا ألعاب لصحابكم، والهدية عليها خصم ${lang.toAr(off)}٪.',
+        'Ehdo al3ab le so7abkom, wel hedeya 3aleiha khasm $off%.',
+      ),
+      cta: lang.t('شوفوا الهدايا', 'Shoofo el hadaya'),
+      action: PromoAction.gifts,
+      stamp: lang.t('${lang.toAr(off)}٪', '$off%'),
     ),
     Promo(
       id: 'free-play',

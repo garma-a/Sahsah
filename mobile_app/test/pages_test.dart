@@ -11,12 +11,12 @@ void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   group('shop rules', () {
-    test('packs cost 100 EGP a game; gifts are 10% off', () {
+    test('packs cost 100 EGP a game; gifts are 20% off', () {
       expect(packPrice(1), 100);
       expect(packPrice(2), 200);
       expect(packPrice(5), 500);
-      expect(packPrice(1, gift: true), 90);
-      expect(packPrice(5, gift: true), 450);
+      expect(packPrice(1, gift: true), 80);
+      expect(packPrice(5, gift: true), 400);
       expect(packListPrice(5), 500);
     });
 
@@ -52,7 +52,7 @@ void main() {
     expect(find.text('اشتري'), findsNWidgets(3));
 
     // Gift tab: a bad number is caught before anything else.
-    await tapText(tester, 'هدية · خصم ١٠٪');
+    await tapText(tester, 'هدية · خصم ٢٠٪');
     expect(find.text('اهدي صاحبك لعبة'), findsOneWidget);
     await tester.tap(find.text('اهدي').first);
     await settle(tester);

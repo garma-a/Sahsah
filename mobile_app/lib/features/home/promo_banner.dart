@@ -35,6 +35,11 @@ class PromoBanner extends StatelessWidget {
     // The words' side, as a fixed side of the screen.
     final textRight = promo.textAtStart == rtl;
     final scale = large ? 1.2 : 1.0;
+    // A discount is printed in ink straight on its yellow paper; the
+    // others are light words over a dark wash on a picture.
+    final paper = promo.stamp != null;
+    final ink = paper ? AppColors.ink : AppColors.ivory;
+    final lift = paper ? const <Shadow>[] : const [_lift];
 
     return Semantics(
       container: true,
@@ -79,9 +84,9 @@ class PromoBanner extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: AppText.display(
                           30 * scale,
-                          color: AppColors.ivory,
+                          color: ink,
                           height: 1.15,
-                        ).copyWith(shadows: [_lift]),
+                        ).copyWith(shadows: lift),
                       ),
                     ),
                     SizedBox(height: 6 * scale),
@@ -92,9 +97,9 @@ class PromoBanner extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: AppText.sans(
                           14 * scale,
-                          color: AppColors.ivory,
+                          color: ink,
                           height: 1.45,
-                        ).copyWith(shadows: [_lift]),
+                        ).copyWith(shadows: lift),
                       ),
                     ),
                     SizedBox(height: 12 * scale),
@@ -104,7 +109,8 @@ class PromoBanner extends StatelessWidget {
                       height: 42 * scale,
                       radius: 999,
                       depth: 4,
-                      color: AppColors.gold,
+                      // Yellow on yellow would vanish: ink on the discount.
+                      color: paper ? AppColors.ink : AppColors.gold,
                       semanticLabel: promo.cta,
                       onTap: onAction,
                       child: Padding(
@@ -144,24 +150,25 @@ class PromoBanner extends StatelessWidget {
                 child: _Art(promo: promo, textRight: textRight),
               ),
               // A dark wash under the words, clear over the art.
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: textRight
-                        ? Alignment.centerRight
-                        : Alignment.centerLeft,
-                    end: textRight
-                        ? Alignment.centerLeft
-                        : Alignment.centerRight,
-                    colors: const [
-                      Color(0xE6151B19),
-                      Color(0x99151B19),
-                      Color(0x00151B19),
-                    ],
-                    stops: const [0, 0.45, 0.75],
+              if (!paper)
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: textRight
+                          ? Alignment.centerRight
+                          : Alignment.centerLeft,
+                      end: textRight
+                          ? Alignment.centerLeft
+                          : Alignment.centerRight,
+                      colors: const [
+                        Color(0xE6151B19),
+                        Color(0x99151B19),
+                        Color(0x00151B19),
+                      ],
+                      stops: const [0, 0.45, 0.75],
+                    ),
                   ),
                 ),
-              ),
               const DecoratedBox(decoration: BoxDecoration(image: grainImage)),
               words,
             ],
@@ -192,6 +199,8 @@ class _Art extends StatelessWidget {
         errorBuilder: (_, _, _) => const ColoredBox(color: AppColors.forest),
       );
     }
+    final stamp = promo.stamp;
+    if (stamp != null) return _Ticket(stamp: stamp, textRight: textRight);
     final lang = context.lang;
     return ColoredBox(
       color: AppColors.press,
@@ -247,6 +256,100 @@ class _Art extends StatelessWidget {
   }
 }
 
+/// A discount's art: a red ticket with the figure, stuck on crooked on
+/// sun-yellow paper, in the half away from the words.
+class _Ticket extends StatelessWidget {
+  const _Ticket({required this.stamp, required this.textRight});
+
+  final String stamp;
+  final bool textRight;
+
+  @override
+  Widget build(BuildContext context) {
+    final lang = context.lang;
+    return ColoredBox(
+      color: AppColors.sun,
+      child: LayoutBuilder(
+        builder: (context, box) {
+          final h = box.maxHeight * 0.56;
+          final w = math.min(box.maxWidth * 0.34, h * 1.25);
+          final centre = textRight ? box.maxWidth * 0.26 : box.maxWidth * 0.74;
+          return Stack(
+            children: [
+              const Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(image: grainImage),
+                ),
+              ),
+              Positioned(
+                left: centre - w / 2,
+                top: (box.maxHeight - h) / 2,
+                width: w,
+                height: h,
+                child: Transform.rotate(
+                  angle: -6 * math.pi / 180,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.press,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.ink, width: 4),
+                      boxShadow: [inkDrop(7)],
+                    ),
+                    padding: EdgeInsets.all(h * 0.08),
+                    child: FittedBox(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                LucideIcons.gift,
+                                color: Colors.white,
+                                size: 22,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                lang.t('خصم', 'Khasm'),
+                                style: AppText.display(
+                                  24,
+                                  color: Colors.white,
+                                  height: 1,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Text(
+                            stamp,
+                            textDirection: TextDirection.ltr,
+                            style:
+                                AppText.display(
+                                  64,
+                                  color: Colors.white,
+                                  height: 1.05,
+                                ).copyWith(
+                                  shadows: const [
+                                    Shadow(
+                                      color: AppColors.ink,
+                                      offset: Offset(3, 4),
+                                    ),
+                                  ],
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
 /// The lobby's stage: the promos as a banner carousel that turns every few
 /// seconds (unless animations are off) and can be swiped, with page dots.
 class PromoCarousel extends StatefulWidget {
@@ -273,15 +376,26 @@ class _PromoCarouselState extends State<PromoCarousel> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _schedule();
+    // Turns on its own unless animations are off or a screen reader is on
+    // (slides moving under it are disorienting; they can still be swiped).
+    // Only a change in that restarts the turn: other MediaQuery changes
+    // mustn't keep resetting it.
+    final auto =
+        widget.promos.length > 1 &&
+        !MediaQuery.disableAnimationsOf(context) &&
+        !MediaQuery.accessibleNavigationOf(context);
+    if (auto != _auto) {
+      _auto = auto;
+      _schedule();
+    }
   }
+
+  bool? _auto;
 
   /// (Re)starts the turn, so a swipe gets the full interval.
   void _schedule() {
     _timer?.cancel();
-    if (MediaQuery.disableAnimationsOf(context) || widget.promos.length < 2) {
-      return;
-    }
+    if (_auto != true) return;
     _timer = Timer.periodic(PromoCarousel.interval, (_) {
       if (!_pages.hasClients) return;
       _pages.animateToPage(
