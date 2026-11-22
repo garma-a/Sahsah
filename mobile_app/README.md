@@ -24,6 +24,8 @@ A mobile game lobby laid out as a phone game, first built from the prototype (`.
 - **Feel:** buttons and cards give press feedback and haptics, screens fade, and system font scaling is capped at 130%.
 - **Motion** (`lib/core/ui/motion.dart`), after the website's keyframes: cards rise 22px and fade in one after another (board packs, pack tiles, shelf and setup posters, the lobby's posters, which settle a little crooked); a picked poster's sticker pops; the answer slab turns up. With the system's animations off, everything simply appears. The lobby's headings are printed strips stuck on at a tilt, like the website's hero.
 - **Contrast:** every text-and-fill pair of the website's look clears WCAG AA, and `test/contrast_test.dart` keeps it so. Small red text on paper uses the deeper press red, since the button red is 4.4:1 there.
+- **Screen readers:** every control has a spoken label, and TalkBack or VoiceOver can press it. A control speaks a label of its own through `Pressable(semanticLabel:)` or `GameButton(semanticLabel:)`, which keep the tap with the label; wrapping one in `Semantics(excludeSemantics: true)` would drop it. `test/screen_reader_test.dart` plays a turn by spoken labels alone.
+- **Icon and launch screen:** the retro صحصح logo on the website's charcoal (#2B3230), with the website's one-colour mark for Android's themed icons. The launch screen is the logo on charcoal, so the app never opens on white. `flutter test tool/brand_icons_test.dart` redraws every icon and launch image from the SVGs.
 
 ### Playing a game
 

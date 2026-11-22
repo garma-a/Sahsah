@@ -486,39 +486,35 @@ class _HelpChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final lang = context.lang;
     final label = lang.t('إزاي نلعب؟', 'Ezay nel3ab?');
-    return Semantics(
-      button: true,
-      label: label,
-      excludeSemantics: true,
-      child: Pressable(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(999),
-            color: AppColors.gold,
-            border: Border.all(color: AppColors.ink, width: 2.5),
-            boxShadow: [inkDrop(3)],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                LucideIcons600.circleHelp,
-                size: 15,
+    return Pressable(
+      semanticLabel: label,
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(999),
+          color: AppColors.gold,
+          border: Border.all(color: AppColors.ink, width: 2.5),
+          boxShadow: [inkDrop(3)],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              LucideIcons600.circleHelp,
+              size: 15,
+              color: AppColors.deep,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: AppText.sans(
+                13,
+                weight: FontWeight.w700,
                 color: AppColors.deep,
               ),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: AppText.sans(
-                  13,
-                  weight: FontWeight.w700,
-                  color: AppColors.deep,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

@@ -99,18 +99,14 @@ class RoundIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: label,
-      excludeSemantics: true,
-      child: Pressable(
-        onTap: onTap,
-        child: Container(
-          width: size,
-          height: size,
-          decoration: glassDecoration(shape: BoxShape.circle, shadow: false),
-          child: Icon(icon, size: size * 0.45, color: AppColors.ivory),
-        ),
+    return Pressable(
+      semanticLabel: label,
+      onTap: onTap,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: glassDecoration(shape: BoxShape.circle, shadow: false),
+        child: Icon(icon, size: size * 0.45, color: AppColors.ivory),
       ),
     );
   }

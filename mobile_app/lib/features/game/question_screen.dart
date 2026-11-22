@@ -720,24 +720,20 @@ class _TimerBar extends StatelessWidget {
     // where it will be at the next tick.
     final left = (running ? ms - 1000 : ms) / GameController.answerMs;
 
-    Widget round(IconData icon, String label, VoidCallback onTap) => Semantics(
-      button: true,
-      label: label,
-      excludeSemantics: true,
-      child: Pressable(
-        onTap: disabled ? null : onTap,
-        child: Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: elapsed ? Colors.white : AppColors.ink,
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            icon,
-            size: 17,
-            color: elapsed ? AppColors.ink : Colors.white,
-          ),
+    Widget round(IconData icon, String label, VoidCallback onTap) => Pressable(
+      semanticLabel: label,
+      onTap: disabled ? null : onTap,
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: elapsed ? Colors.white : AppColors.ink,
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          icon,
+          size: 17,
+          color: elapsed ? AppColors.ink : Colors.white,
         ),
       ),
     );

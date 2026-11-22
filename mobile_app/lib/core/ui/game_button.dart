@@ -40,6 +40,8 @@ class GameButton extends StatefulWidget {
 
   /// How far the face sits above its edge.
   final double depth;
+
+  /// What a screen reader says, in place of the text on the face.
   final String? semanticLabel;
 
   @override
@@ -60,22 +62,28 @@ class _GameButtonState extends State<GameButton> {
     final radius = BorderRadius.circular(widget.radius);
     final edge = widget.edgeColor ?? AppColors.ink;
     final sink = _down ? widget.depth : 0.0;
+    final tap = enabled
+        ? () {
+            HapticFeedback.lightImpact();
+            widget.onTap!();
+          }
+        : null;
+    // A label replaces the face's own text for screen readers, and then
+    // carries the tap itself (excluding the face also drops its tap).
+    final labelled = widget.semanticLabel != null;
 
     return Semantics(
       button: true,
       enabled: enabled,
       label: widget.semanticLabel,
+      onTap: labelled ? tap : null,
+      excludeSemantics: labelled,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTapDown: (_) => _set(true),
         onTapUp: (_) => _set(false),
         onTapCancel: () => _set(false),
-        onTap: enabled
-            ? () {
-                HapticFeedback.lightImpact();
-                widget.onTap!();
-              }
-            : null,
+        onTap: tap,
         child: Opacity(
           opacity: enabled ? 1 : 0.5,
           child: SizedBox(
