@@ -105,26 +105,22 @@ class LangToggle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final lang = context.lang;
-    return Semantics(
-      button: true,
-      label: lang.t('Switch to English (Franco)', 'غيّر للعربي'),
-      excludeSemantics: true,
-      child: Pressable(
-        onTap: lang.toggle,
-        child: Container(
-          height: 44,
-          constraints: const BoxConstraints(minWidth: 44),
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          decoration: glassDecoration(
-            radius: BorderRadius.circular(999),
-            shadow: false,
-          ),
-          child: Center(
-            widthFactor: 1,
-            child: Text(
-              lang.ar ? 'EN' : 'عربي',
-              style: AppText.sans(14, weight: FontWeight.w700),
-            ),
+    return Pressable(
+      semanticLabel: lang.t('Switch to English (Franco)', 'غيّر للعربي'),
+      onTap: lang.toggle,
+      child: Container(
+        height: 44,
+        constraints: const BoxConstraints(minWidth: 44),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        decoration: glassDecoration(
+          radius: BorderRadius.circular(999),
+          shadow: false,
+        ),
+        child: Center(
+          widthFactor: 1,
+          child: Text(
+            lang.ar ? 'EN' : 'عربي',
+            style: AppText.sans(14, weight: FontWeight.w700),
           ),
         ),
       ),
@@ -144,9 +140,8 @@ class TokenWallet extends StatelessWidget {
     // While the shop is closed every game is free, so say that instead of
     // a zero balance (an Arabic "٠" also reads like a stray dot).
     final free = tokens == 0;
-    return Semantics(
-      button: true,
-      label: free
+    return Pressable(
+      semanticLabel: free
           ? lang.t(
               'اللعب مجاني دلوقتي، المتجر',
               'El le3b magany delwa2ty, el matgar',
@@ -155,73 +150,70 @@ class TokenWallet extends StatelessWidget {
               'رصيدك $tokens توكن، اشتري توكنز',
               'Rasidak $tokens token, eshtery tokens',
             ),
-      excludeSemantics: true,
-      child: Pressable(
-        onTap: () => ShellNav.of(context).go(AppRoute.shop),
-        child: Container(
-          height: 44,
-          padding: const EdgeInsets.symmetric(horizontal: 2),
-          decoration: glassDecoration(
-            radius: BorderRadius.circular(999),
-            shadow: false,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
+      onTap: () => ShellNav.of(context).go(AppRoute.shop),
+      child: Container(
+        height: 44,
+        padding: const EdgeInsets.symmetric(horizontal: 2),
+        decoration: glassDecoration(
+          radius: BorderRadius.circular(999),
+          shadow: false,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: const BoxDecoration(
+                color: AppColors.gold,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                LucideIcons600.coins,
+                size: 18,
+                color: AppColors.forest,
+              ),
+            ),
+            const SizedBox(width: 8),
+            free
+                ? Text(
+                    lang.t('اللعب مجاني', 'El le3b magany'),
+                    style: AppText.sans(
+                      15,
+                      weight: FontWeight.w700,
+                      color: AppColors.gold,
+                      height: 1,
+                    ),
+                  )
+                : Text(
+                    lang.toAr(tokens),
+                    textDirection: TextDirection.ltr,
+                    style: AppText.num(20, height: 1),
+                  ),
+            // "+" (buy more) only when there's a balance to add to; while
+            // play is free it would promise something that isn't there.
+            if (free)
+              const SizedBox(width: 10)
+            else ...[
+              const SizedBox(width: 10),
               Container(
-                width: 34,
-                height: 34,
-                decoration: const BoxDecoration(
-                  color: AppColors.gold,
+                width: 26,
+                height: 26,
+                decoration: BoxDecoration(
+                  color: AppColors.gold.withValues(alpha: 0.18),
                   shape: BoxShape.circle,
+                  border: Border.all(
+                    color: AppColors.gold.withValues(alpha: 0.5),
+                  ),
                 ),
                 child: const Icon(
-                  LucideIcons600.coins,
-                  size: 18,
-                  color: AppColors.forest,
+                  LucideIcons600.plus,
+                  size: 15,
+                  color: AppColors.gold,
                 ),
               ),
-              const SizedBox(width: 8),
-              free
-                  ? Text(
-                      lang.t('اللعب مجاني', 'El le3b magany'),
-                      style: AppText.sans(
-                        15,
-                        weight: FontWeight.w700,
-                        color: AppColors.gold,
-                        height: 1,
-                      ),
-                    )
-                  : Text(
-                      lang.toAr(tokens),
-                      textDirection: TextDirection.ltr,
-                      style: AppText.num(20, height: 1),
-                    ),
-              // "+" (buy more) only when there's a balance to add to; while
-              // play is free it would promise something that isn't there.
-              if (free)
-                const SizedBox(width: 10)
-              else ...[
-                const SizedBox(width: 10),
-                Container(
-                  width: 26,
-                  height: 26,
-                  decoration: BoxDecoration(
-                    color: AppColors.gold.withValues(alpha: 0.18),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: AppColors.gold.withValues(alpha: 0.5),
-                    ),
-                  ),
-                  child: const Icon(
-                    LucideIcons600.plus,
-                    size: 15,
-                    color: AppColors.gold,
-                  ),
-                ),
-              ],
             ],
-          ),
+          ],
         ),
       ),
     );

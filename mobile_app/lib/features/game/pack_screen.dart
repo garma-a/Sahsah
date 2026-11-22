@@ -495,70 +495,67 @@ class _QuestionTile extends StatelessWidget {
     // board; one already opened is cream, waiting to be finished.
     final face = started ? AppColors.paper : fill;
     final ink = AppColors.inkOn(face);
-    return Semantics(
-      label: lang.t(
+    return GameButton(
+      semanticLabel: lang.t(
         'سؤال ${lang.toAr(number)}، $points نقطة، ${format.$2}${started ? '، مفتوح' : ''}',
         'So2al $number, ${q.points} no2ta, ${format.$3}${started ? ', maftoo7' : ''}',
       ),
-      excludeSemantics: true,
-      child: GameButton(
-        key: ValueKey('question-$id'),
-        radius: 18,
-        depth: 6,
-        color: face,
-        onTap: () => onPlay(id),
-        child: _numbered(
-          context,
-          ink,
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 36),
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(points, style: AppText.num(34, color: ink, height: 1)),
-                  ...[
-                    const SizedBox(width: 10),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: started
-                            ? AppColors.sun
-                            : ink.withValues(alpha: 0.14),
-                        borderRadius: BorderRadius.circular(999),
-                        border: started
-                            ? Border.all(color: AppColors.ink, width: 2)
-                            : null,
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            started ? LucideIcons600.circlePlay : format.$1,
-                            size: 14,
+      key: ValueKey('question-$id'),
+      radius: 18,
+      depth: 6,
+      color: face,
+      onTap: () => onPlay(id),
+      child: _numbered(
+        context,
+        ink,
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 36),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(points, style: AppText.num(34, color: ink, height: 1)),
+                ...[
+                  const SizedBox(width: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: started
+                          ? AppColors.sun
+                          : ink.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(999),
+                      border: started
+                          ? Border.all(color: AppColors.ink, width: 2)
+                          : null,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          started ? LucideIcons600.circlePlay : format.$1,
+                          size: 14,
+                          color: started ? AppColors.ink : ink,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          started
+                              ? lang.t('كمّل', 'Kammel')
+                              : lang.t(format.$2, format.$3),
+                          style: AppText.sans(
+                            12,
+                            weight: FontWeight.w700,
                             color: started ? AppColors.ink : ink,
                           ),
-                          const SizedBox(width: 4),
-                          Text(
-                            started
-                                ? lang.t('كمّل', 'Kammel')
-                                : lang.t(format.$2, format.$3),
-                            style: AppText.sans(
-                              12,
-                              weight: FontWeight.w700,
-                              color: started ? AppColors.ink : ink,
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ],
-              ),
+              ],
             ),
           ),
         ),

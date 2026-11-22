@@ -208,32 +208,28 @@ class _BarAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: label,
-      excludeSemantics: true,
-      child: Pressable(
-        onTap: onTap,
-        child: Container(
-          height: 52,
-          constraints: const BoxConstraints(minWidth: 56),
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          decoration: glassDecoration(
-            radius: BorderRadius.circular(16),
-            shadow: false,
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 18, color: AppColors.ivory),
-              const SizedBox(height: 2),
-              Text(
-                caption,
-                maxLines: 1,
-                style: AppText.sans(12, weight: FontWeight.w700, height: 1.1),
-              ),
-            ],
-          ),
+    return Pressable(
+      semanticLabel: label,
+      onTap: onTap,
+      child: Container(
+        height: 52,
+        constraints: const BoxConstraints(minWidth: 56),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        decoration: glassDecoration(
+          radius: BorderRadius.circular(16),
+          shadow: false,
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 18, color: AppColors.ivory),
+            const SizedBox(height: 2),
+            Text(
+              caption,
+              maxLines: 1,
+              style: AppText.sans(12, weight: FontWeight.w700, height: 1.1),
+            ),
+          ],
         ),
       ),
     );
@@ -318,98 +314,94 @@ class _TeamScoreState extends State<TeamScore>
     final color = teamColors[team];
     const ink = AppColors.ink;
     final leading = game.leader == team;
-    final pill = Semantics(
-      button: !game.finished,
-      label: lang.t(
+    final pill = Pressable(
+      semanticLabel: lang.t(
         '${game.teamNames[team]}: ${game.scores[team]} نقطة، عدّل النقط',
         '${game.teamNames[team]}: ${game.scores[team]} no2ta, 3addel el no2at',
       ),
-      excludeSemantics: true,
-      child: Pressable(
-        onTap: game.finished ? null : () => _editScore(context, game, team),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          height: compact ? 44 : 52,
-          padding: const EdgeInsetsDirectional.fromSTEB(5, 0, 10, 0),
-          // The website's score card: cream with an ink edge, the team name
-          // on a ribbon of its colour and a big ink score. The leader gets
-          // the crown and a deeper drop.
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            color: AppColors.paper,
-            border: Border.all(color: AppColors.ink, width: 3),
-            boxShadow: [inkDrop(leading ? 6 : 4)],
-          ),
-          child: Row(
-            children: [
-              if (leading) ...[
-                Icon(LucideIcons600.crown, size: 16, color: ink),
-                const SizedBox(width: 6),
-              ],
-              // Name at the start, a big score at the end: readable from
-              // across the room.
-              Expanded(
-                child: Align(
-                  alignment: AlignmentDirectional.centerStart,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 9,
-                      vertical: 1,
-                    ),
-                    decoration: BoxDecoration(
-                      color: color,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      game.teamNames[team],
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppText.display(
-                        compact ? 16 : 20,
-                        height: 1.2,
-                        color: ink,
-                      ),
+      onTap: game.finished ? null : () => _editScore(context, game, team),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        height: compact ? 44 : 52,
+        padding: const EdgeInsetsDirectional.fromSTEB(5, 0, 10, 0),
+        // The website's score card: cream with an ink edge, the team name
+        // on a ribbon of its colour and a big ink score. The leader gets
+        // the crown and a deeper drop.
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          color: AppColors.paper,
+          border: Border.all(color: AppColors.ink, width: 3),
+          boxShadow: [inkDrop(leading ? 6 : 4)],
+        ),
+        child: Row(
+          children: [
+            if (leading) ...[
+              Icon(LucideIcons600.crown, size: 16, color: ink),
+              const SizedBox(width: 6),
+            ],
+            // Name at the start, a big score at the end: readable from
+            // across the room.
+            Expanded(
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 1,
+                  ),
+                  decoration: BoxDecoration(
+                    color: color,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    game.teamNames[team],
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppText.display(
+                      compact ? 16 : 20,
+                      height: 1.2,
+                      color: ink,
                     ),
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-              // The unit sits under the score so it takes no width from the
-              // name.
-              Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  TweenAnimationBuilder<double>(
-                    tween: Tween(end: game.scores[team].toDouble()),
-                    duration: const Duration(milliseconds: 600),
-                    curve: Curves.easeOutCubic,
-                    // A lone Arabic zero is a small dot, so say it.
-                    builder: (context, v, _) => Text(
-                      v.round() == 0 && lang.ar ? 'صفر' : lang.toAr(v.round()),
-                      textDirection: TextDirection.ltr,
-                      // The word is wider and has a tail, so it's set smaller.
-                      style: AppText.num(
-                        v.round() == 0 && lang.ar
-                            ? (compact ? 16 : 21)
-                            : (compact ? 20 : 26),
-                        color: ink,
-                        height: 1.05,
-                      ),
+            ),
+            const SizedBox(width: 8),
+            // The unit sits under the score so it takes no width from the
+            // name.
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                TweenAnimationBuilder<double>(
+                  tween: Tween(end: game.scores[team].toDouble()),
+                  duration: const Duration(milliseconds: 600),
+                  curve: Curves.easeOutCubic,
+                  // A lone Arabic zero is a small dot, so say it.
+                  builder: (context, v, _) => Text(
+                    v.round() == 0 && lang.ar ? 'صفر' : lang.toAr(v.round()),
+                    textDirection: TextDirection.ltr,
+                    // The word is wider and has a tail, so it's set smaller.
+                    style: AppText.num(
+                      v.round() == 0 && lang.ar
+                          ? (compact ? 16 : 21)
+                          : (compact ? 20 : 26),
+                      color: ink,
+                      height: 1.05,
                     ),
                   ),
-                  Text(
-                    lang.t('نقطة', 'no2ta'),
-                    style: AppText.sans(
-                      12,
-                      weight: FontWeight.w700,
-                      color: AppColors.inkMuted,
-                      height: 1.1,
-                    ),
+                ),
+                Text(
+                  lang.t('نقطة', 'no2ta'),
+                  style: AppText.sans(
+                    12,
+                    weight: FontWeight.w700,
+                    color: AppColors.inkMuted,
+                    height: 1.1,
                   ),
-                ],
-              ),
-            ],
-          ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -523,55 +515,51 @@ class TurnChip extends StatelessWidget {
       color: color,
     );
 
-    return Semantics(
-      button: !game.finished,
-      label: lang.t(
+    return Pressable(
+      semanticLabel: lang.t(
         'الدور على $name، اضغط عشان تبدّل الدور',
         'El door 3ala $name, edghat 3ashan tebaddel el door',
       ),
-      excludeSemantics: true,
-      child: Pressable(
-        key: const ValueKey('turn-chip'),
-        onTap: game.finished ? null : controller.switchTurn,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 220),
-          height: 52,
-          constraints: const BoxConstraints(maxWidth: 170),
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          decoration: BoxDecoration(
-            color: AppColors.deep,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: color, width: 2),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (team == 0) ...[arrow, const SizedBox(width: 4)],
-              Flexible(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      lang.t('الدور على', 'El door 3ala'),
-                      maxLines: 1,
-                      style: AppText.sans(
-                        12,
-                        color: AppColors.ivory.withValues(alpha: 0.8),
-                        height: 1.2,
-                      ),
+      key: const ValueKey('turn-chip'),
+      onTap: game.finished ? null : controller.switchTurn,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        height: 52,
+        constraints: const BoxConstraints(maxWidth: 170),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        decoration: BoxDecoration(
+          color: AppColors.deep,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color, width: 2),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (team == 0) ...[arrow, const SizedBox(width: 4)],
+            Flexible(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    lang.t('الدور على', 'El door 3ala'),
+                    maxLines: 1,
+                    style: AppText.sans(
+                      12,
+                      color: AppColors.ivory.withValues(alpha: 0.8),
+                      height: 1.2,
                     ),
-                    Text(
-                      name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppText.display(16, height: 1.25),
-                    ),
-                  ],
-                ),
+                  ),
+                  Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppText.display(16, height: 1.25),
+                  ),
+                ],
               ),
-              if (team == 1) ...[const SizedBox(width: 4), arrow],
-            ],
-          ),
+            ),
+            if (team == 1) ...[const SizedBox(width: 4), arrow],
+          ],
         ),
       ),
     );
@@ -805,122 +793,115 @@ class _CategoryCard extends StatelessWidget {
     final name = lang.t(category.name, category.nameEn);
     final winner = done ? _winner(ids) : null;
 
-    return Semantics(
-      button: !done,
-      label: done
+    return Pressable(
+      semanticLabel: done
           ? lang.t('$name، خلصت', '$name, khelset')
           : lang.t(
               '$name، باقي ${lang.toAr(left)} أسئلة',
               '$name, ba2y $left as2ela',
             ),
-      excludeSemantics: true,
-      child: Pressable(
-        scale: 0.97,
-        onTap: done ? null : () => onOpen(categoryId),
-        // The website's board card: the film-still cover in its tone's
-        // frame, a count chip, and a "done" stamp in the winner's colour.
-        child: Container(
-          decoration: BoxDecoration(
-            color: AppColors.paper,
-            borderRadius: BorderRadius.circular(4),
-            border: Border.all(color: coverBorders[toneOf(slot)], width: 4),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x8C000000),
-                offset: Offset(0, 10),
-                blurRadius: 14,
-                spreadRadius: -8,
-              ),
-            ],
-          ),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Opacity(
-                opacity: done ? 0.5 : 1,
-                child: ColorFiltered(
-                  colorFilter: done
-                      ? const ColorFilter.matrix([
-                          0.2126, 0.7152, 0.0722, 0, 0, //
-                          0.2126, 0.7152, 0.0722, 0, 0, //
-                          0.2126, 0.7152, 0.0722, 0, 0, //
-                          0, 0, 0, 1, 0, //
-                        ])
-                      : const ColorFilter.mode(
-                          Colors.transparent,
-                          BlendMode.dst,
-                        ),
-                  child: CategoryCover(
-                    image: BrandImages.category(categoryId),
-                    name: name,
-                    tone: slot,
-                    footInset: 12,
-                  ),
+      scale: 0.97,
+      onTap: done ? null : () => onOpen(categoryId),
+      // The website's board card: the film-still cover in its tone's
+      // frame, a count chip, and a "done" stamp in the winner's colour.
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.paper,
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: coverBorders[toneOf(slot)], width: 4),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x8C000000),
+              offset: Offset(0, 10),
+              blurRadius: 14,
+              spreadRadius: -8,
+            ),
+          ],
+        ),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Opacity(
+              opacity: done ? 0.5 : 1,
+              child: ColorFiltered(
+                colorFilter: done
+                    ? const ColorFilter.matrix([
+                        0.2126, 0.7152, 0.0722, 0, 0, //
+                        0.2126, 0.7152, 0.0722, 0, 0, //
+                        0.2126, 0.7152, 0.0722, 0, 0, //
+                        0, 0, 0, 1, 0, //
+                      ])
+                    : const ColorFilter.mode(Colors.transparent, BlendMode.dst),
+                child: CategoryCover(
+                  image: BrandImages.category(categoryId),
+                  name: name,
+                  tone: slot,
+                  footInset: 12,
                 ),
               ),
-              if (!done)
-                PositionedDirectional(
-                  top: 6,
-                  start: 6,
-                  child: _Badge(
-                    color: AppColors.paper,
-                    ink: AppColors.ink,
-                    label: lang.t(
-                      '${lang.toAr(left)}/${lang.toAr(ids.length)} باقي',
-                      '$left/${ids.length} ba2y',
-                    ),
+            ),
+            if (!done)
+              PositionedDirectional(
+                top: 6,
+                start: 6,
+                child: _Badge(
+                  color: AppColors.paper,
+                  ink: AppColors.ink,
+                  label: lang.t(
+                    '${lang.toAr(left)}/${lang.toAr(ids.length)} باقي',
+                    '$left/${ids.length} ba2y',
                   ),
                 ),
-              if (open && !done)
-                PositionedDirectional(
-                  top: 6,
-                  end: 6,
-                  child: _Badge(
-                    color: AppColors.gold,
-                    ink: AppColors.ink,
-                    icon: LucideIcons600.circlePlay,
-                    label: lang.t('سؤال مفتوح', 'So2al maftoo7'),
-                  ),
+              ),
+            if (open && !done)
+              PositionedDirectional(
+                top: 6,
+                end: 6,
+                child: _Badge(
+                  color: AppColors.gold,
+                  ink: AppColors.ink,
+                  icon: LucideIcons600.circlePlay,
+                  label: lang.t('سؤال مفتوح', 'So2al maftoo7'),
                 ),
-              Positioned(
-                left: 8,
-                right: 8,
-                bottom: 7,
-                child: Row(
-                  children: [
-                    for (final (i, id) in ids.indexed) ...[
-                      if (i > 0) const SizedBox(width: 4),
-                      Expanded(child: _Pip(result: game.results[id])),
-                    ],
+              ),
+            Positioned(
+              left: 8,
+              right: 8,
+              bottom: 7,
+              child: Row(
+                children: [
+                  for (final (i, id) in ids.indexed) ...[
+                    if (i > 0) const SizedBox(width: 4),
+                    Expanded(child: _Pip(result: game.results[id])),
                   ],
-                ),
+                ],
               ),
-              if (done)
-                Center(
-                  child: Transform.rotate(
-                    angle: -14 * 3.14159 / 180,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: winner == null
-                            ? AppColors.paper
-                            : teamColors[winner],
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppColors.ink, width: 3),
-                        boxShadow: [inkDrop(4)],
-                      ),
-                      child: Text(
-                        lang.t('خلصت', 'Khelset'),
-                        style: AppText.display(26, color: AppColors.ink),
-                      ),
+            ),
+            if (done)
+              Center(
+                child: Transform.rotate(
+                  angle: -14 * 3.14159 / 180,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: winner == null
+                          ? AppColors.paper
+                          : teamColors[winner],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.ink, width: 3),
+                      boxShadow: [inkDrop(4)],
+                    ),
+                    child: Text(
+                      lang.t('خلصت', 'Khelset'),
+                      style: AppText.display(26, color: AppColors.ink),
                     ),
                   ),
                 ),
-            ],
-          ),
+              ),
+          ],
         ),
       ),
     );

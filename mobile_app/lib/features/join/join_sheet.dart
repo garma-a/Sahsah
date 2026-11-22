@@ -137,24 +137,20 @@ class _JoinSheetState extends State<JoinSheet> {
               const SizedBox(height: 20),
               Row(
                 children: [
-                  Semantics(
-                    button: true,
-                    label: lang.t('امسح الـQR', 'Emsa7 el QR'),
-                    excludeSemantics: true,
-                    child: Pressable(
-                      onTap: _scan,
-                      child: Container(
-                        width: 60,
-                        height: 60,
-                        decoration: glassDecoration(
-                          radius: BorderRadius.circular(16),
-                          shadow: false,
-                        ),
-                        child: const Icon(
-                          LucideIcons.scanLine,
-                          size: 26,
-                          color: AppColors.gold,
-                        ),
+                  Pressable(
+                    semanticLabel: lang.t('امسح الـQR', 'Emsa7 el QR'),
+                    onTap: _scan,
+                    child: Container(
+                      width: 60,
+                      height: 60,
+                      decoration: glassDecoration(
+                        radius: BorderRadius.circular(16),
+                        shadow: false,
+                      ),
+                      child: const Icon(
+                        LucideIcons.scanLine,
+                        size: 26,
+                        color: AppColors.gold,
                       ),
                     ),
                   ),

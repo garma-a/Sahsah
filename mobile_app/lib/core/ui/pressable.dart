@@ -12,12 +12,23 @@ class Pressable extends StatefulWidget {
     required this.onTap,
     this.haptic = true,
     this.scale = 0.96,
+    this.semanticLabel,
+    this.selected,
   });
 
   final Widget child;
   final VoidCallback? onTap;
   final bool haptic;
   final double scale;
+
+  /// What a screen reader says for this control, in place of the text
+  /// inside it. The label keeps the tap with it: wrapping a Pressable in
+  /// `Semantics(excludeSemantics: true)` instead would drop the tap, so
+  /// TalkBack and VoiceOver could read the button but not press it.
+  final String? semanticLabel;
+
+  /// For a choice among several: whether this one is picked.
+  final bool? selected;
 
   @override
   State<Pressable> createState() => _PressableState();
@@ -33,24 +44,36 @@ class _PressableState extends State<Pressable> {
 
   @override
   Widget build(BuildContext context) {
-    // Callers add their own Semantics (button/link labels).
-    return GestureDetector(
+    final onTap = widget.onTap;
+    final tap = onTap == null
+        ? null
+        : () {
+            if (widget.haptic) HapticFeedback.selectionClick();
+            onTap();
+          };
+    final pressable = GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTapDown: (_) => _set(true),
       onTapUp: (_) => _set(false),
       onTapCancel: () => _set(false),
-      onTap: widget.onTap == null
-          ? null
-          : () {
-              if (widget.haptic) HapticFeedback.selectionClick();
-              widget.onTap!();
-            },
+      onTap: tap,
       child: AnimatedScale(
         scale: _down ? widget.scale : 1,
         duration: const Duration(milliseconds: 120),
         curve: easeBrand,
         child: widget.child,
       ),
+    );
+    final label = widget.semanticLabel;
+    if (label == null) return pressable;
+    return Semantics(
+      button: true,
+      enabled: tap != null,
+      selected: widget.selected,
+      label: label,
+      onTap: tap,
+      excludeSemantics: true,
+      child: pressable,
     );
   }
 }

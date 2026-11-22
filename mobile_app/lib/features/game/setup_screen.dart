@@ -587,30 +587,28 @@ class _SelectablePoster extends StatelessWidget {
     final lang = context.lang;
     final selected = order >= 0;
     final available = isPlayable(category.id);
-    return Semantics(
-      button: true,
+    final name = lang.t(category.name, category.nameEn);
+    return Pressable(
+      semanticLabel: available
+          ? name
+          : lang.t('$name، قريبًا', '$name, 2orayeb'),
       selected: selected,
-      enabled: available,
-      label: lang.t(category.name, category.nameEn),
-      excludeSemantics: true,
-      child: Pressable(
-        onTap: onTap,
-        // Once six are picked the rest rest, as on the website.
-        child: AnimatedOpacity(
-          duration: const Duration(milliseconds: 160),
-          opacity: available && full && !selected ? 0.6 : 1,
-          child: Rise(
-            delay: delay,
-            child: Align(
-              alignment: Alignment.topCenter,
-              child: Poster(
-                category: category,
-                tone: tone,
-                showNewBadge: !selected,
-                selected: selected,
-                order: selected ? lang.toAr(order + 1) : null,
-                soon: !available,
-              ),
+      onTap: onTap,
+      // Once six are picked the rest rest, as on the website.
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 160),
+        opacity: available && full && !selected ? 0.6 : 1,
+        child: Rise(
+          delay: delay,
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: Poster(
+              category: category,
+              tone: tone,
+              showNewBadge: !selected,
+              selected: selected,
+              order: selected ? lang.toAr(order + 1) : null,
+              soon: !available,
             ),
           ),
         ),

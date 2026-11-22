@@ -104,16 +104,12 @@ class CategoryPosterButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final lang = context.lang;
-    return Semantics(
-      button: true,
-      label: lang.t(category.name, category.nameEn),
-      excludeSemantics: true,
-      child: Pressable(
-        onTap: () => showCategorySheet(context, category),
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: Poster(category: category, tone: tone),
-        ),
+    return Pressable(
+      semanticLabel: lang.t(category.name, category.nameEn),
+      onTap: () => showCategorySheet(context, category),
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: Poster(category: category, tone: tone),
       ),
     );
   }

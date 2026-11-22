@@ -304,32 +304,28 @@ class _Rating extends StatelessWidget {
         for (final (i, face) in _faces.indexed) ...[
           if (i > 0) const SizedBox(width: 8),
           Expanded(
-            child: Semantics(
-              button: true,
+            child: Pressable(
+              semanticLabel: '${i + 1}/5',
               selected: value == i + 1,
-              label: '${i + 1}/5',
-              excludeSemantics: true,
-              child: Pressable(
-                onTap: () => onChanged(i + 1),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 160),
-                  height: 50,
-                  alignment: Alignment.center,
-                  decoration: value == i + 1
-                      ? BoxDecoration(
-                          color: AppColors.gold,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppColors.ink, width: 2.5),
-                          boxShadow: [inkDrop(3)],
-                        )
-                      : paperDecoration(
-                          radius: BorderRadius.circular(14),
-                          color: Colors.white,
-                          border: 2.5,
-                          drop: 0,
-                        ),
-                  child: Text(face, style: const TextStyle(fontSize: 24)),
-                ),
+              onTap: () => onChanged(i + 1),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                height: 50,
+                alignment: Alignment.center,
+                decoration: value == i + 1
+                    ? BoxDecoration(
+                        color: AppColors.gold,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppColors.ink, width: 2.5),
+                        boxShadow: [inkDrop(3)],
+                      )
+                    : paperDecoration(
+                        radius: BorderRadius.circular(14),
+                        color: Colors.white,
+                        border: 2.5,
+                        drop: 0,
+                      ),
+                child: Text(face, style: const TextStyle(fontSize: 24)),
               ),
             ),
           ),
