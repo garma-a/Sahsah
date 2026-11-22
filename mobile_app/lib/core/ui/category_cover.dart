@@ -235,7 +235,7 @@ class PosterBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final sticker = AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
+      duration: motionFor(context, const Duration(milliseconds: 200)),
       width: size,
       height: size,
       alignment: Alignment.center,

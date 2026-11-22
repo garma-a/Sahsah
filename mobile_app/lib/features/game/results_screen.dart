@@ -9,7 +9,6 @@ import '../../core/audio/sound.dart';
 import '../../core/i18n/lang.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/brand_art.dart';
-import '../../core/ui/motion.dart';
 import '../../core/ui/play_button.dart';
 import '../../core/ui/surfaces.dart';
 import '../../data/categories.dart';
@@ -17,6 +16,7 @@ import 'game_controller.dart';
 import 'model/question.dart';
 import 'setup_screen.dart';
 import 'ui/game_ui.dart';
+import '../../core/ui/motion.dart';
 
 /// Final scores. Scores are locked; the saved game is cleared on leaving.
 class ResultsScreen extends StatefulWidget {
@@ -272,7 +272,7 @@ class _Banner extends StatelessWidget {
     final color = leader == null ? AppColors.ivory : teamColors[leader!];
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0.85, end: 1),
-      duration: const Duration(milliseconds: 600),
+      duration: motionFor(context, const Duration(milliseconds: 600)),
       curve: Curves.elasticOut,
       builder: (context, v, child) => Transform.scale(scale: v, child: child),
       child: Column(
@@ -373,7 +373,7 @@ class _ScoreCard extends StatelessWidget {
           const SizedBox(height: 6),
           TweenAnimationBuilder<double>(
             tween: Tween(begin: 0, end: game.scores[team].toDouble()),
-            duration: const Duration(milliseconds: 1200),
+            duration: motionFor(context, const Duration(milliseconds: 1200)),
             curve: Curves.easeOutCubic,
             // An Arabic zero is a dot, so zero is written out, as on the
             // board.

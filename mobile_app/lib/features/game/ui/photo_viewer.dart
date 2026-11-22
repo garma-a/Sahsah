@@ -17,8 +17,10 @@ Future<void> showPhotoViewer(BuildContext context, WidgetBuilder builder) {
       transitionDuration: const Duration(milliseconds: 220),
       reverseTransitionDuration: const Duration(milliseconds: 180),
       pageBuilder: (context, _, _) => _PhotoViewer(builder: builder),
-      transitionsBuilder: (_, animation, _, child) =>
-          FadeTransition(opacity: animation, child: child),
+      transitionsBuilder: (context, animation, _, child) =>
+          MediaQuery.disableAnimationsOf(context)
+          ? child
+          : FadeTransition(opacity: animation, child: child),
     ),
   );
 }
@@ -81,7 +83,11 @@ class _PhotoViewerState extends State<_PhotoViewer>
       begin: _transform.value,
       end: end,
     ).animate(CurvedAnimation(parent: _zoom, curve: Curves.easeOutCubic));
-    _zoom.forward(from: 0);
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _transform.value = end;
+    } else {
+      _zoom.forward(from: 0);
+    }
   }
 
   @override

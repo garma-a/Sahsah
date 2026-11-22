@@ -6,6 +6,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/ui/pressable.dart';
 import '../../core/ui/surfaces.dart';
 import '../game/ui/game_ui.dart';
+import '../../core/ui/motion.dart';
 
 /// Labelled text field in the app's dark style.
 class SahsahField extends StatelessWidget {
@@ -167,7 +168,7 @@ class _Pill extends StatelessWidget {
       child: Pressable(
         onTap: onTap,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
+          duration: motionFor(context, const Duration(milliseconds: 160)),
           height: 44,
           padding: const EdgeInsets.symmetric(horizontal: 16),
           decoration: selected

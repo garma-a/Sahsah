@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../theme/app_theme.dart';
+import 'motion.dart';
 
 /// The prototype's `--ease-brand` curve.
 const easeBrand = Cubic(0.22, 1, 0.36, 1);
@@ -119,7 +120,7 @@ class _PlayButtonState extends State<PlayButton> {
                   ),
                 ),
               AnimatedPadding(
-                duration: const Duration(milliseconds: 90),
+                duration: motionFor(context, const Duration(milliseconds: 90)),
                 curve: easeBrand,
                 padding: EdgeInsets.only(
                   top: sink,

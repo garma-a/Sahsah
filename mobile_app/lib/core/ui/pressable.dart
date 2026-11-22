@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'play_button.dart';
+import 'motion.dart';
 
 /// Tappable wrapper with game-style feedback: a quick squash on press and an
 /// optional haptic tick.
@@ -59,7 +60,7 @@ class _PressableState extends State<Pressable> {
       onTap: tap,
       child: AnimatedScale(
         scale: _down ? widget.scale : 1,
-        duration: const Duration(milliseconds: 120),
+        duration: motionFor(context, const Duration(milliseconds: 120)),
         curve: easeBrand,
         child: widget.child,
       ),

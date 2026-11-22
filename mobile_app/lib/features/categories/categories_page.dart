@@ -3,12 +3,12 @@ import 'package:flutter/material.dart';
 import '../../core/i18n/lang.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/brand_art.dart';
-import '../../core/ui/motion.dart';
 import '../../core/ui/pressable.dart';
 import '../../core/ui/retro.dart';
 import '../../core/ui/surfaces.dart';
 import '../../data/categories.dart';
 import 'category_widgets.dart';
+import '../../core/ui/motion.dart';
 
 /// Every category, grouped by section. Landscape: a game-style shelf with
 /// section tabs; portrait fallback: a grid per section.
@@ -147,7 +147,7 @@ class _ShelfState extends State<_Shelf> {
         final height = box.maxHeight;
         final width = Poster.widthFor(height);
         return AnimatedSwitcher(
-          duration: const Duration(milliseconds: 200),
+          duration: motionFor(context, const Duration(milliseconds: 200)),
           child: ListView.separated(
             key: ValueKey(_section),
             controller: _scroll,
@@ -199,7 +199,7 @@ class _SectionTab extends StatelessWidget {
       child: Pressable(
         onTap: onTap,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
+          duration: motionFor(context, const Duration(milliseconds: 180)),
           padding: const EdgeInsets.symmetric(horizontal: 14),
           decoration: selected
               ? BoxDecoration(
