@@ -674,11 +674,24 @@ class _TeamsStep extends StatelessWidget {
         const SizedBox(height: 18),
         LayoutBuilder(
           builder: (context, box) {
-            final vs = Text(
-              'VS',
-              style: AppText.display(
-                22,
-                color: AppColors.ivory.withValues(alpha: 0.5),
+            // A sticker between the teams, like the posters' ones: faint
+            // text got lost on the poster wall.
+            final vs = Transform.rotate(
+              angle: -0.08,
+              child: Container(
+                width: 48,
+                height: 48,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.sun,
+                  border: Border.all(color: AppColors.ink, width: 3),
+                  boxShadow: [inkDrop(3)],
+                ),
+                child: Text(
+                  'VS',
+                  style: AppText.display(18, color: AppColors.ink, height: 1),
+                ),
               ),
             );
             // Wide (landscape): the two teams face each other side by side.
