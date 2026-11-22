@@ -53,63 +53,67 @@ class SahsahField extends StatelessWidget {
           ? const BorderSide(color: AppColors.ink, width: 2.5)
           : BorderSide(color: Colors.white.withValues(alpha: 0.14)),
     );
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text.rich(
-          TextSpan(
-            text: label,
-            style: AppText.sans(13, weight: FontWeight.w700),
-            children: [
-              if (optional)
-                TextSpan(
-                  text: lang.t(' (اختياري)', ' (e5tyary)'),
-                  style: AppText.sans(12, color: context.mutedText),
-                ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 6),
-        TextField(
-          key: fieldKey,
-          controller: controller,
-          keyboardType: keyboardType,
-          maxLines: maxLines,
-          maxLength: maxLength,
-          onChanged: onChanged,
-          autofillHints: autofillHints,
-          textDirection: ltr ? TextDirection.ltr : null,
-          textAlign: TextAlign.start,
-          style: AppText.sans(
-            16,
-            weight: FontWeight.w600,
-            color: context.textColor,
-          ),
-          cursorColor: paper ? AppColors.ink : AppColors.gold,
-          decoration: InputDecoration(
-            hintText: hint,
-            hintTextDirection: ltr ? TextDirection.ltr : null,
-            hintStyle: AppText.sans(15, color: context.mutedText),
-            counterText: '',
-            isDense: true,
-            filled: true,
-            fillColor: paper
-                ? Colors.white
-                : Colors.white.withValues(alpha: 0.06),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 14,
-              vertical: 13,
-            ),
-            border: border,
-            enabledBorder: border,
-            focusedBorder: border.copyWith(
-              borderSide: paper
-                  ? const BorderSide(color: AppColors.cyan, width: 3)
-                  : const BorderSide(color: AppColors.gold, width: 2),
+    // One node for screen readers: the field is announced with its name
+    // ("رقم المستلم, edit box"), not as a bare edit box after a loose line.
+    return MergeSemantics(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text.rich(
+            TextSpan(
+              text: label,
+              style: AppText.sans(13, weight: FontWeight.w700),
+              children: [
+                if (optional)
+                  TextSpan(
+                    text: lang.t(' (اختياري)', ' (e5tyary)'),
+                    style: AppText.sans(12, color: context.mutedText),
+                  ),
+              ],
             ),
           ),
-        ),
-      ],
+          const SizedBox(height: 6),
+          TextField(
+            key: fieldKey,
+            controller: controller,
+            keyboardType: keyboardType,
+            maxLines: maxLines,
+            maxLength: maxLength,
+            onChanged: onChanged,
+            autofillHints: autofillHints,
+            textDirection: ltr ? TextDirection.ltr : null,
+            textAlign: TextAlign.start,
+            style: AppText.sans(
+              16,
+              weight: FontWeight.w600,
+              color: context.textColor,
+            ),
+            cursorColor: paper ? AppColors.ink : AppColors.gold,
+            decoration: InputDecoration(
+              hintText: hint,
+              hintTextDirection: ltr ? TextDirection.ltr : null,
+              hintStyle: AppText.sans(15, color: context.mutedText),
+              counterText: '',
+              isDense: true,
+              filled: true,
+              fillColor: paper
+                  ? Colors.white
+                  : Colors.white.withValues(alpha: 0.06),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 13,
+              ),
+              border: border,
+              enabledBorder: border,
+              focusedBorder: border.copyWith(
+                borderSide: paper
+                    ? const BorderSide(color: AppColors.cyan, width: 3)
+                    : const BorderSide(color: AppColors.gold, width: 2),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
