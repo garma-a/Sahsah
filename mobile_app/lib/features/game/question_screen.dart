@@ -21,6 +21,7 @@ import 'pack_screen.dart' show PackScreen;
 import 'ui/fit_text.dart';
 import 'ui/game_ui.dart';
 import 'ui/photo_viewer.dart';
+import '../../core/ui/motion.dart';
 
 /// Arabic "for [team]": ل + ال joins as لل (للفراعنة), otherwise لـ.
 String _forTeam(String name) =>
@@ -44,15 +45,21 @@ Future<void> playQuestionOn(
       transitionDuration: const Duration(milliseconds: 260),
       reverseTransitionDuration: const Duration(milliseconds: 200),
       pageBuilder: (_, _, _) => QuestionScreen(questionId: id),
-      transitionsBuilder: (_, animation, _, child) => FadeTransition(
-        opacity: animation,
-        child: ScaleTransition(
-          scale: Tween(begin: 0.96, end: 1.0).animate(
-            CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
-          ),
-          child: child,
-        ),
-      ),
+      transitionsBuilder: (context, animation, _, child) =>
+          MediaQuery.disableAnimationsOf(context)
+          ? child
+          : FadeTransition(
+              opacity: animation,
+              child: ScaleTransition(
+                scale: Tween(begin: 0.96, end: 1.0).animate(
+                  CurvedAnimation(
+                    parent: animation,
+                    curve: Curves.easeOutCubic,
+                  ),
+                ),
+                child: child,
+              ),
+            ),
     ),
   );
   if (game.game?.activeId == id) game.leave();
@@ -828,7 +835,7 @@ class _TimerBar extends StatelessWidget {
     return Opacity(
       opacity: disabled ? 0.55 : 1,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
+        duration: motionFor(context, const Duration(milliseconds: 250)),
         height: 48,
         // The website's timer: a white face with an ink edge and drop;
         // the bar is cyan, amber when paused and red for the last ten
@@ -1234,7 +1241,7 @@ class _StageLadder extends StatelessWidget {
               selected: i == stage,
               excludeSemantics: true,
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 220),
+                duration: motionFor(context, const Duration(milliseconds: 220)),
                 height: 42,
                 padding: const EdgeInsets.symmetric(horizontal: 10),
                 decoration: BoxDecoration(
@@ -1512,7 +1519,7 @@ class _RevealSlab extends StatelessWidget {
     if (calm) return slab;
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
-      duration: const Duration(milliseconds: 650),
+      duration: motionFor(context, const Duration(milliseconds: 650)),
       curve: Curves.easeOut,
       child: slab,
       builder: (context, t, child) {
@@ -1706,7 +1713,7 @@ class _Picture extends StatelessWidget {
 
     return TweenAnimationBuilder<double>(
       tween: Tween(end: gray ? 0 : 1),
-      duration: const Duration(milliseconds: 700),
+      duration: motionFor(context, const Duration(milliseconds: 700)),
       curve: easeBrand,
       builder: (context, saturation, child) =>
           ColorFiltered(colorFilter: _saturation(saturation), child: child),
@@ -1717,7 +1724,7 @@ class _Picture extends StatelessWidget {
           // width, around its own centre; then it eases back.
           child: TweenAnimationBuilder<double>(
             tween: Tween(end: 1 / (1 - crop.$2 - crop.$4)),
-            duration: const Duration(milliseconds: 700),
+            duration: motionFor(context, const Duration(milliseconds: 700)),
             curve: easeBrand,
             builder: (context, scale, child) => Transform.scale(
               scale: scale,
@@ -1758,7 +1765,7 @@ class _AnimatedInsetClip extends StatelessWidget {
     final (t, r, b, l) = insets;
     return TweenAnimationBuilder<EdgeInsets>(
       tween: EdgeInsetsTween(end: EdgeInsets.fromLTRB(l, t, r, b)),
-      duration: const Duration(milliseconds: 700),
+      duration: motionFor(context, const Duration(milliseconds: 700)),
       curve: easeBrand,
       builder: (context, e, child) =>
           ClipRect(clipper: _InsetClipper(e), child: child),

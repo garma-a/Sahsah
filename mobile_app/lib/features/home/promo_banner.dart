@@ -12,6 +12,7 @@ import '../../core/ui/game_button.dart';
 import '../../core/ui/surfaces.dart';
 import '../../data/promos.dart';
 import '../game/ui/game_ui.dart';
+import '../../core/ui/motion.dart';
 
 /// One promo as an ad banner: a picture (or a fan of the new posters) with
 /// the title, a line and a button over a dark wash on the words' side.
@@ -443,7 +444,10 @@ class _PromoCarouselState extends State<PromoCarousel> {
               children: [
                 for (var i = 0; i < promos.length; i++)
                   AnimatedContainer(
-                    duration: const Duration(milliseconds: 250),
+                    duration: motionFor(
+                      context,
+                      const Duration(milliseconds: 250),
+                    ),
                     margin: const EdgeInsets.symmetric(horizontal: 3),
                     width: i == _page ? 22 : 8,
                     height: 8,

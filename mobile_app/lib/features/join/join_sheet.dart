@@ -7,6 +7,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/ui/play_button.dart';
 import '../../core/ui/pressable.dart';
 import '../../core/ui/surfaces.dart';
+import '../../core/ui/motion.dart';
 
 /// Opens the "join with code" bottom sheet guests use to enter a room.
 Future<void> showJoinSheet(BuildContext context) {
@@ -272,7 +273,7 @@ class _Box extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 140),
+      duration: motionFor(context, const Duration(milliseconds: 140)),
       height: 64,
       alignment: Alignment.center,
       decoration: BoxDecoration(

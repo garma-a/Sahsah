@@ -8,7 +8,6 @@ import '../../core/i18n/lang.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/brand_art.dart';
 import '../../core/ui/category_cover.dart';
-import '../../core/ui/motion.dart';
 import '../../core/ui/pressable.dart';
 import '../../core/ui/surfaces.dart';
 import '../../data/categories.dart';
@@ -18,6 +17,7 @@ import 'pack_screen.dart';
 import 'question_screen.dart';
 import 'results_screen.dart';
 import 'ui/game_ui.dart';
+import '../../core/ui/motion.dart';
 
 /// The 6 × 6 board the host plays from.
 class BoardScreen extends StatefulWidget {
@@ -60,19 +60,25 @@ class _BoardScreenState extends State<BoardScreen> {
         transitionDuration: const Duration(milliseconds: 280),
         reverseTransitionDuration: const Duration(milliseconds: 200),
         pageBuilder: (_, _, _) => PackScreen(categoryId: categoryId),
-        transitionsBuilder: (_, animation, _, child) => FadeTransition(
-          opacity: animation,
-          child: SlideTransition(
-            position: Tween(begin: const Offset(0, 0.04), end: Offset.zero)
-                .animate(
-                  CurvedAnimation(
-                    parent: animation,
-                    curve: Curves.easeOutCubic,
-                  ),
+        transitionsBuilder: (context, animation, _, child) =>
+            MediaQuery.disableAnimationsOf(context)
+            ? child
+            : FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position:
+                      Tween(
+                        begin: const Offset(0, 0.04),
+                        end: Offset.zero,
+                      ).animate(
+                        CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOutCubic,
+                        ),
+                      ),
+                  child: child,
                 ),
-            child: child,
-          ),
-        ),
+              ),
       ),
     );
     if (mounted && (context.game.game?.finished ?? false)) _showResults();
@@ -322,7 +328,7 @@ class _TeamScoreState extends State<TeamScore>
       ),
       onTap: game.finished ? null : () => _editScore(context, game, team),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
+        duration: motionFor(context, const Duration(milliseconds: 200)),
         height: compact ? 44 : 52,
         padding: const EdgeInsetsDirectional.fromSTEB(5, 0, 10, 0),
         // The website's score card: cream with an ink edge, the team name
@@ -378,7 +384,10 @@ class _TeamScoreState extends State<TeamScore>
                   children: [
                     TweenAnimationBuilder<double>(
                       tween: Tween(end: game.scores[team].toDouble()),
-                      duration: const Duration(milliseconds: 600),
+                      duration: motionFor(
+                        context,
+                        const Duration(milliseconds: 600),
+                      ),
                       curve: Curves.easeOutCubic,
                       // A lone Arabic zero is a small dot, so say it.
                       builder: (context, v, _) => Text(
@@ -442,59 +451,73 @@ class _TeamScoreState extends State<TeamScore>
           followerAnchor: Alignment.topCenter,
           offset: const Offset(0, -8),
           child: IgnorePointer(
-            child: FadeTransition(
-              opacity: TweenSequence<double>([
-                TweenSequenceItem(
-                  tween: Tween(begin: 0.0, end: 1.0),
-                  weight: 10,
-                ),
-                TweenSequenceItem(tween: ConstantTween(1.0), weight: 65),
-                TweenSequenceItem(
-                  tween: Tween(begin: 1.0, end: 0.0),
-                  weight: 25,
-                ),
-              ]).animate(_pop),
-              child: SlideTransition(
-                position: Tween(begin: const Offset(0, -0.6), end: Offset.zero)
-                    .animate(
-                      CurvedAnimation(
-                        parent: _pop,
-                        curve: const Interval(
-                          0,
-                          0.25,
-                          curve: Curves.easeOutBack,
-                        ),
+            // With animations off the chip just shows while the pop
+            // runs, then goes: no drop, no fade.
+            child: MediaQuery.disableAnimationsOf(context)
+                ? AnimatedBuilder(
+                    animation: _pop,
+                    child: chip,
+                    builder: (_, chip) =>
+                        Visibility(visible: _pop.isAnimating, child: chip!),
+                  )
+                : FadeTransition(
+                    opacity: TweenSequence<double>([
+                      TweenSequenceItem(
+                        tween: Tween(begin: 0.0, end: 1.0),
+                        weight: 10,
                       ),
+                      TweenSequenceItem(tween: ConstantTween(1.0), weight: 65),
+                      TweenSequenceItem(
+                        tween: Tween(begin: 1.0, end: 0.0),
+                        weight: 25,
+                      ),
+                    ]).animate(_pop),
+                    child: SlideTransition(
+                      position:
+                          Tween(
+                            begin: const Offset(0, -0.6),
+                            end: Offset.zero,
+                          ).animate(
+                            CurvedAnimation(
+                              parent: _pop,
+                              curve: const Interval(
+                                0,
+                                0.25,
+                                curve: Curves.easeOutBack,
+                              ),
+                            ),
+                          ),
+                      child: chip,
                     ),
-                child: chip,
-              ),
-            ),
+                  ),
           ),
         ),
       ),
       child: CompositedTransformTarget(
         link: _link,
-        // A quick swell as the points land.
-        child: ScaleTransition(
-          scale: TweenSequence<double>([
-            TweenSequenceItem(
-              tween: Tween(
-                begin: 1.0,
-                end: 1.08,
-              ).chain(CurveTween(curve: Curves.easeOut)),
-              weight: 12,
-            ),
-            TweenSequenceItem(
-              tween: Tween(
-                begin: 1.08,
-                end: 1.0,
-              ).chain(CurveTween(curve: Curves.easeIn)),
-              weight: 18,
-            ),
-            TweenSequenceItem(tween: ConstantTween(1.0), weight: 70),
-          ]).animate(_pop),
-          child: pill,
-        ),
+        // A quick swell as the points land (not with animations off).
+        child: MediaQuery.disableAnimationsOf(context)
+            ? pill
+            : ScaleTransition(
+                scale: TweenSequence<double>([
+                  TweenSequenceItem(
+                    tween: Tween(
+                      begin: 1.0,
+                      end: 1.08,
+                    ).chain(CurveTween(curve: Curves.easeOut)),
+                    weight: 12,
+                  ),
+                  TweenSequenceItem(
+                    tween: Tween(
+                      begin: 1.08,
+                      end: 1.0,
+                    ).chain(CurveTween(curve: Curves.easeIn)),
+                    weight: 18,
+                  ),
+                  TweenSequenceItem(tween: ConstantTween(1.0), weight: 70),
+                ]).animate(_pop),
+                child: pill,
+              ),
       ),
     );
   }
@@ -531,7 +554,7 @@ class TurnChip extends StatelessWidget {
       key: const ValueKey('turn-chip'),
       onTap: game.finished ? null : controller.switchTurn,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
+        duration: motionFor(context, const Duration(milliseconds: 220)),
         height: 52,
         constraints: const BoxConstraints(maxWidth: 170),
         padding: const EdgeInsets.symmetric(horizontal: 8),

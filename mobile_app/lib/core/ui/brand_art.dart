@@ -6,6 +6,7 @@ import '../i18n/lang.dart';
 import '../theme/app_theme.dart';
 import 'category_cover.dart';
 import 'retro.dart';
+import 'motion.dart';
 
 abstract final class BrandImages {
   static const plaque = 'assets/logo/plaque.png';
@@ -169,7 +170,7 @@ class Poster extends StatelessWidget {
     final lang = context.lang;
     final t = tone ?? toneFor(category.id);
     final frame = AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
+      duration: motionFor(context, const Duration(milliseconds: 200)),
       decoration: BoxDecoration(
         color: AppColors.paper,
         border: Border.all(color: coverBorders[toneOf(t)], width: 4),
@@ -273,10 +274,10 @@ class Poster extends StatelessWidget {
         clipBehavior: Clip.none,
         children: [
           AnimatedSlide(
-            duration: const Duration(milliseconds: 200),
+            duration: motionFor(context, const Duration(milliseconds: 200)),
             offset: selected ? const Offset(0, -0.03) : Offset.zero,
             child: AnimatedRotation(
-              duration: const Duration(milliseconds: 200),
+              duration: motionFor(context, const Duration(milliseconds: 200)),
               turns: selected ? -1 / 360 : 0,
               child: frame,
             ),

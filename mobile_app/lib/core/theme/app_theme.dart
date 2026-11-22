@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../ui/motion.dart';
+
 /// The website's palette (`web_app/frontend/src/app/globals.css`), taken
 /// from the client's brand sheet: charcoal and cream paper, bold retro
 /// colours on top, and a dark ink for outlines. The old names are kept so
@@ -170,6 +172,15 @@ abstract final class AppTheme {
       useMaterial3: true,
       brightness: Brightness.dark,
       fontFamily: AppFonts.sans,
+      // Android's zoom transition steps aside with animations off. (iOS
+      // keeps its own, for the edge swipe back.)
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: CalmPageTransitions(
+            ZoomPageTransitionsBuilder(),
+          ),
+        },
+      ),
       colorScheme: const ColorScheme.dark(
         primary: AppColors.gold,
         onPrimary: AppColors.ink,

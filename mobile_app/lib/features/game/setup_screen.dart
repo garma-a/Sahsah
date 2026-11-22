@@ -8,7 +8,6 @@ import 'package:lucide_icons_flutter/lucide_icons_600.dart';
 import '../../core/i18n/lang.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/brand_art.dart';
-import '../../core/ui/motion.dart';
 import '../../core/ui/play_button.dart';
 import '../../core/ui/pressable.dart';
 import '../../core/ui/surfaces.dart';
@@ -17,6 +16,7 @@ import '../../data/question_bank.dart';
 import 'board_screen.dart';
 import 'game_controller.dart';
 import 'ui/game_ui.dart';
+import '../../core/ui/motion.dart';
 
 /// Opens game setup. [categoryId] preselects a category (from its sheet).
 Future<void> openSetup(
@@ -217,7 +217,7 @@ class _SetupScreenState extends State<SetupScreen> {
             ),
             Expanded(
               child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 220),
+                duration: motionFor(context, const Duration(milliseconds: 220)),
                 child: _step == 0
                     ? _CategoryStep(
                         key: const ValueKey('categories'),
@@ -289,7 +289,10 @@ class _SetupScreenState extends State<SetupScreen> {
                     if (i > 0) const SizedBox(width: 4),
                     Expanded(
                       child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 180),
+                        duration: motionFor(
+                          context,
+                          const Duration(milliseconds: 180),
+                        ),
                         height: 5,
                         decoration: BoxDecoration(
                           color: i < n
@@ -369,7 +372,7 @@ class _StepDots extends StatelessWidget {
         for (var i = 0; i < 2; i++) ...[
           if (i > 0) const SizedBox(width: 4),
           AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
+            duration: motionFor(context, const Duration(milliseconds: 180)),
             width: i == step ? 22 : 8,
             height: 8,
             decoration: BoxDecoration(
@@ -614,7 +617,7 @@ class _SelectablePoster extends StatelessWidget {
       onTap: onTap,
       // Once six are picked the rest rest, as on the website.
       child: AnimatedOpacity(
-        duration: const Duration(milliseconds: 160),
+        duration: motionFor(context, const Duration(milliseconds: 160)),
         opacity: available && full && !selected ? 0.6 : 1,
         child: Rise(
           delay: delay,

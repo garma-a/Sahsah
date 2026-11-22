@@ -2,6 +2,37 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+/// [duration], or no time at all with the system's animations off
+/// (Android's "Remove animations", iOS's "Reduce motion"): for implicit
+/// animations, whose end state then simply appears.
+Duration motionFor(BuildContext context, Duration duration) =>
+    MediaQuery.disableAnimationsOf(context) ? Duration.zero : duration;
+
+/// A page transition that steps aside with animations off: the new page is
+/// simply there.
+class CalmPageTransitions extends PageTransitionsBuilder {
+  const CalmPageTransitions(this.inner);
+
+  final PageTransitionsBuilder inner;
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) => MediaQuery.disableAnimationsOf(context)
+      ? child
+      : inner.buildTransitions(
+          route,
+          context,
+          animation,
+          secondaryAnimation,
+          child,
+        );
+}
+
 /// The website's `rise` keyframes (`globals.css`): a card slides up 22px
 /// and fades in, settling at its own small [turn]. Plays once, when the
 /// card first appears; [delay] staggers a row of them. With animations

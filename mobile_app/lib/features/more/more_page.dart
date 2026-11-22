@@ -9,6 +9,7 @@ import '../../core/ui/pressable.dart';
 import '../../core/ui/surfaces.dart';
 import '../shell/app_route.dart';
 import '../shell/link_opener.dart';
+import '../../core/ui/motion.dart';
 
 /// Account, settings, help and "about" — the app's home for what the
 /// website keeps in its footer.
@@ -318,7 +319,7 @@ class _LanguageSwitch extends StatelessWidget {
         child: Pressable(
           onTap: () => lang.setLang(value),
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 160),
+            duration: motionFor(context, const Duration(milliseconds: 160)),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
             decoration: BoxDecoration(
               color: selected ? AppColors.gold : Colors.transparent,

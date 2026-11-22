@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../theme/app_theme.dart';
+import 'motion.dart';
 
 /// Chunky game-style button after the website's tiles: a flat face with an
 /// ink outline, standing on an ink lip that it sinks onto when pressed. Give it a [height] (and a [width] inside a Row), or put it
@@ -103,7 +104,10 @@ class _GameButtonState extends State<GameButton> {
                   ),
                 ),
                 AnimatedPositioned(
-                  duration: const Duration(milliseconds: 70),
+                  duration: motionFor(
+                    context,
+                    const Duration(milliseconds: 70),
+                  ),
                   left: 0,
                   right: 0,
                   top: sink,

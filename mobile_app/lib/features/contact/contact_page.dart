@@ -11,6 +11,7 @@ import '../../core/ui/surfaces.dart';
 import '../../data/shop.dart';
 import '../shared/form_widgets.dart';
 import '../shell/link_opener.dart';
+import '../../core/ui/motion.dart';
 
 /// The three ways to reach the team (prototype `ContactPage`).
 enum ContactTab { support, experience, business }
@@ -309,7 +310,7 @@ class _Rating extends StatelessWidget {
               selected: value == i + 1,
               onTap: () => onChanged(i + 1),
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 160),
+                duration: motionFor(context, const Duration(milliseconds: 160)),
                 height: 50,
                 alignment: Alignment.center,
                 decoration: value == i + 1

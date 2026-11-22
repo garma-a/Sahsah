@@ -8,7 +8,6 @@ import '../../core/i18n/lang.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/brand_art.dart';
 import '../../core/ui/game_button.dart';
-import '../../core/ui/motion.dart';
 import '../../core/ui/play_button.dart';
 import '../../core/ui/pressable.dart';
 import '../../core/ui/surfaces.dart';
@@ -20,6 +19,7 @@ import '../game/game_controller.dart';
 import '../game/ui/game_ui.dart';
 import '../shell/app_route.dart';
 import 'promo_banner.dart';
+import '../../core/ui/motion.dart';
 
 part 'lobby.dart';
 
@@ -497,7 +497,7 @@ class _Reveal extends StatelessWidget {
   Widget build(BuildContext context) {
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
-      duration: const Duration(milliseconds: 420),
+      duration: motionFor(context, const Duration(milliseconds: 420)),
       curve: easeBrand,
       builder: (context, v, child) => Opacity(
         opacity: v,

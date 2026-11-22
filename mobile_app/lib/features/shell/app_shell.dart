@@ -18,6 +18,7 @@ import 'app_route.dart';
 import 'bottom_nav.dart';
 import 'header.dart';
 import 'hud.dart';
+import '../../core/ui/motion.dart';
 
 /// App frame. Landscape (the app's orientation): a game top bar over the
 /// lobby or the current screen. Portrait fallback: floating top bar, the
@@ -84,11 +85,15 @@ class _AppShellState extends State<AppShell> with TickerProviderStateMixin {
     if (route == _route) {
       // Tapping the current tab scrolls back to the top, like most apps.
       if (_scroll.hasClients) {
-        _scroll.animateTo(
-          0,
-          duration: const Duration(milliseconds: 350),
-          curve: Curves.easeOutCubic,
-        );
+        if (MediaQuery.disableAnimationsOf(context)) {
+          _scroll.jumpTo(0);
+        } else {
+          _scroll.animateTo(
+            0,
+            duration: const Duration(milliseconds: 350),
+            curve: Curves.easeOutCubic,
+          );
+        }
       }
       return;
     }
@@ -151,7 +156,7 @@ class _AppShellState extends State<AppShell> with TickerProviderStateMixin {
       ),
       SliverToBoxAdapter(
         child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 220),
+          duration: motionFor(context, const Duration(milliseconds: 220)),
           switchInCurve: Curves.easeOut,
           switchOutCurve: Curves.easeIn,
           layoutBuilder: (current, previous) => Stack(
@@ -204,7 +209,10 @@ class _AppShellState extends State<AppShell> with TickerProviderStateMixin {
                       const SizedBox(height: 10),
                       Expanded(
                         child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 220),
+                          duration: motionFor(
+                            context,
+                            const Duration(milliseconds: 220),
+                          ),
                           switchInCurve: Curves.easeOut,
                           switchOutCurve: Curves.easeIn,
                           layoutBuilder: (current, previous) => Stack(
