@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/i18n/lang.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/brand_background.dart';
+import '../../core/ui/paper_scroll.dart';
 import '../../core/ui/surfaces.dart';
 import '../../data/promos.dart';
 import '../account/account_page.dart';
@@ -36,6 +37,13 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> with TickerProviderStateMixin {
   final _scroll = ScrollController();
+
+  /// Landscape paper pages, one controller each: during the switch the
+  /// old and new pages are both on screen, and a shown scrollbar needs its
+  /// controller on one page only.
+  final _paperScrolls = <AppRoute, ScrollController>{};
+  ScrollController _paperScroll(AppRoute route) =>
+      _paperScrolls.putIfAbsent(route, ScrollController.new);
   AppRoute _route = AppRoute.home;
 
   /// Local balance until the backend exposes accounts and tokens.
@@ -73,6 +81,9 @@ class _AppShellState extends State<AppShell> with TickerProviderStateMixin {
   @override
   void dispose() {
     _scroll.dispose();
+    for (final c in _paperScrolls.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -84,11 +95,12 @@ class _AppShellState extends State<AppShell> with TickerProviderStateMixin {
     }
     if (route == _route) {
       // Tapping the current tab scrolls back to the top, like most apps.
-      if (_scroll.hasClients) {
+      for (final c in [_scroll, ?_paperScrolls[_route]]) {
+        if (c.positions.length != 1) continue;
         if (MediaQuery.disableAnimationsOf(context)) {
-          _scroll.jumpTo(0);
+          c.jumpTo(0);
         } else {
-          _scroll.animateTo(
+          c.animateTo(
             0,
             duration: const Duration(milliseconds: 350),
             curve: Curves.easeOutCubic,
@@ -136,13 +148,13 @@ class _AppShellState extends State<AppShell> with TickerProviderStateMixin {
       ),
     ),
     _ => Padding(
-      padding: EdgeInsets.fromLTRB(0, 4, 8, 18 + bottomInset),
-      child: PaperSheet(
-        child: SingleChildScrollView(
-          controller: _scroll,
-          padding: const EdgeInsets.fromLTRB(18, 16, 18, 24),
-          child: _page(),
-        ),
+      padding: const EdgeInsets.fromLTRB(0, 4, 8, 0),
+      child: PaperScroll(
+        controller: _paperScroll(_route),
+        frame: (scroll) => PaperSheet(child: scroll),
+        footRoom: 18 + bottomInset,
+        padding: const EdgeInsets.fromLTRB(18, 16, 18, 24),
+        child: _page(),
       ),
     ),
   };
