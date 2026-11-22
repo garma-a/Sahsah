@@ -22,6 +22,7 @@ import 'ui/fit_text.dart';
 import 'ui/game_ui.dart';
 import 'ui/photo_viewer.dart';
 import '../../core/ui/motion.dart';
+import '../../core/ui/cover_image.dart';
 
 /// Arabic "for [team]": ل + ال joins as لل (للفراعنة), otherwise لـ.
 String _forTeam(String name) =>
@@ -1712,6 +1713,14 @@ class _Picture extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final q = question;
+    final cover =
+        (fit ??
+            (q.kind == QuestionKind.staged ? BoxFit.contain : BoxFit.cover)) ==
+        BoxFit.cover;
+    if (cover &&
+        (q.kind == QuestionKind.standard || q.kind == QuestionKind.staged)) {
+      return CoverAsset(asset, alignment: q.imageAlignment);
+    }
     if (q.kind == QuestionKind.standard || q.kind == QuestionKind.staged) {
       return Image.asset(
         asset,

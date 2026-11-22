@@ -63,6 +63,30 @@ abstract final class AppColors {
   /// Behind artwork.
   static const card = Color(0xFF22160E);
 
+  /// A form error on paper.
+  static const errorOnPaper = Color(0xFFB3261E);
+
+  /// A form error on a dark card.
+  static const errorOnDark = Color(0xFFFF8A80);
+
+  /// The main button's face while it can't be pressed.
+  static const disabled = Color(0xFF6F7471);
+
+  /// A played tile nobody won.
+  static const unclaimed = Color(0xFFB9BDB9);
+
+  /// The website's shelf sheet: a warmer cream than [paper].
+  static const sheet = Color(0xFFF3E6C8);
+
+  /// The near-black under film stills (cover washes and title shadows).
+  static const soot = Color(0xFF120A06);
+
+  /// A cover's hand-lettered title.
+  static const filmCream = Color(0xFFFBF1DC);
+
+  /// The title on a narrow cover's ink slab.
+  static const slabYellow = Color(0xFFF6D64A);
+
   /// Poster title strip.
   static const poster = ink;
 

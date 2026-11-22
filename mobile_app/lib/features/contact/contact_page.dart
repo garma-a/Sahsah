@@ -12,6 +12,7 @@ import '../../data/shop.dart';
 import '../shared/form_widgets.dart';
 import '../shell/link_opener.dart';
 import '../../core/ui/motion.dart';
+import '../../core/ui/cover_image.dart';
 
 /// The three ways to reach the team (prototype `ContactPage`).
 enum ContactTab { support, experience, business }
@@ -370,9 +371,8 @@ class _ReachUs extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            Image.asset(
+            const CoverAsset(
               BrandImages.contact,
-              fit: BoxFit.cover,
               alignment: Alignment.centerLeft,
             ),
             const DecoratedBox(

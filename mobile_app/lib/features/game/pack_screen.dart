@@ -243,11 +243,11 @@ class _PackCover extends StatelessWidget {
                     lang.t(category.name, category.nameEn),
                     textAlign: TextAlign.center,
                     maxLines: 2,
-                    style: AppText.poster(30, color: const Color(0xFFFBF1DC))
+                    style: AppText.poster(30, color: AppColors.filmCream)
                         .copyWith(
                           shadows: [
                             const Shadow(
-                              color: Color(0xFF120A06),
+                              color: AppColors.soot,
                               offset: Offset(0, 1.5),
                             ),
                             Shadow(
@@ -461,7 +461,7 @@ class _QuestionTile extends StatelessWidget {
           // Played: the winner's colour with an ink edge, as on the
           // website's board; nobody's tiles fade on grey.
           decoration: BoxDecoration(
-            color: color ?? const Color(0xFFB9BDB9),
+            color: color ?? AppColors.unclaimed,
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
               color: color == null

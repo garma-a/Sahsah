@@ -227,8 +227,8 @@ class FormError extends StatelessWidget {
     if (text == null) return const SizedBox.shrink();
     // A light red on dark; the website's error red on paper.
     final red = context.onPaper
-        ? const Color(0xFFB3261E)
-        : const Color(0xFFFF8A80);
+        ? AppColors.errorOnPaper
+        : AppColors.errorOnDark;
     return Padding(
       padding: const EdgeInsets.only(top: 10),
       child: Semantics(

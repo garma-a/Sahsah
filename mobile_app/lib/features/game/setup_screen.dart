@@ -17,6 +17,7 @@ import 'board_screen.dart';
 import 'game_controller.dart';
 import 'ui/game_ui.dart';
 import '../../core/ui/motion.dart';
+import '../../core/ui/cover_image.dart';
 
 /// Opens game setup. [categoryId] preselects a category (from its sheet).
 Future<void> openSetup(
@@ -771,11 +772,10 @@ class _TeamsStep extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     ClipOval(
-                      child: Image.asset(
+                      child: CoverAsset(
                         BrandImages.category(c.id),
                         width: 28,
                         height: 28,
-                        fit: BoxFit.cover,
                       ),
                     ),
                     const SizedBox(width: 8),

@@ -9,6 +9,7 @@ import '../../core/ui/pressable.dart';
 import '../../data/categories.dart';
 import '../../data/question_bank.dart';
 import '../game/setup_screen.dart';
+import '../../core/ui/cover_image.dart';
 
 /// Row heading with an optional "see all" action at the end.
 class SectionHeader extends StatelessWidget {
@@ -157,11 +158,10 @@ Future<void> showCategorySheet(BuildContext context, Category category) {
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(14),
-                    child: Image.asset(
+                    child: CoverAsset(
                       BrandImages.category(category.id),
                       width: 96,
                       height: 96 * 297 / 210,
-                      fit: BoxFit.cover,
                     ),
                   ),
                   const SizedBox(width: 16),

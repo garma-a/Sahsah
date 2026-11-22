@@ -17,6 +17,7 @@ import 'model/question.dart';
 import 'setup_screen.dart';
 import 'ui/game_ui.dart';
 import '../../core/ui/motion.dart';
+import '../../core/ui/cover_image.dart';
 
 /// Final scores. Scores are locked; the saved game is cleared on leaving.
 class ResultsScreen extends StatefulWidget {
@@ -561,11 +562,10 @@ class _CategoryRow extends StatelessWidget {
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(10),
-            child: Image.asset(
+            child: CoverAsset(
               BrandImages.category(categoryId),
               width: 40,
               height: 40,
-              fit: BoxFit.cover,
             ),
           ),
           const SizedBox(width: 12),

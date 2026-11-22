@@ -15,7 +15,6 @@ double contrast(Color a, Color b) {
 /// The colour pairs the website's look puts text on must clear AA (4.5:1),
 /// like the website's own tones (`components/brand/tones.ts`).
 void main() {
-  const sheet = Color(0xFFF3E6C8);
   const aa = 4.5;
 
   void expectAA(String what, Color text, Color fill) {
@@ -30,12 +29,13 @@ void main() {
   test('text on paper', () {
     for (final (name, fill) in [
       ('card', AppColors.paper),
-      ('sheet', sheet),
+      ('sheet', AppColors.sheet),
       ('white', const Color(0xFFFFFFFF)),
     ]) {
       expectAA('ink on $name', AppColors.ink, fill);
       expectAA('muted ink on $name', AppColors.inkMuted, fill);
       expectAA('red accent on $name', AppColors.pressDeep, fill);
+      expectAA('error on $name', AppColors.errorOnPaper, fill);
     }
   });
 
@@ -49,7 +49,9 @@ void main() {
       expectAA('yellow on $name', AppColors.gold, fill);
     }
     // The compact cover's name slab.
-    expectAA('slab title', const Color(0xFFF6D64A), AppColors.ink);
+    expectAA('slab title', AppColors.slabYellow, AppColors.ink);
+    // Form errors, on the paper and on a dark card.
+    expectAA('error on dark', AppColors.errorOnDark, AppColors.ui);
   });
 
   test('buttons, tiles and teams', () {

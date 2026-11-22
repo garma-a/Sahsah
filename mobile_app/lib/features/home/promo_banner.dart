@@ -13,6 +13,7 @@ import '../../core/ui/surfaces.dart';
 import '../../data/promos.dart';
 import '../game/ui/game_ui.dart';
 import '../../core/ui/motion.dart';
+import '../../core/ui/cover_image.dart';
 
 /// One promo as an ad banner: a picture (or a fan of the new posters) with
 /// the title, a line and a button over a dark wash on the words' side.
@@ -193,9 +194,8 @@ class _Art extends StatelessWidget {
   Widget build(BuildContext context) {
     final image = promo.image;
     if (image != null) {
-      return Image.asset(
+      return CoverAsset(
         image,
-        fit: BoxFit.cover,
         alignment: promo.imageAlignment,
         errorBuilder: (_, _, _) => const ColoredBox(color: AppColors.forest),
       );
