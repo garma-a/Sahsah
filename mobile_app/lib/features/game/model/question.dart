@@ -1,93 +1,119 @@
 import 'package:flutter/painting.dart';
 
-/// How a question is presented (see `CONTEXT.md`: Question format).
+import '../../../core/api/game_wire.dart';
+
+/// How a question is presented, from its server format.
 enum QuestionKind {
-  /// Text, optionally with a photo.
+  /// `STANDARD`: text, optionally with a photo.
   standard,
 
-  /// "مين في الصورة؟": only a strip of the portrait until the reveal.
+  /// `IMAGE_PERSON`: a strip of a portrait until the reveal.
   person,
 
-  /// "اللون الأصلي إيه؟": grayscale until the reveal, then a colour swatch.
+  /// `IMAGE_COLOR`: grayscale until the reveal, then the original colour.
   color,
 
-  /// "الصورة بتقول إيه؟": an illustrated Egyptian proverb.
+  /// `IMAGE_RIDDLE`: an illustrated Egyptian proverb.
   riddle,
 
-  /// "ركز معايا": show the picture, hide it, then ask.
+  /// `IMAGE_MEMORY`: show the picture, hide it, then ask.
   memory,
 
-  /// "مثّلها" (template 6B): one player acts out the hidden answer. The
-  /// timer starts when the host taps Ready, not when the question opens.
+  /// `CHARADES`: one player acts out a card only they see.
   acting,
 
-  /// "وضّح الصورة" (template 6C): a picture that gets clearer in stages;
-  /// each stage lowers the points the answer is worth.
+  /// `IMAGE_BLUR`, `IMAGE_ZOOM`, `IMAGE_CLUES`: a picture that gets clearer
+  /// in stages; each stage lowers the points the answer is worth.
   staged,
-}
 
-/// Which strip of a portrait stays visible before the reveal.
-enum PersonCrop { eyes, center, lower }
+  /// `AUDIO_GUESS`, `AUDIO_REVERSE`, `AUDIO_VOICE`: a clip the host plays.
+  audio;
+
+  static QuestionKind of(String format) => switch (format) {
+    'IMAGE_PERSON' => person,
+    'IMAGE_COLOR' => color,
+    'IMAGE_RIDDLE' => riddle,
+    'IMAGE_MEMORY' => memory,
+    'CHARADES' => acting,
+    'IMAGE_BLUR' || 'IMAGE_ZOOM' || 'IMAGE_CLUES' => staged,
+    'AUDIO_GUESS' || 'AUDIO_REVERSE' || 'AUDIO_VOICE' => audio,
+    _ => standard,
+  };
+}
 
 /// Tile values per row: 200, 200, 400, 400, 600, 600.
 const tilePoints = [200, 200, 400, 400, 600, 600];
 
+/// The open question, from the server's view of it. Pictures and clips are
+/// [MediaRef]s; the game controller turns them into short-lived links.
 class Question {
   const Question({
     required this.categoryId,
     required this.row,
     required this.kind,
-    required this.prompt,
-    required this.promptEn,
-    required this.answer,
-    required this.answerEn,
+    this.format = 'STANDARD',
+    this.prompt = '',
+    this.answer = '',
     this.image,
-    this.imageAlignment = Alignment.center,
-    this.crop,
-    this.color,
-    this.stages = const [],
+    this.clue,
+    this.audio,
     this.answerImage,
-  });
+    this.forwardAudio,
+    this.color,
+    this.hint,
+    this.cardUrl,
+    this.durationMs,
+    int? points,
+    this.pointStages = const [],
+  }) : _points = points;
 
   final String categoryId;
 
   /// 0–5 within the category.
   final int row;
   final QuestionKind kind;
+
+  /// The server's format name (`AUDIO_REVERSE`, `IMAGE_CLUES`, …).
+  final String format;
+
+  /// What's asked, in the app's language (memory: the instruction until
+  /// the picture is hidden).
   final String prompt;
-  final String promptEn;
+
+  /// Empty until the answer is revealed.
   final String answer;
-  final String answerEn;
+  final MediaRef? image;
 
-  /// Asset path of the question picture, if any.
-  final String? image;
+  /// The current clue card (`IMAGE_CLUES`).
+  final MediaRef? clue;
 
-  /// Focal point when the photo is cropped to fill its box.
-  final Alignment imageAlignment;
-  final PersonCrop? crop;
+  /// The host's clip (audio questions).
+  final MediaRef? audio;
+
+  /// The picture shown with the answer.
+  final MediaRef? answerImage;
+
+  /// The clip played forwards, with a reversed clip's answer.
+  final MediaRef? forwardAudio;
 
   /// Original colour, shown with the answer of colour questions.
   final Color? color;
 
-  /// Staged pictures, blurriest or closest first (staged questions only).
-  final List<String> stages;
+  /// A spoken clue (`AUDIO_VOICE`).
+  final String? hint;
 
-  /// The full picture shown with the answer (staged questions).
-  final String? answerImage;
+  /// The page the actor opens to see the card (`CHARADES`).
+  final String? cardUrl;
+  final int? durationMs;
+  final int? _points;
+
+  /// Points available at each stage of a staged question; one stage
+  /// otherwise.
+  final List<int> pointStages;
 
   String get id => '$categoryId-$row';
-  int get points => tilePoints[row];
+  int get points => _points ?? tilePoints[row];
 
   /// Picture rounds show the artwork whole (letterboxed) rather than cropped.
   bool get isPictureRound => kind != QuestionKind.standard;
-
-  /// Points available at each stage of a staged question, from the
-  /// prototype's `defaultPointStages`. Other questions have one stage.
-  List<int> get pointStages => kind != QuestionKind.staged
-      ? [points]
-      : switch (points) {
-          600 => const [600, 400, 200],
-          400 => const [400, 250, 150],
-          _ => const [200, 150, 50],
-        };
 }

@@ -11,8 +11,11 @@ import '../../core/ui/brand_art.dart';
 import '../../core/ui/play_button.dart';
 import '../../core/ui/pressable.dart';
 import '../../core/ui/surfaces.dart';
-import '../../data/categories.dart';
-import '../../data/question_bank.dart';
+import '../../core/api/sahsah_api.dart';
+import '../../data/catalog.dart';
+import '../../data/game_rules.dart';
+import '../categories/category_widgets.dart' show CatalogStatusView;
+import 'sign_in_sheet.dart';
 import 'board_screen.dart';
 import 'game_controller.dart';
 import 'ui/game_ui.dart';
@@ -59,8 +62,9 @@ class SetupScreen extends StatefulWidget {
 class _SetupScreenState extends State<SetupScreen> {
   late final List<String> _selected = [
     for (final id in widget.initialCategories)
-      if (isPlayable(id)) id,
+      if (context.catalog.byId(id)?.playable ?? false) id,
   ];
+  bool _starting = false;
   late int _step = widget.startOnTeams ? 1 : 0;
   late final List<TextEditingController> _teams;
 
@@ -100,7 +104,7 @@ class _SetupScreenState extends State<SetupScreen> {
 
   void _toggle(String id) {
     final lang = context.lang;
-    if (!isPlayable(id)) {
+    if (!(context.catalog.byId(id)?.playable ?? false)) {
       _toast(lang.t('الفئة دي جاية قريب', 'El fe2a di gaya 2orayeb'));
       return;
     }
@@ -121,18 +125,16 @@ class _SetupScreenState extends State<SetupScreen> {
     });
   }
 
-  void _pick(List<String> ids) => setState(
-    () => _selected
-      ..clear()
-      ..addAll(ids.where(isPlayable).take(boardCategories)),
-  );
-
   void _random() {
     final pool = [
-      for (final c in allCategories)
-        if (isPlayable(c.id)) c.id,
+      for (final c in context.catalog.categories)
+        if (c.playable) c.id,
     ]..shuffle(math.Random());
-    _pick(pool);
+    setState(
+      () => _selected
+        ..clear()
+        ..addAll(pool.take(boardCategories)),
+    );
   }
 
   void _toast(String text) {
@@ -150,6 +152,8 @@ class _SetupScreenState extends State<SetupScreen> {
   Future<void> _start() async {
     final lang = context.lang;
     final game = context.game;
+    final catalog = context.catalog;
+    if (_starting) return;
     if (game.hasActiveGame) {
       final ok = await confirmDialog(
         context,
@@ -171,11 +175,54 @@ class _SetupScreenState extends State<SetupScreen> {
                   : lang.t('الجدعان', 'El Ged3an'))
             : _teams[i].text.trim(),
     ];
-    game.start(categoryIds: _selected, teams: names);
+    if (names[0] == names[1]) {
+      _toast(
+        lang.t(
+          'الفريقين لازم يكون ليهم اسمين مختلفين.',
+          'El fare2een lazem yekoon lehom esmein mokhtalfeen.',
+        ),
+      );
+      return;
+    }
+    // Hosting needs this phone signed in (the passcode, once).
+    if (!game.session.signedIn &&
+        !await showSignInSheet(context, game.session)) {
+      return;
+    }
     if (!mounted) return;
-    Navigator.of(
-      context,
-    ).pushReplacement(MaterialPageRoute(builder: (_) => const BoardScreen()));
+    setState(() => _starting = true);
+    try {
+      await game.start(
+        categoryIds: _selected,
+        teams: names,
+        names: {for (final c in catalog.categories) c.id: c.name},
+      );
+      if (!mounted) return;
+      Navigator.of(
+        context,
+      ).pushReplacement(MaterialPageRoute(builder: (_) => const BoardScreen()));
+    } on SignInNeeded {
+      if (mounted) setState(() => _starting = false);
+      return _start();
+    } on NoPackLeft catch (e) {
+      final names = [...e.played, ...e.empty].join('، ');
+      _toast(
+        e.empty.isEmpty
+            ? lang.t(
+                'لعبتوا كل باقات «$names» قبل كده. اختاروا فئة تانية.',
+                'Le3beto kol ba2at "$names" 2abl keda. Ekhtaro fe2a tanya.',
+              )
+            : lang.t(
+                'مفيش باقات جاهزة في «$names». اختاروا فئة تانية.',
+                'Mafeesh ba2at gahza fe "$names". Ekhtaro fe2a tanya.',
+              ),
+      );
+    } on ApiError catch (e) {
+      // A refused sign-in drops it; the next tap asks for the passcode.
+      _toast(e.message(lang));
+    } finally {
+      if (mounted) setState(() => _starting = false);
+    }
   }
 
   void _back() {
@@ -224,14 +271,6 @@ class _SetupScreenState extends State<SetupScreen> {
                         key: const ValueKey('categories'),
                         selected: _selected,
                         onToggle: _toggle,
-                        onPreset: () => _pick(const [
-                          'person',
-                          'color',
-                          'riddle',
-                          'memory',
-                          'general',
-                          'football',
-                        ]),
                         onRandom: _random,
                       )
                     : _TeamsStep(
@@ -328,14 +367,26 @@ class _SetupScreenState extends State<SetupScreen> {
   Widget _teamsBar(LangController lang) {
     return PlayButton(
       height: 60,
-      onPressed: _full ? _start : null,
+      onPressed: _full && !_starting ? _start : null,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.play_arrow_rounded, size: 28),
+          if (_starting)
+            const SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(
+                strokeWidth: 3,
+                color: Colors.white,
+              ),
+            )
+          else
+            const Icon(Icons.play_arrow_rounded, size: 28),
           const SizedBox(width: 8),
           Text(
-            lang.t('ابدأ اللعبة', 'Ebda2 el le3ba'),
+            _starting
+                ? lang.t('بنجهّز اللعبة…', 'Bengahhez el le3ba…')
+                : lang.t('ابدأ اللعبة', 'Ebda2 el le3ba'),
             style: AppText.sans(
               20,
               weight: FontWeight.w700,
@@ -394,13 +445,11 @@ class _CategoryStep extends StatelessWidget {
     super.key,
     required this.selected,
     required this.onToggle,
-    required this.onPreset,
     required this.onRandom,
   });
 
   final List<String> selected;
   final ValueChanged<String> onToggle;
-  final VoidCallback onPreset;
   final VoidCallback onRandom;
 
   @override
@@ -427,12 +476,10 @@ class _CategoryStep extends StatelessWidget {
         style: AppText.sans(14, color: AppColors.ivory.withValues(alpha: 0.65)),
       ),
     ];
+    if (context.catalog.status != CatalogStatus.ready) {
+      return const CatalogStatusView();
+    }
     final picks = [
-      _QuickPick(
-        icon: LucideIcons.sparkles,
-        label: lang.t('التحديات الجديدة', 'El ta7adyat el gdeeda'),
-        onTap: onPreset,
-      ),
       _QuickPick(
         icon: LucideIcons.shuffle,
         label: lang.t('عشوائي', '3ashwa2y'),
@@ -469,20 +516,22 @@ class _CategoryStep extends StatelessWidget {
               const SizedBox(width: 16),
               Expanded(
                 child: ListView(
+                  key: const ValueKey('category-posters'),
                   padding: const EdgeInsetsDirectional.fromSTEB(0, 8, 16, 24),
-                  children: _sections(lang, first: 0),
+                  children: _sections(context, lang, first: 0),
                 ),
               ),
             ],
           );
         }
         return ListView(
+          key: const ValueKey('category-posters'),
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
           children: [
             ...intro,
             const SizedBox(height: 14),
             Wrap(spacing: 8, runSpacing: 8, children: picks),
-            ..._sections(lang, first: 22),
+            ..._sections(context, lang, first: 22),
           ],
         );
       },
@@ -490,14 +539,15 @@ class _CategoryStep extends StatelessWidget {
   }
 
   /// Each section's posters; [first] is the gap above the first title.
-  List<Widget> _sections(LangController lang, {required double first}) {
+  List<Widget> _sections(
+    BuildContext context,
+    LangController lang, {
+    required double first,
+  }) {
     return [
-      for (final (i, section) in categorySections.indexed) ...[
+      for (final (i, section) in context.catalog.shelves.indexed) ...[
         SizedBox(height: i == 0 ? first : 22),
-        Text(
-          lang.t(section.name, section.nameEn),
-          style: AppText.display(22, height: 1.2),
-        ),
+        Text(section.title(lang), style: AppText.display(22, height: 1.2)),
         const SizedBox(height: 10),
         LayoutBuilder(
           builder: (context, box) {
@@ -593,7 +643,7 @@ class _SelectablePoster extends StatelessWidget {
     required this.onTap,
   });
 
-  final LocalCategory category;
+  final Category category;
   final int tone;
 
   /// When it rises onto the shelf.
@@ -608,8 +658,8 @@ class _SelectablePoster extends StatelessWidget {
   Widget build(BuildContext context) {
     final lang = context.lang;
     final selected = order >= 0;
-    final available = isPlayable(category.id);
-    final name = lang.t(category.name, category.nameEn);
+    final available = category.playable;
+    final name = category.name;
     return Pressable(
       semanticLabel: available
           ? name
@@ -627,8 +677,7 @@ class _SelectablePoster extends StatelessWidget {
             child: Poster(
               id: category.id,
               name: name,
-              cover: AssetImage(BrandImages.category(category.id)),
-              isNew: category.isNew,
+              cover: coverOf(category),
               tone: tone,
               showNewBadge: !selected,
               selected: selected,
@@ -657,9 +706,7 @@ class _TeamsStep extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final lang = context.lang;
-    final chosen = [
-      for (final id in selected) allCategories.firstWhere((c) => c.id == id),
-    ];
+    final chosen = [for (final id in selected) ?context.catalog.byId(id)];
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
@@ -775,15 +822,22 @@ class _TeamsStep extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     ClipOval(
-                      child: CoverAsset(
-                        BrandImages.category(c.id),
+                      child: SizedBox(
                         width: 28,
                         height: 28,
+                        child: switch (coverOf(c)) {
+                          final cover? => CoverPicture(
+                            cover,
+                            errorBuilder: (_, _, _) =>
+                                const ColoredBox(color: AppColors.card),
+                          ),
+                          null => const ColoredBox(color: AppColors.card),
+                        },
                       ),
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      lang.t(c.name, c.nameEn),
+                      c.name,
                       style: AppText.sans(13, weight: FontWeight.w600),
                     ),
                   ],
@@ -804,8 +858,8 @@ class _TeamsStep extends StatelessWidget {
               Expanded(
                 child: Text(
                   lang.t(
-                    'تجريبي: اللعبة شغالة على الموبايل ده ومش هيتخصم توكن. دعوة الشلة بالكود جاية مع غرف اللعب.',
-                    'Tagreeby: el le3ba shaghala 3al mobile da w mesh hayetkhesem token. Da3wet el shella bel code gaya ma3 ghoraf el le3b.',
+                    'اللعبة محفوظة على سيرفر صحصح، فتقدروا تكملوها لو التطبيق اتقفل. دعوة الشلة بالكود من موبايلاتهم جاية قريب.',
+                    'El le3ba ma7fooza 3ala server Sa7Sa7, fa te2daro tkammelooha law el app et2afal. Da3wet el shella bel code men mobilathom gaya 2orayeb.',
                   ),
                   style: AppText.sans(
                     13,

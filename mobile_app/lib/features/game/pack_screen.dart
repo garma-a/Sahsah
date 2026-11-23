@@ -4,12 +4,11 @@ import 'package:lucide_icons_flutter/lucide_icons_600.dart';
 
 import '../../core/i18n/lang.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/ui/brand_art.dart';
 import '../../core/ui/category_cover.dart';
 import '../../core/ui/motion.dart';
 import '../../core/ui/game_button.dart';
 import '../../core/ui/surfaces.dart';
-import '../../data/categories.dart';
+import '../../data/catalog.dart';
 import 'board_screen.dart' show TeamScore;
 import 'game_controller.dart';
 import 'model/question.dart';
@@ -45,7 +44,7 @@ class PackScreen extends StatelessWidget {
     final controller = context.game;
     final game = controller.game;
     if (game == null) return const GameScaffold(child: SizedBox());
-    final category = allCategories.firstWhere((c) => c.id == categoryId);
+    final category = context.catalog.byId(categoryId);
     final slot = game.categoryIds.indexOf(categoryId);
     // The pack keeps its board card's frame colour.
     final frame = coverBorders[toneOf(slot)];
@@ -144,6 +143,7 @@ class PackScreen extends StatelessWidget {
                               key: coverKey,
                               width: box.maxWidth * 0.3,
                               child: _PackCover(
+                                categoryId: categoryId,
                                 category: category,
                                 frame: frame,
                                 tone: slot,
@@ -160,6 +160,7 @@ class PackScreen extends StatelessWidget {
                             SizedBox(
                               height: 150,
                               child: _PackCover(
+                                categoryId: categoryId,
                                 category: category,
                                 frame: frame,
                                 tone: slot,
@@ -183,13 +184,17 @@ class PackScreen extends StatelessWidget {
 /// The pack's photo with its name, what it's about and how many are left.
 class _PackCover extends StatelessWidget {
   const _PackCover({
+    required this.categoryId,
     required this.category,
     required this.frame,
     required this.tone,
     required this.game,
   });
 
-  final LocalCategory category;
+  final String categoryId;
+
+  /// The catalogue's entry, for the cover and the blurb.
+  final Category? category;
   final Color frame;
   final int tone;
   final Game game;
@@ -198,9 +203,11 @@ class _PackCover extends StatelessWidget {
   Widget build(BuildContext context) {
     final lang = context.lang;
     final left = [
-      for (var r = 0; r < tilePoints.length; r++) '${category.id}-$r',
+      for (var r = 0; r < tilePoints.length; r++) '$categoryId-$r',
     ].where((id) => !game.results.containsKey(id)).length;
     final accent = coverAccents[toneOf(tone)];
+    final name = game.nameOf(categoryId);
+    final about = category?.description;
 
     // The website's cover, big: the film still in its tone's frame, the
     // name lettered in Rakkas, then what the pack is and how many
@@ -216,8 +223,8 @@ class _PackCover extends StatelessWidget {
         fit: StackFit.expand,
         children: [
           CategoryCover(
-            image: AssetImage(BrandImages.category(category.id)),
-            name: lang.t(category.name, category.nameEn),
+            image: coverOf(category),
+            name: name,
             tone: tone,
             showName: false,
           ),
@@ -240,7 +247,7 @@ class _PackCover extends StatelessWidget {
                 Transform.rotate(
                   angle: -0.035,
                   child: Text(
-                    lang.t(category.name, category.nameEn),
+                    name,
                     textAlign: TextAlign.center,
                     maxLines: 2,
                     style: AppText.poster(30, color: AppColors.filmCream)
@@ -260,18 +267,19 @@ class _PackCover extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 // Gives up lines first when the panel is short.
-                Flexible(
-                  child: Text(
-                    lang.t(category.help, category.helpEn),
-                    maxLines: 3,
-                    textAlign: TextAlign.center,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppText.sans(
-                      12,
-                      color: AppColors.ivory.withValues(alpha: 0.8),
+                if (about != null)
+                  Flexible(
+                    child: Text(
+                      about,
+                      maxLines: 3,
+                      textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppText.sans(
+                        12,
+                        color: AppColors.ivory.withValues(alpha: 0.8),
+                      ),
                     ),
                   ),
-                ),
                 const SizedBox(height: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -318,14 +326,6 @@ class _QuestionGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // A format chip on each tile only says something when the pack mixes
-    // formats; otherwise the side panel already names it, once.
-    final mixed =
-        {
-          for (var i = 0; i < tilePoints.length; i++)
-            context.game.question('$categoryId-$i').kind,
-        }.length >
-        1;
     return Column(
       children: [
         for (var level = 0; level < 3; level++) ...[
@@ -347,7 +347,6 @@ class _QuestionGrid extends StatelessWidget {
                               game.categoryIds.indexOf(categoryId),
                             )],
                         game: game,
-                        showFormat: mixed,
                         onPlay: onPlay,
                       ),
                     ),
@@ -368,12 +367,8 @@ class _QuestionTile extends StatelessWidget {
     required this.number,
     required this.fill,
     required this.game,
-    required this.showFormat,
     required this.onPlay,
   });
-
-  /// Whether to show the question's format (packs that mix formats).
-  final bool showFormat;
 
   /// The category's tile colour.
   final Color fill;
@@ -384,26 +379,6 @@ class _QuestionTile extends StatelessWidget {
   final int number;
   final Game game;
   final ValueChanged<String> onPlay;
-
-  /// What kind of question is behind the tile (no spoilers).
-  static (IconData, String, String) _format(QuestionKind kind) =>
-      switch (kind) {
-        QuestionKind.acting => (LucideIcons.drama, 'مثّلها', 'Massel-ha'),
-        QuestionKind.staged => (
-          LucideIcons.zoomIn,
-          'وضّح الصورة',
-          'Wada7 el soora',
-        ),
-        QuestionKind.memory => (LucideIcons.brain, 'ركز معايا', 'Rakez m3aya'),
-        QuestionKind.person ||
-        QuestionKind.color ||
-        QuestionKind.riddle => (LucideIcons.image, 'صورة', 'Soora'),
-        QuestionKind.standard => (
-          LucideIcons.messageCircleQuestionMark,
-          'سؤال',
-          'So2al',
-        ),
-      };
 
   /// The tile's number in a corner.
   Widget _numbered(BuildContext context, Color ink, Widget child) {
@@ -440,7 +415,8 @@ class _QuestionTile extends StatelessWidget {
     final controller = context.game;
     final q = controller.question(id);
     final result = game.results[id];
-    final started = game.progress[id] != null;
+    // Opened before and left undecided: its time and hints are kept.
+    final started = game.opened.contains(id);
     final points = lang.toAr(q.points);
 
     if (result != null) {
@@ -511,15 +487,14 @@ class _QuestionTile extends StatelessWidget {
       );
     }
 
-    final format = _format(q.kind);
     // Unplayed tiles take the category's colour, as on the website's
     // board; one already opened is cream, waiting to be finished.
     final face = started ? AppColors.paper : fill;
     final ink = AppColors.inkOn(face);
     return GameButton(
       semanticLabel: lang.t(
-        'سؤال ${lang.toAr(number)}، $points نقطة، ${format.$2}${started ? '، مفتوح' : ''}',
-        'So2al $number, ${q.points} no2ta, ${format.$3}${started ? ', maftoo7' : ''}',
+        'سؤال ${lang.toAr(number)}، $points نقطة${started ? '، مفتوح' : ''}',
+        'So2al $number, ${q.points} no2ta${started ? ', maftoo7' : ''}',
       ),
       key: ValueKey('question-$id'),
       radius: 18,
@@ -537,7 +512,7 @@ class _QuestionTile extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(points, style: AppText.num(34, color: ink, height: 1)),
-                if (started || showFormat) ...[
+                if (started) ...[
                   const SizedBox(width: 10),
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -545,31 +520,25 @@ class _QuestionTile extends StatelessWidget {
                       vertical: 3,
                     ),
                     decoration: BoxDecoration(
-                      color: started
-                          ? AppColors.sun
-                          : ink.withValues(alpha: 0.14),
+                      color: AppColors.sun,
                       borderRadius: BorderRadius.circular(999),
-                      border: started
-                          ? Border.all(color: AppColors.ink, width: 2)
-                          : null,
+                      border: Border.all(color: AppColors.ink, width: 2),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
-                          started ? LucideIcons600.circlePlay : format.$1,
+                        const Icon(
+                          LucideIcons600.circlePlay,
                           size: 14,
-                          color: started ? AppColors.ink : ink,
+                          color: AppColors.ink,
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          started
-                              ? lang.t('كمّل', 'Kammel')
-                              : lang.t(format.$2, format.$3),
+                          lang.t('كمّل', 'Kammel'),
                           style: AppText.sans(
                             12,
                             weight: FontWeight.w700,
-                            color: started ? AppColors.ink : ink,
+                            color: AppColors.ink,
                           ),
                         ),
                       ],

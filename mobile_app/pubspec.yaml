@@ -16,6 +16,7 @@ dependencies:
   flutter_svg: ^2.3.0
   http: ^1.2.2
   lucide_icons_flutter: ^4.0.2
+  qr_flutter: ^4.1.0
   shared_preferences: ^2.5.5
   url_launcher: ^6.3.2
   wakelock_plus: ^1.6.1
@@ -29,8 +30,6 @@ flutter:
   uses-material-design: true
   assets:
     - assets/img/
-    - assets/game/
-    - assets/game/stages/
     - assets/sfx/
     - assets/logo/
     - assets/cinema/

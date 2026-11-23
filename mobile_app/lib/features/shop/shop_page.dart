@@ -6,7 +6,7 @@ import '../../core/i18n/lang.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/game_button.dart';
 import '../../core/ui/surfaces.dart';
-import '../../data/categories.dart';
+import '../../data/game_rules.dart';
 import '../../data/shop.dart';
 import '../game/setup_screen.dart';
 import '../shared/form_widgets.dart';

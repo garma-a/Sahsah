@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:lucide_icons_flutter/lucide_icons_600.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
+import '../../core/api/game_wire.dart' show MediaRef;
 import '../../core/audio/sound.dart';
 import '../../core/i18n/lang.dart';
 import '../../core/theme/app_theme.dart';
@@ -13,7 +16,6 @@ import '../../core/ui/game_button.dart';
 import '../../core/ui/play_button.dart';
 import '../../core/ui/pressable.dart';
 import '../../core/ui/surfaces.dart';
-import '../../data/categories.dart';
 import 'board_screen.dart' show TeamScore;
 import 'game_controller.dart';
 import 'model/question.dart';
@@ -22,7 +24,6 @@ import 'ui/fit_text.dart';
 import 'ui/game_ui.dart';
 import 'ui/photo_viewer.dart';
 import '../../core/ui/motion.dart';
-import '../../core/ui/cover_image.dart';
 
 /// Arabic "for [team]": ل + ال joins as لل (للفراعنة), otherwise لـ.
 String _forTeam(String name) =>
@@ -33,8 +34,7 @@ String _forTeam(String name) =>
 Future<void> playQuestion(BuildContext context, String id) =>
     playQuestionOn(Navigator.of(context), context.game, id);
 
-/// [playQuestion] without a context: also used to reopen a question after
-/// its award is taken back.
+/// [playQuestion] without a context.
 Future<void> playQuestionOn(
   NavigatorState navigator,
   GameController game,
@@ -131,10 +131,9 @@ class _QuestionScreenState extends State<QuestionScreen> {
       context: context,
       barrierColor: Colors.black.withValues(alpha: 0.6),
       builder: (_) => _LeaveDialog(
-        question: game.question(id),
+        questionId: id,
         teamNames: game.game!.teamNames,
         points: game.availablePoints(id),
-        revealed: game.progressOf(id).revealed,
         onReveal: () => game.reveal(id),
       ),
     );
@@ -156,15 +155,11 @@ class _QuestionScreenState extends State<QuestionScreen> {
             '✓ ${lang.toAr(points)} نقطة محسومة ${_forTeam(names[team])}',
             '✓ $points no2ta ma7sooma le ${names[team]}',
           );
-    final id = widget.questionId;
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
     final ink = team == null
         ? AppColors.ivory
         : AppColors.inkOn(teamColors[team]);
-    // A wrong tap can be taken back for a few seconds (not on the tile
-    // that ends the game: its scores lock).
-    final undoable = game.canUndoAward;
     // Over the foot of the pack's side panel, clear of the tiles; centred
     // at the bottom if the pack has no side panel (portrait).
     // Measured against the app's own overlay, the space the snack bar is
@@ -191,61 +186,16 @@ class _QuestionScreenState extends State<QuestionScreen> {
                   math.max(0, screen.height - over.bottom + 8),
                 ),
           persist: false,
-          duration: Duration(seconds: undoable ? 4 : 2),
+          duration: const Duration(seconds: 2),
           backgroundColor: team == null ? AppColors.ui : teamColors[team],
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
             side: const BorderSide(color: AppColors.ink, width: 3),
           ),
-          padding: const EdgeInsetsDirectional.fromSTEB(14, 8, 10, 8),
-          // Narrow over the panel: the words, then the undo under them.
-          content: Flex(
-            direction: over == null ? Axis.horizontal : Axis.vertical,
-            crossAxisAlignment: over == null
-                ? CrossAxisAlignment.center
-                : CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Flexible(
-                fit: over == null ? FlexFit.tight : FlexFit.loose,
-                child: Text(
-                  message,
-                  style: AppText.sans(15, weight: FontWeight.w700, color: ink),
-                ),
-              ),
-              if (undoable && over != null) const SizedBox(height: 6),
-              if (undoable)
-                TextButton.icon(
-                  key: const ValueKey('award-undo'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: ink,
-                    minimumSize: const Size(0, 44),
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    shape: StadiumBorder(
-                      side: BorderSide(
-                        color: ink.withValues(alpha: 0.6),
-                        width: 1.5,
-                      ),
-                    ),
-                  ),
-                  onPressed: () {
-                    messenger.hideCurrentSnackBar();
-                    // Back on the same question to pick again.
-                    if (game.undoAward(id) && navigator.mounted) {
-                      playQuestionOn(navigator, game, id);
-                    }
-                  },
-                  icon: const Icon(LucideIcons.undo2, size: 16),
-                  label: Text(
-                    lang.t('تراجع', 'Taraga3'),
-                    style: AppText.sans(
-                      14,
-                      weight: FontWeight.w700,
-                      color: ink,
-                    ),
-                  ),
-                ),
-            ],
+          padding: const EdgeInsetsDirectional.fromSTEB(14, 12, 10, 12),
+          content: Text(
+            message,
+            style: AppText.sans(15, weight: FontWeight.w700, color: ink),
           ),
         ),
       );
@@ -260,9 +210,19 @@ class _QuestionScreenState extends State<QuestionScreen> {
     }
     final lang = context.lang;
     final id = widget.questionId;
+    // Opening on the server, or it couldn't be opened.
+    if (controller.viewOf(id) == null) {
+      return GameScaffold(
+        tv: true,
+        child: _Opening(
+          busy: controller.busy,
+          onRetry: () => controller.open(id),
+        ),
+      );
+    }
     final q = controller.question(id);
     final p = controller.progressOf(id);
-    final category = allCategories.firstWhere((c) => c.id == q.categoryId);
+    final categoryName = game.nameOf(q.categoryId);
     final points = controller.availablePoints(id);
 
     final Widget content = p.revealed && !_showQuestion
@@ -288,19 +248,18 @@ class _QuestionScreenState extends State<QuestionScreen> {
       badge: lang.t(
         // A dash, not a dot: an Arabic zero is a dot, so "٢٠٠ ·" would
         // read as ٢٠٠٠.
-        '${category.name} – ${lang.toAr(points)} نقطة',
-        '${category.nameEn} – $points no2ta',
+        '$categoryName – ${lang.toAr(points)} نقطة',
+        '$categoryName – $points no2ta',
       ),
       child: content,
     );
 
-    final status = controller.timerStatus(p);
     // The clock waits on the memory picture and the acting rules, and
     // stops with the reveal.
     final timerOff =
         p.revealed ||
         (q.kind == QuestionKind.memory && !p.memoryAsked) ||
-        (q.kind == QuestionKind.acting && status == TimerStatus.ready);
+        (q.kind == QuestionKind.acting && !controller.actorReady(id));
     final timer = _TimerBar(questionId: id, disabled: timerOff);
     Widget score(int team) => TeamScore(game: game, team: team, compact: true);
 
@@ -508,27 +467,23 @@ class _QuestionView extends StatelessWidget {
     final game = context.game;
     final q = question;
     final p = progress;
-    final status = game.timerStatus(p);
     final memoryWaiting = q.kind == QuestionKind.memory && !p.memoryAsked;
     // 6B: before Ready the screen shows the rules; the timer waits.
     final actingRules =
         q.kind == QuestionKind.acting &&
-        status == TimerStatus.ready &&
+        !game.actorReady(questionId) &&
         !p.revealed;
-    final canClarify =
-        q.kind == QuestionKind.staged &&
-        !p.revealed &&
-        p.stage < q.pointStages.length - 1;
+    final canClarify = game.can(questionId, 'advance_hint');
 
     // With no picture the question has the whole card, so it can be bigger.
     final textOnly = q.kind == QuestionKind.standard && q.image == null;
     final prompt = FitText(
-      memoryWaiting
+      memoryWaiting && q.prompt.isEmpty
           ? lang.t(
               'ركّزوا في الصورة… السؤال جاي بعد ما تختفي',
               'Rakkezo fel soora… el so2al gay ba3d ma tekhtefy',
             )
-          : lang.t(q.prompt, q.promptEn),
+          : q.prompt,
       max: textOnly ? 46 : 38,
       min: 16,
       textAlign: TextAlign.center,
@@ -543,21 +498,14 @@ class _QuestionView extends StatelessWidget {
     // The picture, when the question has one.
     final Widget? media = switch (q.kind) {
       QuestionKind.acting => null,
-      QuestionKind.staged => _Photo(
-        question: q,
-        asset: q.stages[math.min(p.stage, q.stages.length - 1)],
-        revealed: false,
-      ),
+      QuestionKind.audio => _ClipCard(clip: q.audio, hint: q.hint),
       QuestionKind.memory => _MemoryMedia(
         question: q,
         progress: p,
         questionId: questionId,
       ),
-      _ when q.image != null => _Photo(
-        question: q,
-        asset: q.image!,
-        revealed: p.revealed,
-      ),
+      QuestionKind.staged when q.clue != null => _WithClue(question: q),
+      _ when q.image != null => _Photo(question: q, image: q.image!),
       _ => null,
     };
 
@@ -582,7 +530,7 @@ class _QuestionView extends StatelessWidget {
       primary = _GreenButton(
         icon: LucideIcons600.play,
         label: lang.t('جاهز', 'Gahez'),
-        onTap: () => game.toggleTimer(questionId),
+        onTap: () => game.startActing(questionId),
       );
     } else if (memoryWaiting) {
       // Nothing to reveal yet: say when the answer comes, rather than show
@@ -598,7 +546,9 @@ class _QuestionView extends StatelessWidget {
       primary = _GreenButton(
         icon: LucideIcons600.eye,
         label: lang.t('إظهار الإجابة', 'Ezhar el egaba'),
-        onTap: () => game.reveal(questionId),
+        onTap: game.can(questionId, 'reveal_answer')
+            ? () => game.reveal(questionId)
+            : null,
       );
     }
 
@@ -678,7 +628,7 @@ class _QuestionView extends StatelessWidget {
             child: q.kind != QuestionKind.acting
                 ? Center(child: prompt)
                 : actingRules
-                ? const _ActingRules()
+                ? _ActingRules(cardUrl: q.cardUrl)
                 : _ActingLive(prompt: prompt),
           ),
           const SizedBox(height: 12),
@@ -812,7 +762,7 @@ class _TimerBar extends StatelessWidget {
 
     // A 48×48 target (the platforms' minimum) around a 38px button, so a
     // hurried thumb mid-game still lands.
-    Widget round(IconData icon, String label, VoidCallback onTap) => Pressable(
+    Widget round(IconData icon, String label, VoidCallback? onTap) => Pressable(
       semanticLabel: label,
       onTap: disabled ? null : onTap,
       child: SizedBox(
@@ -860,7 +810,14 @@ class _TimerBar extends StatelessWidget {
             round(
               running ? LucideIcons600.pause : LucideIcons600.play,
               running ? lang.t('وقّف', 'Wa22af') : lang.t('كمّل', 'Kammel'),
-              () => game.toggleTimer(questionId),
+              // Only what the server allows right now.
+              game.can(questionId, switch (status) {
+                    TimerStatus.running => 'pause_timer',
+                    TimerStatus.paused => 'resume_timer',
+                    _ => 'reset_timer',
+                  })
+                  ? () => game.toggleTimer(questionId)
+                  : null,
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -956,7 +913,9 @@ class _TimerBar extends StatelessWidget {
             round(
               LucideIcons.rotateCcw,
               lang.t('إعادة الوقت', 'E3adet el wa2t'),
-              () => game.resetTimer(questionId),
+              game.can(questionId, 'reset_timer')
+                  ? () => game.resetTimer(questionId)
+                  : null,
             ),
           ],
         ),
@@ -967,10 +926,12 @@ class _TimerBar extends StatelessWidget {
 
 // ---- 6B acting -------------------------------------------------------------
 
-/// Before Ready: the rules and a QR code per team (template 6B). Scanning
-/// needs game rooms in the backend, so the codes are placeholders for now.
+/// Before Ready: the rules and the code the actor scans (template 6B). The
+/// card opens on the actor's phone only (ADR 0019).
 class _ActingRules extends StatelessWidget {
-  const _ActingRules();
+  const _ActingRules({required this.cardUrl});
+
+  final String? cardUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -1001,7 +962,7 @@ class _ActingRules extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const _QrBox(team: 0),
+              _CardQr(url: cardUrl),
               const SizedBox(width: 14),
               Expanded(
                 // The three rules keep the full width and shrink together
@@ -1071,8 +1032,6 @@ class _ActingRules extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 14),
-              const _QrBox(team: 1),
             ],
           ),
         ),
@@ -1081,23 +1040,24 @@ class _ActingRules extends StatelessWidget {
   }
 }
 
-class _QrBox extends StatelessWidget {
-  const _QrBox({required this.team});
+/// The charades card's address as a QR code, for the actor's phone.
+class _CardQr extends StatelessWidget {
+  const _CardQr({required this.url});
 
-  final int team;
+  final String? url;
 
   @override
   Widget build(BuildContext context) {
     final lang = context.lang;
-    final name = context.game.game!.teamNames[team];
+    final link = url;
     return Semantics(
       label: lang.t(
-        'كود $name، المسح جاي مع غرف اللعب',
-        'Code $name, el mas7 gay ma3 ghoraf el le3b',
+        'كود الممثل: امسحه من موبايله',
+        'Code el momasel: emsa7o men mobailo',
       ),
       excludeSemantics: true,
       child: Container(
-        width: 150,
+        width: 170,
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           color: AppColors.paperShade,
@@ -1109,102 +1069,40 @@ class _QrBox extends StatelessWidget {
             Expanded(
               child: AspectRatio(
                 aspectRatio: 1,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Opacity(
-                        opacity: 0.35,
-                        child: CustomPaint(painter: _QrPainter(seed: team)),
-                      ),
-                    ),
-                    Center(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.deep,
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          lang.t('قريبًا', 'Orayeb'),
-                          style: AppText.sans(
-                            12,
-                            weight: FontWeight.w700,
-                            color: AppColors.gold,
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: link == null
+                      ? const Icon(LucideIcons.qrCode, color: AppColors.ink)
+                      : QrImageView(
+                          data: link,
+                          padding: EdgeInsets.zero,
+                          eyeStyle: const QrEyeStyle(
+                            eyeShape: QrEyeShape.square,
+                            color: AppColors.ink,
+                          ),
+                          dataModuleStyle: const QrDataModuleStyle(
+                            dataModuleShape: QrDataModuleShape.square,
+                            color: AppColors.ink,
                           ),
                         ),
-                      ),
-                    ),
-                  ],
                 ),
               ),
             ),
             const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-              decoration: BoxDecoration(
-                color: teamColors[team],
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Text(
-                name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: AppText.sans(
-                  12,
-                  weight: FontWeight.w700,
-                  color: AppColors.inkOn(teamColors[team]),
-                ),
-              ),
+            Text(
+              lang.t('للممثل بس', 'Lel momasel bas'),
+              maxLines: 1,
+              style: AppText.sans(13, weight: FontWeight.w700),
             ),
           ],
         ),
       ),
     );
   }
-}
-
-/// A QR-like pattern used as a placeholder (it encodes nothing).
-class _QrPainter extends CustomPainter {
-  const _QrPainter({required this.seed});
-
-  final int seed;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (size.isEmpty) return;
-    const n = 21;
-    final cell = size.shortestSide / n;
-    final paint = Paint()..color = AppColors.deep;
-    final random = math.Random(seed + 11);
-    bool finder(int x, int y) =>
-        (x < 7 && y < 7) || (x >= n - 7 && y < 7) || (x < 7 && y >= n - 7);
-    for (var y = 0; y < n; y++) {
-      for (var x = 0; x < n; x++) {
-        if (finder(x, y)) continue;
-        if (random.nextBool()) {
-          canvas.drawRect(Rect.fromLTWH(x * cell, y * cell, cell, cell), paint);
-        }
-      }
-    }
-    for (final (fx, fy) in [(0, 0), (n - 7, 0), (0, n - 7)]) {
-      final outer = Rect.fromLTWH(fx * cell, fy * cell, cell * 7, cell * 7);
-      canvas.drawRect(outer, paint);
-      canvas.drawRect(outer.deflate(cell), Paint()..color = Colors.white);
-      canvas.drawRect(outer.deflate(cell * 2), paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(_QrPainter old) => old.seed != seed;
 }
 
 /// After Ready: what kind of thing is being acted, not the answer.
@@ -1343,7 +1241,12 @@ class _AnswerView extends StatelessWidget {
   Widget build(BuildContext context) {
     final lang = context.lang;
     final q = question;
-    final asset = q.kind == QuestionKind.staged ? q.answerImage : q.image;
+    // The answer's picture; a riddle's illustration may stay.
+    final picture =
+        q.answerImage ??
+        (q.kind == QuestionKind.riddle || q.kind == QuestionKind.standard
+            ? q.image
+            : null);
 
     // The website's answer slab: yellow, ink-edged, turning up from its
     // top edge once when it appears.
@@ -1369,7 +1272,7 @@ class _AnswerView extends StatelessWidget {
                 const SizedBox(height: 4),
                 Flexible(
                   child: FitText(
-                    lang.t(q.answer, q.answerEn),
+                    q.answer,
                     max: 40,
                     min: 18,
                     textAlign: TextAlign.center,
@@ -1497,7 +1400,15 @@ class _AnswerView extends StatelessWidget {
       },
     );
 
-    if (asset == null) {
+    final Widget? media = picture != null
+        ? _Photo(question: q, image: picture)
+        : q.forwardAudio != null
+        ? _ClipCard(
+            clip: q.forwardAudio,
+            label: lang.t('اسمع المقطع صح', 'Esma3 el ma2ta3 sa7'),
+          )
+        : null;
+    if (media == null) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1509,7 +1420,7 @@ class _AnswerView extends StatelessWidget {
     }
     return _MediaLayout(
       aspect: _photoAspect(q),
-      media: _Photo(question: q, asset: asset, revealed: true),
+      media: media,
       top: answer,
       bottom: award,
     );
@@ -1570,26 +1481,38 @@ class _RevealSlab extends StatelessWidget {
 // ---- Pictures --------------------------------------------------------------
 
 /// The question picture in a polaroid frame. Tap to open it full screen
-/// and zoom; the crop and grayscale stay on until the reveal.
+/// and zoom. It comes from a short-lived link; until the link is in, the
+/// frame waits.
 class _Photo extends StatelessWidget {
-  const _Photo({
-    required this.question,
-    required this.asset,
-    required this.revealed,
-  });
+  const _Photo({required this.question, required this.image});
 
   final Question question;
-  final String asset;
-  final bool revealed;
+  final MediaRef image;
 
   @override
   Widget build(BuildContext context) {
     final lang = context.lang;
+    final provider = context.game.image(image);
+    if (provider == null) {
+      return _Framed(
+        aspect: _photoAspect(question),
+        child: const Center(
+          child: SizedBox(
+            width: 28,
+            height: 28,
+            child: CircularProgressIndicator(
+              strokeWidth: 3,
+              color: AppColors.gold,
+            ),
+          ),
+        ),
+      );
+    }
     Widget picture({required bool full}) => _Picture(
-      question: question,
-      asset: asset,
-      revealed: revealed,
-      fit: full ? BoxFit.contain : null,
+      image: provider,
+      fit: full || question.kind == QuestionKind.staged
+          ? BoxFit.contain
+          : (question.isPictureRound ? BoxFit.contain : BoxFit.cover),
     );
     return _Framed(
       aspect: _photoAspect(question),
@@ -1623,6 +1546,31 @@ class _Photo extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// A clue round: the picture, with the latest clue card beside it.
+class _WithClue extends StatelessWidget {
+  const _WithClue({required this.question});
+
+  final Question question;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          flex: 3,
+          child: _Photo(question: question, image: question.image!),
+        ),
+        const SizedBox(height: 8),
+        Expanded(
+          flex: 2,
+          child: _Photo(question: question, image: question.clue!),
+        ),
+      ],
     );
   }
 }
@@ -1686,138 +1634,213 @@ class _Framed extends StatelessWidget {
   }
 }
 
-/// The picture with person crop / grayscale applied until the reveal.
+/// A question picture. The server sends it already cropped or in grey
+/// where the format asks for it, and the full picture with the answer.
 class _Picture extends StatelessWidget {
-  const _Picture({
-    required this.question,
-    required this.asset,
-    required this.revealed,
-    this.fit,
-  });
+  const _Picture({required this.image, required this.fit});
 
-  final Question question;
-  final String asset;
-  final bool revealed;
-
-  /// Full screen shows the whole picture; the frame fills its box.
-  final BoxFit? fit;
-
-  // Visible strip per crop, as (top, right, bottom, left) insets — the
-  // prototype's `clip-path: inset(...)`.
-  static const _insets = {
-    PersonCrop.eyes: (0.27, 0.12, 0.48, 0.12),
-    PersonCrop.center: (0.27, 0.18, 0.38, 0.18),
-    PersonCrop.lower: (0.42, 0.15, 0.27, 0.15),
-  };
+  final ImageProvider<Object> image;
+  final BoxFit fit;
 
   @override
   Widget build(BuildContext context) {
-    final q = question;
-    final cover =
-        (fit ??
-            (q.kind == QuestionKind.staged ? BoxFit.contain : BoxFit.cover)) ==
-        BoxFit.cover;
-    if (cover &&
-        (q.kind == QuestionKind.standard || q.kind == QuestionKind.staged)) {
-      return CoverAsset(asset, alignment: q.imageAlignment);
-    }
-    if (q.kind == QuestionKind.standard || q.kind == QuestionKind.staged) {
-      return Image.asset(
-        asset,
-        fit:
-            fit ??
-            (q.kind == QuestionKind.staged ? BoxFit.contain : BoxFit.cover),
-        alignment: q.imageAlignment,
-        width: double.infinity,
-        height: double.infinity,
-      );
-    }
-    const none = (0.0, 0.0, 0.0, 0.0);
-    final strip = q.kind == QuestionKind.person
-        ? _insets[q.crop ?? PersonCrop.eyes]!
-        : none;
-    final crop = revealed ? none : strip;
-    final gray = q.kind == QuestionKind.color && !revealed;
+    return Image(
+      image: image,
+      fit: fit,
+      width: double.infinity,
+      height: double.infinity,
+      gaplessPlayback: true,
+      errorBuilder: (_, _, _) => const Center(
+        child: Icon(LucideIcons.imageOff, size: 30, color: AppColors.ivory),
+      ),
+    );
+  }
+}
 
-    return TweenAnimationBuilder<double>(
-      tween: Tween(end: gray ? 0 : 1),
-      duration: motionFor(context, const Duration(milliseconds: 700)),
-      curve: easeBrand,
-      builder: (context, saturation, child) =>
-          ColorFiltered(colorFilter: _saturation(saturation), child: child),
+/// A clip the host plays out loud (audio rounds), in the picture's place.
+class _ClipCard extends StatefulWidget {
+  const _ClipCard({required this.clip, this.hint, this.label});
+
+  final MediaRef? clip;
+
+  /// A spoken clue under the button (`AUDIO_VOICE`).
+  final String? hint;
+
+  /// What the button says before it's played.
+  final String? label;
+
+  @override
+  State<_ClipCard> createState() => _ClipCardState();
+}
+
+class _ClipCardState extends State<_ClipCard> {
+  AudioPlayer? _player;
+  StreamSubscription<PlayerState>? _state;
+  bool _playing = false;
+  bool _failed = false;
+
+  @override
+  void dispose() {
+    _state?.cancel();
+    _player?.dispose();
+    super.dispose();
+  }
+
+  Future<void> _toggle() async {
+    final game = context.game;
+    final player = _player ??= AudioPlayer();
+    if (_playing) {
+      await player.pause();
+      return;
+    }
+    // A link renewed if it's about to expire.
+    final url = await game.freshMediaUrl(widget.clip);
+    if (url == null || !mounted) return;
+    _state ??= player.onPlayerStateChanged.listen((s) {
+      if (mounted) setState(() => _playing = s == PlayerState.playing);
+    });
+    try {
+      setState(() => _failed = false);
+      await player.play(UrlSource(url));
+    } on Object {
+      if (mounted) setState(() => _failed = true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final lang = context.lang;
+    final ready = context.game.mediaUrl(widget.clip) != null;
+    return _Framed(
+      aspect: 4 / 3,
       child: Center(
-        child: AspectRatio(
-          aspectRatio: 4 / 3,
-          // Until the reveal the visible strip is zoomed to the frame's
-          // width, around its own centre; then it eases back.
-          child: TweenAnimationBuilder<double>(
-            tween: Tween(end: 1 / (1 - crop.$2 - crop.$4)),
-            duration: motionFor(context, const Duration(milliseconds: 700)),
-            curve: easeBrand,
-            builder: (context, scale, child) => Transform.scale(
-              scale: scale,
-              alignment: Alignment(strip.$4 - strip.$2, strip.$1 - strip.$3),
-              child: child,
-            ),
-            child: _AnimatedInsetClip(
-              insets: crop,
-              child: Image.asset(asset, fit: BoxFit.contain),
-            ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Pressable(
+                semanticLabel: _playing
+                    ? lang.t('وقّف المقطع', 'Wa22af el ma2ta3')
+                    : lang.t('شغّل المقطع', 'Shaghghal el ma2ta3'),
+                onTap: ready ? _toggle : null,
+                child: Container(
+                  width: 84,
+                  height: 84,
+                  decoration: BoxDecoration(
+                    color: ready ? AppColors.gold : AppColors.disabled,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.ink, width: 3),
+                    boxShadow: [inkDrop(4)],
+                  ),
+                  child: ready
+                      ? Icon(
+                          _playing ? LucideIcons600.pause : LucideIcons600.play,
+                          size: 38,
+                          color: AppColors.ink,
+                        )
+                      : const Padding(
+                          padding: EdgeInsets.all(26),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 3,
+                            color: AppColors.ink,
+                          ),
+                        ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                _failed
+                    ? lang.t(
+                        'المقطع مشتغلش. جرّب تاني.',
+                        'El ma2ta3 mashtaghalsh. Garrab tany.',
+                      )
+                    : widget.label ?? lang.t('اسمعوا كويس', 'Esma3o kwayes'),
+                textAlign: TextAlign.center,
+                style: AppText.display(20, height: 1.2),
+              ),
+              if (widget.hint case final hint?) ...[
+                const SizedBox(height: 6),
+                Text(
+                  hint,
+                  textAlign: TextAlign.center,
+                  style: AppText.sans(14, height: 1.4),
+                ),
+              ],
+            ],
           ),
         ),
       ),
     );
   }
-
-  /// Luminance-preserving saturation matrix (0 = grayscale).
-  static ColorFilter _saturation(double s) {
-    const r = 0.2126, g = 0.7152, b = 0.0722;
-    final i = 1 - s;
-    return ColorFilter.matrix([
-      r * i + s, g * i, b * i, 0, 0, //
-      r * i, g * i + s, b * i, 0, 0, //
-      r * i, g * i, b * i + s, 0, 0, //
-      0, 0, 0, 1, 0, //
-    ]);
-  }
 }
 
-class _AnimatedInsetClip extends StatelessWidget {
-  const _AnimatedInsetClip({required this.insets, required this.child});
+/// The question couldn't be shown yet: it's opening on the server, or the
+/// server refused (the message says why).
+class _Opening extends StatelessWidget {
+  const _Opening({required this.busy, required this.onRetry});
 
-  final (double, double, double, double) insets;
-  final Widget child;
+  final bool busy;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
-    final (t, r, b, l) = insets;
-    return TweenAnimationBuilder<EdgeInsets>(
-      tween: EdgeInsetsTween(end: EdgeInsets.fromLTRB(l, t, r, b)),
-      duration: motionFor(context, const Duration(milliseconds: 700)),
-      curve: easeBrand,
-      builder: (context, e, child) =>
-          ClipRect(clipper: _InsetClipper(e), child: child),
-      child: child,
+    final lang = context.lang;
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (busy) ...[
+            const SizedBox(
+              width: 30,
+              height: 30,
+              child: CircularProgressIndicator(
+                strokeWidth: 3,
+                color: AppColors.gold,
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              lang.t('بنفتح السؤال…', 'Benfta7 el so2al…'),
+              style: AppText.display(22),
+            ),
+          ] else ...[
+            Text(
+              lang.t('مقدرناش نفتح السؤال', 'Ma2dernash nefta7 el so2al'),
+              style: AppText.display(24),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: 150,
+                  child: GlassButton(
+                    height: 50,
+                    icon: lang.ar
+                        ? LucideIcons.arrowRight
+                        : LucideIcons.arrowLeft,
+                    label: lang.t('رجوع', 'Rogoo3'),
+                    onTap: () => Navigator.of(context).pop(),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                SizedBox(
+                  width: 170,
+                  child: GoldButton(
+                    height: 50,
+                    icon: LucideIcons600.rotateCcw,
+                    label: lang.t('جرّب تاني', 'Garrab tany'),
+                    onTap: onRetry,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
     );
   }
-}
-
-class _InsetClipper extends CustomClipper<Rect> {
-  _InsetClipper(this.f);
-
-  /// Fractions of the box.
-  final EdgeInsets f;
-
-  @override
-  Rect getClip(Size s) => Rect.fromLTRB(
-    s.width * f.left,
-    s.height * f.top,
-    s.width * (1 - f.right),
-    s.height * (1 - f.bottom),
-  );
-
-  @override
-  bool shouldReclip(_InsetClipper old) => old.f != f;
 }
 
 /// "ركز معايا": show the picture, hide it to ask, revisit if needed.
@@ -1842,12 +1865,8 @@ class _MemoryMedia extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Expanded(
-          child: viewing
-              ? _Photo(
-                  question: question,
-                  asset: question.image!,
-                  revealed: true,
-                )
+          child: viewing && question.image != null
+              ? _Photo(question: question, image: question.image!)
               : _Framed(
                   aspect: _photoAspect(question),
                   child: _MemoryPlaceholder(
@@ -1863,13 +1882,17 @@ class _MemoryMedia extends StatelessWidget {
                   height: 46,
                   icon: LucideIcons600.eyeOff,
                   label: lang.t('حفظناها — اسألنا', '7afaznaha — es2alna'),
-                  onTap: () => game.hideMemory(questionId),
+                  onTap: game.can(questionId, 'hide_memory')
+                      ? () => game.hideMemory(questionId)
+                      : null,
                 )
               : GlassButton(
                   height: 46,
                   icon: LucideIcons.eye,
                   label: lang.t('ارجع للصورة', 'Erga3 lel soora'),
-                  onTap: () => game.showMemory(questionId),
+                  onTap: game.can(questionId, 'show_memory')
+                      ? () => game.showMemory(questionId)
+                      : null,
                 ),
         ],
       ],
@@ -1939,21 +1962,17 @@ class _MemoryPlaceholder extends StatelessWidget {
 /// index, [nobody], or null to keep playing.
 class _LeaveDialog extends StatefulWidget {
   const _LeaveDialog({
-    required this.question,
+    required this.questionId,
     required this.teamNames,
     required this.points,
-    required this.revealed,
     required this.onReveal,
   });
 
   static const nobody = -1;
 
-  final Question question;
+  final String questionId;
   final List<String> teamNames;
   final int points;
-
-  /// The answer was already shown on the question screen.
-  final bool revealed;
 
   /// The host asked to see the answer from here; it counts as a reveal.
   final VoidCallback onReveal;
@@ -1963,14 +1982,16 @@ class _LeaveDialog extends StatefulWidget {
 }
 
 class _LeaveDialogState extends State<_LeaveDialog> {
-  // Pressing back by mistake mustn't spoil the answer.
-  late bool _shown = widget.revealed;
+  // Pressing back by mistake mustn't spoil the answer: it shows only once
+  // the server has revealed it.
 
   @override
   Widget build(BuildContext context) {
     final lang = context.lang;
     final nav = Navigator.of(context);
-    final question = widget.question;
+    final game = context.game;
+    final question = game.question(widget.questionId);
+    final shown = game.progressOf(widget.questionId).revealed;
     final teamNames = widget.teamNames;
     final points = widget.points;
 
@@ -2043,7 +2064,7 @@ class _LeaveDialogState extends State<_LeaveDialog> {
                   style: AppText.sans(13, color: AppColors.inkMuted),
                 ),
                 const SizedBox(height: 10),
-                if (!_shown)
+                if (!shown)
                   Center(
                     child: OutlinedButton.icon(
                       key: const ValueKey('leave-show-answer'),
@@ -2056,10 +2077,7 @@ class _LeaveDialogState extends State<_LeaveDialog> {
                         ),
                         shape: const StadiumBorder(),
                       ),
-                      onPressed: () {
-                        widget.onReveal();
-                        setState(() => _shown = true);
-                      },
+                      onPressed: game.busy ? null : widget.onReveal,
                       icon: const Icon(
                         LucideIcons.eye,
                         size: 16,
@@ -2101,7 +2119,7 @@ class _LeaveDialogState extends State<_LeaveDialog> {
                             ),
                           ),
                           TextSpan(
-                            text: lang.t(question.answer, question.answerEn),
+                            text: question.answer,
                             style: AppText.sans(
                               15,
                               weight: FontWeight.w700,

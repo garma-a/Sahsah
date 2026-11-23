@@ -6,6 +6,7 @@ import 'core/api/api_scope.dart';
 import 'core/api/sahsah_api.dart';
 import 'core/audio/sound.dart';
 import 'core/i18n/lang.dart';
+import 'core/session/host_session.dart';
 import 'core/theme/app_theme.dart';
 import 'core/ui/orientation.dart';
 import 'core/ui/tablet_scale.dart';
@@ -45,7 +46,8 @@ class SahsahApp extends StatefulWidget {
 class _SahsahAppState extends State<SahsahApp> {
   late final SahsahApi _api = widget.api ?? SahsahApi();
   late final LangController _lang = widget.lang ?? LangController();
-  late final GameController _game = widget.game ?? GameController();
+  late final GameController _game =
+      widget.game ?? GameController(api: _api, session: HostSession(_api));
   late final SoundController _sound = widget.sound ?? SoundController();
   late final CatalogController _catalog =
       widget.catalog ?? CatalogController(_api);
@@ -58,10 +60,18 @@ class _SahsahAppState extends State<SahsahApp> {
     // The catalogue follows the app's language (Franco where it has it).
     _loadCatalog();
     _lang.addListener(_loadCatalog);
+    // The room this phone runs, as the server has it now.
+    _game.refresh();
+    _game.session.renewIfDue();
   }
 
-  void _loadCatalog() =>
-      _catalog.load(_lang.ar ? ContentLanguage.ar : ContentLanguage.franco);
+  /// The catalogue and the game's questions follow the app's language
+  /// (Franco where the content has it).
+  void _loadCatalog() {
+    final language = _lang.ar ? ContentLanguage.ar : ContentLanguage.franco;
+    _catalog.load(language);
+    _game.setLanguage(language);
+  }
 
   @override
   void dispose() {

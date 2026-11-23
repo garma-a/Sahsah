@@ -3,12 +3,14 @@ import 'dart:typed_data';
 
 import 'package:flutter/widgets.dart';
 import 'package:sahsah_mobile/data/catalog.dart';
+import 'package:sahsah_mobile/features/game/game_controller.dart';
 
-/// Runs before every test file: category covers come from a local blank
-/// picture instead of the network (and its on-phone cache), which tests
-/// can't reach.
+/// Runs before every test file: category covers and question pictures come
+/// from a local blank picture instead of the network (and its on-phone
+/// cache), which tests can't reach.
 Future<void> testExecutable(FutureOr<void> Function() testMain) async {
   CatalogImages.provider = (_) => MemoryImage(_transparentPng);
+  MediaImages.provider = (_) => MemoryImage(_transparentPng);
   await testMain();
 }
 

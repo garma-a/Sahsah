@@ -4,13 +4,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sahsah_mobile/app.dart';
 import 'package:sahsah_mobile/core/audio/sound.dart';
 import 'package:sahsah_mobile/core/i18n/lang.dart';
-import 'package:sahsah_mobile/features/game/game_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'game_flow_test.dart' show settle;
 import 'sound_test.dart' show FakeSound;
 
-import 'support/fake_api.dart';
+import 'support/fake_server.dart';
 
 /// Presses a control the way TalkBack or VoiceOver does: by its spoken
 /// label, through the semantics tree, never by touching the screen. A
@@ -33,6 +32,23 @@ Future<void> press(WidgetTester tester, Pattern label) async {
   await settle(tester);
 }
 
+/// Picks the fake server's six categories in setup, by ear, scrolling each
+/// poster into view first (a small screen shows only a few).
+Future<void> pickBoard(WidgetTester tester) async {
+  final list = find.descendant(
+    of: find.byKey(const ValueKey('category-posters')),
+    matching: find.byType(Scrollable),
+  );
+  for (final name in fakeBoardNames) {
+    await tester.scrollUntilVisible(
+      find.bySemanticsLabel(name),
+      120,
+      scrollable: list.first,
+    );
+    await press(tester, name);
+  }
+}
+
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
@@ -42,11 +58,12 @@ void main() {
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
     final lang = LangController(Lang.ar);
+    final server = FakeServer();
     await tester.pumpWidget(
       SahsahApp(
-        api: fakeApi(),
+        api: server.api,
         lang: lang,
-        game: GameController(),
+        game: await server.game(),
         sound: SoundController(backend: FakeSound()),
       ),
     );
@@ -60,11 +77,11 @@ void main() {
 
     // Setup: posters can be picked and unpicked by ear.
     await press(tester, RegExp('^ابدأ لعبة'));
-    await press(tester, 'التحديات الجديدة');
+    await pickBoard(tester);
     expect(find.text('٦ من ٦ فئات'), findsOneWidget);
-    await press(tester, 'مين في الصورة؟');
+    await press(tester, 'موسيقى مصرية');
     expect(find.text('٥ من ٦ فئات'), findsOneWidget);
-    await press(tester, 'مين في الصورة؟');
+    await press(tester, 'موسيقى مصرية');
     expect(find.text('٦ من ٦ فئات'), findsOneWidget);
     await press(tester, 'التالي');
     await press(tester, 'ابدأ اللعبة');
@@ -92,11 +109,12 @@ void main() {
     tester.view.physicalSize = const Size(892 * 3, 412 * 3);
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
+    final server = FakeServer();
     await tester.pumpWidget(
       SahsahApp(
-        api: fakeApi(),
+        api: server.api,
         lang: LangController(Lang.ar),
-        game: GameController(),
+        game: await server.game(),
         sound: SoundController(backend: FakeSound()),
       ),
     );

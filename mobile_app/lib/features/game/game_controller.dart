@@ -4,16 +4,19 @@ import 'dart:math' as math;
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../data/question_bank.dart';
+import '../../core/api/game_wire.dart';
+import '../../core/api/sahsah_api.dart';
+import '../../core/api/wire.dart';
+import '../../core/session/host_session.dart';
 import 'model/question.dart';
 
-/// Answering clock states (see `docs/database/gameplay-design.md`).
+/// Answering clock states, as the server keeps them.
 enum TimerStatus { ready, running, paused, elapsed }
 
 /// "ركز معايا": picture not shown yet, on screen, or hidden (question asked).
 enum MemoryPhase { ready, viewing, hidden }
 
-/// Per-question progress, kept when the host goes back to the board.
+/// The open question's progress, from the server's view of it.
 class QuestionProgress {
   QuestionProgress({
     this.remainingMs = GameController.answerMs,
@@ -22,108 +25,61 @@ class QuestionProgress {
     this.revealed = false,
     this.memory = MemoryPhase.ready,
     this.memoryAsked = false,
-    this.resumeOnReopen = false,
     this.stage = 0,
   });
-
-  factory QuestionProgress.fromJson(Map<String, dynamic> j) => QuestionProgress(
-    remainingMs: j['remainingMs'] as int,
-    status: TimerStatus.values.byName(j['status'] as String),
-    deadline: j['deadline'] == null
-        ? null
-        : DateTime.parse(j['deadline'] as String),
-    revealed: j['revealed'] as bool,
-    memory: MemoryPhase.values.byName(j['memory'] as String),
-    memoryAsked: j['memoryAsked'] as bool,
-    resumeOnReopen: j['resumeOnReopen'] as bool,
-    stage: j['stage'] as int? ?? 0,
-  );
 
   /// Time left at the last start/pause checkpoint.
   int remainingMs;
   TimerStatus status;
 
-  /// Only while running.
+  /// On this phone's clock; only while running.
   DateTime? deadline;
   bool revealed;
   MemoryPhase memory;
   bool memoryAsked;
 
-  /// The clock was paused by leaving to the board, not by the host.
-  bool resumeOnReopen;
-
-  /// How many times a staged picture has been made clearer (template 6C).
+  /// How many times a staged picture has been made clearer.
   int stage;
-
-  Map<String, dynamic> toJson() => {
-    'remainingMs': remainingMs,
-    'status': status.name,
-    'deadline': deadline?.toIso8601String(),
-    'revealed': revealed,
-    'memory': memory.name,
-    'memoryAsked': memoryAsked,
-    'resumeOnReopen': resumeOnReopen,
-    'stage': stage,
-  };
 }
 
 /// The host's decision for a tile: a team (0 or 1) or nobody.
 class TileResult {
   const TileResult(this.team, this.points);
 
-  factory TileResult.fromJson(Map<String, dynamic> j) =>
-      TileResult(j['team'] as int?, j['points'] as int);
-
   final int? team;
   final int points;
-
-  Map<String, dynamic> toJson() => {'team': team, 'points': points};
 }
 
+/// The game as the screens see it: the server's board, scores and results,
+/// plus whose turn it is (kept on the phone; the server has no turns).
 class Game {
   Game({
     required this.categoryIds,
+    required this.categoryNames,
     required this.teamNames,
-    List<int>? scores,
-    Map<String, TileResult>? results,
-    Map<String, QuestionProgress>? progress,
+    required this.scores,
+    required this.results,
+    required this.opened,
     this.activeId,
     this.finished = false,
     this.turn = 0,
-    DateTime? lastActionAt,
-  }) : scores = scores ?? [0, 0],
-       results = results ?? {},
-       progress = progress ?? {},
-       lastActionAt = lastActionAt ?? DateTime.now();
-
-  factory Game.fromJson(Map<String, dynamic> j) => Game(
-    categoryIds: (j['categoryIds'] as List).cast<String>(),
-    teamNames: (j['teamNames'] as List).cast<String>(),
-    scores: (j['scores'] as List).cast<int>(),
-    results: (j['results'] as Map<String, dynamic>).map(
-      (k, v) => MapEntry(k, TileResult.fromJson(v as Map<String, dynamic>)),
-    ),
-    progress: (j['progress'] as Map<String, dynamic>).map(
-      (k, v) =>
-          MapEntry(k, QuestionProgress.fromJson(v as Map<String, dynamic>)),
-    ),
-    activeId: j['activeId'] as String?,
-    finished: j['finished'] as bool,
-    turn: j['turn'] as int? ?? 0,
-    lastActionAt: DateTime.parse(j['lastActionAt'] as String),
-  );
+    Map<String, List<int>>? totals,
+  }) : _totals = totals;
 
   final List<String> categoryIds;
+  final Map<String, String> categoryNames;
   final List<String> teamNames;
   final List<int> scores;
   final Map<String, TileResult> results;
-  final Map<String, QuestionProgress> progress;
-  String? activeId;
-  bool finished;
+
+  /// Tiles opened (or revealed) and not yet decided.
+  final Set<String> opened;
+  final String? activeId;
+  final bool finished;
 
   /// The team (0 or 1) that picks the next question.
-  int turn;
-  DateTime lastActionAt;
+  final int turn;
+  final Map<String, List<int>>? _totals;
 
   int get totalQuestions => categoryIds.length * tilePoints.length;
   int get resolvedCount => results.length;
@@ -135,143 +91,302 @@ class Game {
       ? 0
       : 1;
 
+  String nameOf(String categoryId) => categoryNames[categoryId] ?? '';
+
+  /// Points each team took in a category.
+  List<int> categoryPoints(String categoryId) {
+    final known = _totals?[categoryId];
+    if (known != null) return known;
+    final totals = [0, 0];
+    for (var r = 0; r < tilePoints.length; r++) {
+      final result = results['$categoryId-$r'];
+      if (result?.team != null) totals[result!.team!] += result.points;
+    }
+    return totals;
+  }
+}
+
+/// Why a game couldn't start, beyond what the server said.
+sealed class StartProblem implements Exception {
+  const StartProblem();
+}
+
+/// The host has to sign in first (the preview passcode).
+class SignInNeeded extends StartProblem {
+  const SignInNeeded();
+}
+
+/// Some categories have nothing left to play: every pack was played by
+/// this host ([played]), or there's no playable pack at all ([empty]).
+class NoPackLeft extends StartProblem {
+  const NoPackLeft({required this.played, required this.empty});
+
+  final List<String> played;
+  final List<String> empty;
+}
+
+/// Where question pictures come from: their short-lived signed links.
+/// Tests swap in a local picture.
+abstract final class MediaImages {
+  static ImageProvider<Object> Function(String url) provider = NetworkImage.new;
+}
+
+/// What this phone keeps to run its room: the control proof, whose turn it
+/// is, and the last board (a reopened question names no categories).
+class _HostRoom {
+  _HostRoom({
+    required this.roomId,
+    required this.controlSecret,
+    required this.generation,
+    this.turn = 0,
+    this.board,
+  });
+
+  factory _HostRoom.fromJson(Map<String, dynamic> j) => _HostRoom(
+    roomId: j['roomId'] as String,
+    controlSecret: j['controlSecret'] as String,
+    generation: j['generation'] as String,
+    turn: j['turn'] as int? ?? 0,
+    board: j['board'] as Map<String, dynamic>?,
+  );
+
+  final String roomId;
+  String controlSecret;
+  String generation;
+  int turn;
+  Map<String, dynamic>? board;
+
   Map<String, dynamic> toJson() => {
-    'categoryIds': categoryIds,
-    'teamNames': teamNames,
-    'scores': scores,
-    'results': results.map((k, v) => MapEntry(k, v.toJson())),
-    'progress': progress.map((k, v) => MapEntry(k, v.toJson())),
-    'activeId': activeId,
-    'finished': finished,
+    'roomId': roomId,
+    'controlSecret': controlSecret,
+    'generation': generation,
     'turn': turn,
-    'lastActionAt': lastActionAt.toIso8601String(),
+    'board': ?board,
   };
 }
 
-/// Runs a game on this device (the host's phone) and saves it so it survives
-/// the app closing. Rules follow `docs/database/gameplay-design.md`; a
-/// backend-run game will replace this once rooms exist.
+/// Runs the host's game through the Sahsah API: the room and its game live
+/// on the server, and every host action is a command there
+/// (`docs/api/question-lifecycle.md`). This phone keeps the room's control
+/// proof so the game survives the app closing.
 class GameController extends ChangeNotifier {
   GameController({
+    SahsahApi? api,
+    HostSession? session,
     SharedPreferences? prefs,
-    Game? game,
     DateTime Function()? now,
-  }) : _prefs = prefs,
-       _game = game,
-       _now = now ?? DateTime.now;
-
-  static const storageKey = 'sahsah.game.v1';
-  static const answerMs = 60000;
-
-  /// A game with no host action for this long can't be resumed (Q21–Q24).
-  static const expiry = Duration(hours: 24);
-
-  static Future<GameController> load() async {
-    final prefs = await SharedPreferences.getInstance();
-    Game? game;
-    final raw = prefs.getString(storageKey);
+  }) : _api = api ?? SahsahApi(),
+       _session = session ?? HostSession(api ?? SahsahApi()),
+       _prefs = prefs,
+       _now = now ?? DateTime.now {
+    final raw = _prefs?.getString(roomKey);
     if (raw != null) {
       try {
-        game = Game.fromJson(jsonDecode(raw) as Map<String, dynamic>);
-        if (DateTime.now().difference(game.lastActionAt) > expiry) game = null;
-      } catch (_) {
-        game = null; // Unreadable save from an older build.
+        _room = _HostRoom.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+        final board = _room!.board;
+        if (board != null) _board = BoardView.fromJson(board);
+      } on Object {
+        _prefs?.remove(roomKey);
       }
-      if (game == null) await prefs.remove(storageKey);
     }
-    return GameController(prefs: prefs, game: game);
+    // The offline game of earlier versions can't be resumed.
+    _prefs?.remove('sahsah.game.v1');
   }
 
+  static const roomKey = 'sahsah.room.v1';
+  static const _pendingKey = 'sahsah.room.pending.v1';
+  static const answerMs = 60000;
+
+  /// Restores the room this phone runs, if any; [refresh] then fetches it.
+  static Future<GameController> load(SahsahApi api, HostSession session) async {
+    final prefs = await SharedPreferences.getInstance();
+    return GameController(api: api, session: session, prefs: prefs);
+  }
+
+  final SahsahApi _api;
+  final HostSession _session;
   final SharedPreferences? _prefs;
   final DateTime Function() _now;
-  Game? _game;
 
-  /// The last settled tile and whose turn it was, so the host can take a
-  /// wrong tap back. Not saved: undo is only offered right after the award.
-  ({String id, int turn})? _lastAward;
+  HostSession get session => _session;
 
-  Game? get game => _game;
-  bool get hasActiveGame => _game != null && !_game!.finished;
+  ContentLanguage _language = ContentLanguage.ar;
+  _HostRoom? _room;
+  Snapshot? _snapshot;
+  BoardView? _board;
 
-  Question question(String id) {
-    final dash = id.lastIndexOf('-');
-    return questionFor(
-      id.substring(0, dash),
-      int.parse(id.substring(dash + 1)),
+  /// Server time minus this phone's time, from the last snapshot.
+  Duration _offset = Duration.zero;
+  final _keys = <String, String>{};
+  bool _busy = false;
+  bool _disposed = false;
+
+  ApiError? _problem;
+  int _problemCount = 0;
+
+  /// Another device took control of the room.
+  bool _controlLost = false;
+
+  /// Charades questions whose actor said "ready" (the rules are read).
+  final _actorReady = <String>{};
+
+  // Media links of the open question.
+  final _urls = <String, String>{};
+  final _images = <String, ImageProvider<Object>>{};
+  String _mediaSet = '';
+  List<MediaRef> _mediaRefs = const [];
+
+  /// When the links in hand stop working, on this phone's clock.
+  DateTime? _mediaUntil;
+
+  // ---- What the screens read -----------------------------------------------
+
+  /// A room is held on this phone (it may still be loading).
+  bool get hasRoom => _room != null;
+
+  /// A command or a start is in flight.
+  bool get busy => _busy;
+
+  /// The last thing that went wrong, for a message; [problemCount] counts
+  /// them so a listener shows each once.
+  ApiError? get problem => _problem;
+  int get problemCount => _problemCount;
+  bool get controlLost => _controlLost;
+
+  Game? get game {
+    final board = _board;
+    if (board == null) return null;
+    final view = _snapshot?.view;
+    final teams = switch (view) {
+      BoardView(:final teams) => teams,
+      QuestionView(:final teams) => teams,
+      ResultView(:final teams) => teams,
+      _ => board.teams,
+    };
+    final results = <String, TileResult>{};
+    final opened = <String>{};
+    for (final c in board.board) {
+      for (final t in c.tiles) {
+        final id = '${c.categoryId}-${t.questionPosition - 1}';
+        if (t.state == TileState.resolved) {
+          final winner = t.winningTeamNumber;
+          results[id] = TileResult(
+            winner == null ? null : winner - 1,
+            winner == null ? 0 : (t.awardedPoints ?? 0),
+          );
+        } else if (t.state != TileState.unopened) {
+          opened.add(id);
+        }
+      }
+    }
+    String? active;
+    if (view is QuestionView) {
+      active = _idFor(view.boardPosition, view.questionPosition);
+      if (active != null) opened.add(active);
+    }
+    return Game(
+      categoryIds: [for (final c in board.board) c.categoryId],
+      categoryNames: {for (final c in board.board) c.categoryId: c.name},
+      teamNames: [for (final t in teams) t.name],
+      scores: [for (final t in teams) t.score],
+      results: results,
+      opened: opened,
+      activeId: active,
+      finished: view is ResultView,
+      turn: _room?.turn ?? 0,
+      totals: view is ResultView
+          ? {for (final c in view.categories) c.categoryId: c.points}
+          : null,
     );
   }
 
-  QuestionProgress progressOf(String id) =>
-      _game!.progress.putIfAbsent(id, QuestionProgress.new);
-
-  // ---- Lifecycle ---------------------------------------------------------
-
-  void start({required List<String> categoryIds, required List<String> teams}) {
-    assert(categoryIds.length == 6 && teams.length == 2);
-    _game = Game(categoryIds: List.of(categoryIds), teamNames: List.of(teams));
-    _lastAward = null;
-    _commit();
+  bool get hasActiveGame {
+    final g = game;
+    return g != null && !g.finished;
   }
 
-  /// Deliberate early ending: scores lock (Q57).
-  void end() {
-    final g = _game;
-    if (g == null) return;
-    if (g.activeId != null) _stop(progressOf(g.activeId!));
-    g.activeId = null;
-    g.finished = true;
-    _lastAward = null;
-    _commit();
+  /// The open question's view, when [id] is the one open.
+  QuestionView? viewOf(String id) {
+    final view = _snapshot?.view;
+    if (view is! QuestionView) return null;
+    return _idFor(view.boardPosition, view.questionPosition) == id
+        ? view
+        : null;
   }
 
-  /// Forgets the game entirely (after the results, or to start fresh).
-  void discard() {
-    _game = null;
-    _lastAward = null;
-    _prefs?.remove(storageKey);
-    notifyListeners();
-  }
+  /// Whether the server allows [command] on the open question right now.
+  bool can(String id, String command) =>
+      !_busy && (viewOf(id)?.controls.contains(command) ?? false);
 
-  // ---- Questions -----------------------------------------------------------
-
-  void open(String id) {
-    final g = _game!;
-    if (g.results.containsKey(id) || g.finished) return;
-    if (g.activeId != null && g.activeId != id) leave();
-    g.activeId = id;
-    final p = progressOf(id);
-    final q = question(id);
-    // Memory starts on the first hide (Q53); acting starts on Ready (6B).
-    if (p.status == TimerStatus.ready &&
-        !p.revealed &&
-        q.kind != QuestionKind.memory &&
-        q.kind != QuestionKind.acting) {
-      _run(p, answerMs); // Automatic 60 s clock (Q49).
-    } else if (p.resumeOnReopen && p.status == TimerStatus.paused) {
-      _run(p, p.remainingMs); // Restore time saved by navigation (Q54).
+  Question question(String id) {
+    final (categoryId, row) = _split(id);
+    final view = viewOf(id);
+    if (view == null) {
+      final tile = _tile(id);
+      return Question(
+        categoryId: categoryId,
+        row: row,
+        kind: QuestionKind.standard,
+        points: tile?.basePoints,
+      );
     }
-    p.resumeOnReopen = false;
-    _commit();
+    final q = view.question;
+    final a = view.answer;
+    final memory = q.memoryPhase;
+    final prompt = switch (memory) {
+      'ready' || 'viewing_first' => q.instruction ?? '',
+      _ => q.prompt ?? '',
+    };
+    return Question(
+      categoryId: categoryId,
+      row: row,
+      kind: QuestionKind.of(q.format),
+      format: q.format,
+      prompt: prompt,
+      answer: a?.text ?? '',
+      image: q.image,
+      clue: q.clue,
+      audio: q.audio,
+      answerImage: a?.image,
+      forwardAudio: a?.forwardAudio,
+      color: _color(a?.colorHex),
+      hint: q.hint,
+      cardUrl: q.cardUrl,
+      durationMs: q.durationMs,
+      points: view.basePoints,
+      pointStages: q.stageSuggestions.isEmpty
+          ? [view.basePoints]
+          : q.stageSuggestions,
+    );
   }
 
-  /// Back to the board with hints, reveal and time preserved (Q54).
-  void leave() {
-    final g = _game!;
-    final id = g.activeId;
-    if (id == null) return;
-    final p = progressOf(id);
-    if (timerStatus(p) == TimerStatus.running) {
-      _pause(p);
-      p.resumeOnReopen = true;
+  QuestionProgress progressOf(String id) {
+    final view = viewOf(id);
+    if (view == null) {
+      return QuestionProgress(revealed: _tile(id)?.state == TileState.revealed);
     }
-    g.activeId = null;
-    _commit();
+    final timer = view.timer;
+    final phase = view.question.memoryPhase;
+    return QuestionProgress(
+      remainingMs: timer.remainingMs,
+      status: TimerStatus.values.byName(timer.state.name),
+      deadline: timer.deadlineAt?.subtract(_offset),
+      revealed: view.revealed,
+      memory: switch (phase) {
+        'viewing_first' || 'revisit' => MemoryPhase.viewing,
+        'recall' => MemoryPhase.hidden,
+        _ => view.revealed ? MemoryPhase.hidden : MemoryPhase.ready,
+      },
+      memoryAsked: phase == 'recall' || phase == 'revisit' || view.revealed,
+      stage: view.question.stageIndex,
+    );
   }
 
   int remainingMs(QuestionProgress p) {
-    if (p.status != TimerStatus.running) return p.remainingMs;
-    final left = p.deadline!.difference(_now()).inMilliseconds;
-    return math.max(0, left);
+    if (p.status != TimerStatus.running || p.deadline == null) {
+      return p.remainingMs;
+    }
+    return math.max(0, p.deadline!.difference(_now()).inMilliseconds);
   }
 
   /// Running clocks past their deadline read as elapsed.
@@ -280,158 +395,630 @@ class GameController extends ChangeNotifier {
       ? TimerStatus.elapsed
       : p.status;
 
-  void toggleTimer(String id) {
-    final p = progressOf(id);
-    switch (timerStatus(p)) {
-      case TimerStatus.running:
-        _pause(p);
-      case TimerStatus.paused:
-        _run(p, p.remainingMs);
-      case TimerStatus.ready:
-        _run(p, answerMs);
-      case TimerStatus.elapsed:
-        _run(p, answerMs);
+  /// What a correct answer is worth right now.
+  int availablePoints(String id) =>
+      viewOf(id)?.suggestedPoints ?? question(id).points;
+
+  /// A picture of the open question, once its link is in.
+  ImageProvider<Object>? image(MediaRef? ref) {
+    if (ref == null) return null;
+    final cached = _images[ref.key];
+    if (cached != null) return cached;
+    final url = _urls[ref.key];
+    if (url == null) return null;
+    // The first link keeps showing; a renewed one is for new loads.
+    return _images[ref.key] = MediaImages.provider(url);
+  }
+
+  /// A clip's current link.
+  String? mediaUrl(MediaRef? ref) => ref == null ? null : _urls[ref.key];
+
+  /// A clip's link that still works for a while: renewed first when it's
+  /// about to expire (a picture already on screen doesn't need it).
+  Future<String?> freshMediaUrl(MediaRef? ref) async {
+    if (ref == null) return null;
+    final until = _mediaUntil;
+    if (until == null ||
+        until.difference(_now()) < const Duration(minutes: 1)) {
+      await _fetchMedia(_mediaRefs, _mediaSet);
     }
-    _commit();
+    return _urls[ref.key];
+  }
+
+  bool actorReady(String id) => _actorReady.contains(id);
+
+  // ---- Lifecycle -----------------------------------------------------------
+
+  /// Questions and answers come in this language.
+  void setLanguage(ContentLanguage language) {
+    if (language == _language) return;
+    _language = language;
+    if (_room != null) refresh();
+  }
+
+  /// Starts a game of [categoryIds] (in board order) for [teams]: picks each
+  /// category's next unplayed pack, opens a room and starts it. Any room
+  /// this phone already runs is closed first. Throws [StartProblem] or
+  /// [ApiError].
+  Future<void> start({
+    required List<String> categoryIds,
+    required List<String> teams,
+    Map<String, String> names = const {},
+  }) async {
+    assert(categoryIds.length == 6 && teams.length == 2);
+    final auth = _session.auth;
+    if (auth == null) throw const SignInNeeded();
+    _setBusy(true);
+    try {
+      if (_room != null) await _closeHeld();
+      final packs = await Future.wait([
+        for (final id in categoryIds) _api.firstPack(id, auth, _language),
+      ]);
+      final missing = [
+        for (final (i, id) in categoryIds.indexed)
+          if (packs[i] == null) id,
+      ];
+      if (missing.isNotEmpty) {
+        final any = await Future.wait([
+          for (final id in missing)
+            _api.firstPack(id, auth, _language, freshOnly: false),
+        ]);
+        throw NoPackLeft(
+          played: [
+            for (final (i, id) in missing.indexed)
+              if (any[i] != null) names[id] ?? id,
+          ],
+          empty: [
+            for (final (i, id) in missing.indexed)
+              if (any[i] == null) names[id] ?? id,
+          ],
+        );
+      }
+      final selections = [
+        for (final (i, id) in categoryIds.indexed)
+          {
+            'boardPosition': i + 1,
+            'categoryId': id,
+            'packId': packs[i]!.id,
+            'observedRevision': packs[i]!.contentRevision,
+          },
+      ];
+      final receipt = await _create(auth, teams, selections);
+      _board = null;
+      _snapshot = null;
+      _actorReady.clear();
+      _save();
+      final lobby = await _api.getRoom(receipt.roomId, _hostAuth!, _language);
+      await _startFrom(lobby);
+      await refresh();
+    } finally {
+      _setBusy(false);
+    }
+  }
+
+  /// Fetches the room as it is now.
+  Future<void> refresh() async {
+    final room = _room;
+    final auth = _hostAuth;
+    if (room == null || auth == null) return;
+    try {
+      final snapshot = await _api.getRoom(room.roomId, auth, _language);
+      if (_room != room) return;
+      if (snapshot.view is LobbyView) {
+        // A room made but never started (the app closed in between).
+        await _startFrom(snapshot);
+        return refresh();
+      }
+      _apply(snapshot);
+    } on ApiError catch (e) {
+      if (_room != room) return;
+      _onError(e, fetching: true);
+    }
+  }
+
+  /// Deliberate early ending: the scores lock on the server.
+  Future<void> end() => _send({'name': 'end_game'});
+
+  /// Closes the room on the server and forgets it (after the results, or
+  /// to start fresh).
+  Future<void> discard() async {
+    if (_room == null) return;
+    await _closeHeld();
+    notifyListeners();
+  }
+
+  /// Another device took control: take it back on this phone.
+  Future<void> takeControl() async {
+    final room = _room;
+    final auth = _session.auth;
+    if (room == null || auth == null) return;
+    _setBusy(true);
+    try {
+      final status = await _api.controlStatus(room.roomId, auth);
+      final secret = newSecret();
+      final receipt = await _api.takeControl(
+        room.roomId,
+        auth,
+        newOperationId(),
+        expectedGeneration: status.roomControllerGeneration,
+        controlSecret: secret,
+      );
+      room
+        ..controlSecret = secret
+        ..generation = receipt.controllerGeneration ?? room.generation;
+      _controlLost = false;
+      _save();
+      await refresh();
+    } on ApiError catch (e) {
+      _report(e);
+    } finally {
+      _setBusy(false);
+    }
+  }
+
+  // ---- Questions -------------------------------------------------------------
+
+  /// Opens question [id] on the server (or reopens it with its time, stage
+  /// and reveal kept).
+  Future<void> open(String id) async {
+    if (viewOf(id) != null) return;
+    final (board, question) = _pointer(id) ?? (0, 0);
+    if (board == 0) return;
+    await _send({
+      'name': 'open_question',
+      'boardPosition': board,
+      'questionPosition': question,
+    });
+  }
+
+  /// Back to the board, the question's time and hints kept.
+  Future<void> leave() async {
+    final view = _snapshot?.view;
+    if (view is! QuestionView) return;
+    if (!view.controls.contains('return_to_board')) return;
+    await _question('return_to_board', view);
+  }
+
+  void toggleTimer(String id) {
+    final view = viewOf(id);
+    if (view == null) return;
+    switch (timerStatus(progressOf(id))) {
+      case TimerStatus.running:
+        _question('pause_timer', view);
+      case TimerStatus.paused:
+        _question('resume_timer', view);
+      case TimerStatus.elapsed:
+        _question('reset_timer', view);
+      case TimerStatus.ready:
+        break; // The server starts the clock (memory: on the first hide).
+    }
   }
 
   /// A fresh full clock; hints and reveal are kept.
-  void resetTimer(String id) {
-    _run(progressOf(id), answerMs);
-    _commit();
-  }
+  void resetTimer(String id) => _on(id, 'reset_timer');
 
-  /// Timeout never reveals by itself; the host decides (Q58).
-  void reveal(String id) {
-    final p = progressOf(id);
-    _stop(p);
-    p.revealed = true;
-    _commit();
-  }
-
-  /// Makes a staged picture clearer; the answer is now worth less (6C).
-  void advanceStage(String id) {
-    final q = question(id);
-    final p = progressOf(id);
-    if (q.kind != QuestionKind.staged ||
-        p.revealed ||
-        p.stage >= q.pointStages.length - 1) {
-      return;
+  /// The actor has the card: a fresh minute starts now.
+  void startActing(String id) {
+    _actorReady.add(id);
+    notifyListeners();
+    final view = viewOf(id);
+    if (view == null) return;
+    if (view.controls.contains('reset_timer')) {
+      _question('reset_timer', view);
+    } else if (view.controls.contains('resume_timer')) {
+      _question('resume_timer', view);
     }
-    p.stage++;
-    _commit();
   }
 
-  /// What a correct answer is worth right now.
-  int availablePoints(String id) {
-    final stages = question(id).pointStages;
-    return stages[math.min(progressOf(id).stage, stages.length - 1)];
-  }
+  /// Timeout never reveals by itself; the host decides.
+  Future<void> reveal(String id) => _on(id, 'reveal_answer');
 
-  void showMemory(String id) {
-    progressOf(id).memory = MemoryPhase.viewing;
-    _commit();
-  }
+  /// Makes a staged picture clearer; the answer is now worth less.
+  void advanceStage(String id) => _on(id, 'advance_hint');
 
-  /// First hide asks the question and starts the clock once (Q53).
-  void hideMemory(String id) {
-    final p = progressOf(id);
-    p.memory = MemoryPhase.hidden;
-    if (!p.memoryAsked) {
-      p.memoryAsked = true;
-      _run(p, answerMs);
+  void showMemory(String id) => _on(id, 'show_memory');
+
+  /// The first hide asks the question and starts the clock.
+  void hideMemory(String id) => _on(id, 'hide_memory');
+
+  /// Resolves [id] for [team] (0/1) at the current value, or for nobody,
+  /// revealing it first if it wasn't; then the other team picks. The 36th
+  /// resolution finishes the game.
+  Future<void> award(String id, int? team) async {
+    var view = viewOf(id);
+    if (view == null) return;
+    if (!view.revealed) {
+      if (!await _question('reveal_answer', view)) return;
+      view = viewOf(id);
+      if (view == null || !view.revealed) return;
     }
-    _commit();
-  }
-
-  /// Resolves the tile for [team] (0/1) or nobody, and passes the turn to
-  /// the other team. The 36th resolution finishes the game automatically
-  /// (Q60).
-  void award(String id, int? team) {
-    final g = _game!;
-    if (g.results.containsKey(id)) return;
-    final points = team == null ? 0 : availablePoints(id);
-    _stop(progressOf(id));
-    g.results[id] = TileResult(team, points);
-    if (team != null) g.scores[team] += points;
-    g.activeId = null;
-    _lastAward = (id: id, turn: g.turn);
-    g.turn = 1 - g.turn;
-    if (g.resolvedCount >= g.totalQuestions) {
-      g.finished = true;
-      _lastAward = null; // Scores lock with the game.
+    final ok = await _question('resolve_question', view, {
+      'winningTeamNumber': team == null ? null : team + 1,
+    });
+    if (ok && _room != null) {
+      _room!.turn = 1 - _room!.turn;
+      _save();
+      notifyListeners();
     }
-    _commit();
-  }
-
-  /// Whether the last award can still be taken back.
-  bool get canUndoAward =>
-      _lastAward != null && _game != null && !_game!.finished;
-
-  /// Takes back the award of [id] if it was the last one: the tile is open
-  /// again with its reveal and stage kept, the points come off and the turn
-  /// goes back. Returns whether anything changed.
-  bool undoAward(String id) {
-    final g = _game;
-    final last = _lastAward;
-    if (g == null || last == null || last.id != id || g.finished) return false;
-    final result = g.results.remove(id);
-    if (result == null) return false;
-    final team = result.team;
-    if (team != null) {
-      g.scores[team] = math.max(0, g.scores[team] - result.points);
-    }
-    g.turn = last.turn;
-    _lastAward = null;
-    _commit();
-    return true;
   }
 
   /// The host hands the next pick to the other team.
   void switchTurn() {
-    final g = _game;
-    if (g == null || g.finished) return;
-    g.turn = 1 - g.turn;
-    _commit();
-  }
-
-  /// Manual correction to a nonnegative total (Q55).
-  void setScore(int team, int total) {
-    final g = _game!;
-    if (g.finished || total < 0) return;
-    g.scores[team] = total;
-    _commit();
-  }
-
-  // ---- Internals -----------------------------------------------------------
-
-  void _run(QuestionProgress p, int ms) {
-    p
-      ..status = TimerStatus.running
-      ..remainingMs = ms
-      ..deadline = _now().add(Duration(milliseconds: ms));
-  }
-
-  void _pause(QuestionProgress p) {
-    final left = remainingMs(p);
-    p
-      ..remainingMs = left
-      ..status = left == 0 ? TimerStatus.elapsed : TimerStatus.paused
-      ..deadline = null;
-  }
-
-  void _stop(QuestionProgress p) {
-    if (p.status == TimerStatus.running) _pause(p);
-    p.resumeOnReopen = false;
-  }
-
-  void _commit() {
-    final g = _game;
-    if (g != null) {
-      g.lastActionAt = _now();
-      _prefs?.setString(storageKey, jsonEncode(g.toJson()));
-    }
+    final room = _room;
+    if (room == null || !hasActiveGame) return;
+    room.turn = 1 - room.turn;
+    _save();
     notifyListeners();
+  }
+
+  /// Manual correction to a nonnegative total. Question awards stay as
+  /// they were.
+  Future<void> setScore(int team, int total) async {
+    if (total < 0 || !hasActiveGame) return;
+    await _send({
+      'name': 'adjust_score',
+      'teamNumber': team + 1,
+      'targetTotal': '$total',
+    });
+  }
+
+  // ---- Internals -------------------------------------------------------------
+
+  HostAuth? get _hostAuth {
+    final room = _room;
+    final credential = _session.credential;
+    if (room == null || credential == null) return null;
+    return HostAuth(
+      credential: credential,
+      controlSecret: room.controlSecret,
+      generation: room.generation,
+    );
+  }
+
+  (String, int) _split(String id) {
+    final dash = id.lastIndexOf('-');
+    return (id.substring(0, dash), int.parse(id.substring(dash + 1)));
+  }
+
+  String? _idFor(int boardPosition, int questionPosition) {
+    final board = _board?.board;
+    if (board == null) return null;
+    for (final c in board) {
+      if (c.boardPosition == boardPosition) {
+        return '${c.categoryId}-${questionPosition - 1}';
+      }
+    }
+    return null;
+  }
+
+  (int, int)? _pointer(String id) {
+    final (categoryId, row) = _split(id);
+    for (final c in _board?.board ?? const <BoardCategory>[]) {
+      if (c.categoryId == categoryId) return (c.boardPosition, row + 1);
+    }
+    return null;
+  }
+
+  Tile? _tile(String id) {
+    final (categoryId, row) = _split(id);
+    for (final c in _board?.board ?? const <BoardCategory>[]) {
+      if (c.categoryId != categoryId) continue;
+      for (final t in c.tiles) {
+        if (t.questionPosition == row + 1) return t;
+      }
+    }
+    return null;
+  }
+
+  static Color? _color(String? hex) {
+    if (hex == null || !RegExp(r'^#[0-9a-fA-F]{6}$').hasMatch(hex)) {
+      return null;
+    }
+    return Color(0xFF000000 | int.parse(hex.substring(1), radix: 16));
+  }
+
+  Future<void> _on(String id, String command) async {
+    final view = viewOf(id);
+    if (view != null) await _question(command, view);
+  }
+
+  Future<bool> _question(
+    String command,
+    QuestionView view, [
+    Map<String, Object?> extra = const {},
+  ]) => _send({
+    'name': command,
+    'boardPosition': view.boardPosition,
+    'questionPosition': view.questionPosition,
+    ...extra,
+  });
+
+  /// Sends one host command against the game version on screen. One at a
+  /// time; the same command against the same state keeps its key, so a
+  /// retry after a lost answer is the same operation.
+  Future<bool> _send(Map<String, Object?> command) async {
+    final gameId = _snapshot?.gameId;
+    final version = _snapshot?.gameVersion;
+    final auth = _hostAuth;
+    if (_busy || gameId == null || version == null || auth == null) {
+      return false;
+    }
+    final body = {...command, 'expectedGameVersion': version};
+    final signature = jsonEncode(body);
+    final key = _keys.putIfAbsent(signature, newOperationId);
+    _setBusy(true);
+    try {
+      await _api.command(gameId, auth, key, body);
+      _keys.remove(signature);
+      await refresh();
+      return true;
+    } on ApiError catch (e) {
+      _report(e);
+      _onError(e);
+      if (e.conflict) await refresh();
+      return false;
+    } finally {
+      _setBusy(false);
+    }
+  }
+
+  /// Creates the room. The key and control secret are saved before
+  /// sending, so a retry after a lost answer recovers the same room.
+  Future<Receipt> _create(
+    AccountAuth auth,
+    List<String> teams,
+    List<Map<String, Object>> selections,
+  ) async {
+    final signature = jsonEncode([teams, selections]);
+    Map<String, dynamic>? pending;
+    try {
+      final raw = _prefs?.getString(_pendingKey);
+      if (raw != null) pending = jsonDecode(raw) as Map<String, dynamic>;
+    } on Object {
+      pending = null;
+    }
+    if (pending?['signature'] != signature) {
+      pending = {
+        'signature': signature,
+        'operationId': newOperationId(),
+        'controlSecret': newSecret(),
+      };
+      _prefs?.setString(_pendingKey, jsonEncode(pending));
+    }
+    Receipt receipt;
+    try {
+      receipt = await _api.createRoom(
+        auth,
+        pending!['operationId'] as String,
+        teamNames: teams,
+        selections: selections,
+        controlSecret: pending['controlSecret'] as String,
+      );
+    } on ApiError catch (e) {
+      final existing = e.body?['existingRoomId'] as String?;
+      if (e.code != 'ROOM_ALREADY_OPEN' || existing == null) rethrow;
+      // An open room from another device (or a lost install): close it,
+      // then open this one.
+      await _closeOther(existing, auth);
+      _prefs?.remove(_pendingKey);
+      return _create(auth, teams, selections);
+    }
+    _prefs?.remove(_pendingKey);
+    _room = _HostRoom(
+      roomId: receipt.roomId,
+      controlSecret: pending['controlSecret'] as String,
+      generation: receipt.controllerGeneration ?? '0',
+    );
+    _controlLost = false;
+    return receipt;
+  }
+
+  /// Takes control of a room this account left open elsewhere and closes it.
+  Future<void> _closeOther(String roomId, AccountAuth auth) async {
+    final status = await _api.controlStatus(roomId, auth);
+    final secret = newSecret();
+    final receipt = await _api.takeControl(
+      roomId,
+      auth,
+      newOperationId(),
+      expectedGeneration: status.roomControllerGeneration,
+      controlSecret: secret,
+    );
+    final host = HostAuth(
+      credential: auth.credential,
+      controlSecret: secret,
+      generation:
+          receipt.controllerGeneration ?? status.roomControllerGeneration,
+    );
+    final room = await _api.getRoom(roomId, host, _language);
+    await _api.closeRoom(roomId, host, newOperationId(), room.roomVersion);
+  }
+
+  Future<void> _startFrom(Snapshot lobby) async {
+    final view = lobby.view;
+    if (view is! LobbyView) return;
+    final signature = 'start:${lobby.roomVersion}:${view.readyGeneration}';
+    final key = _keys.putIfAbsent(signature, newOperationId);
+    await _api.startGame(
+      _room!.roomId,
+      _hostAuth!,
+      key,
+      roomVersion: lobby.roomVersion,
+      readyGeneration: view.readyGeneration,
+    );
+    _keys.remove(signature);
+  }
+
+  /// Closes the room this phone holds (best effort) and forgets it.
+  Future<void> _closeHeld() async {
+    final room = _room;
+    final auth = _hostAuth;
+    _forget();
+    if (room == null || auth == null) return;
+    try {
+      final snapshot = await _api.getRoom(room.roomId, auth, _language);
+      await _api.closeRoom(
+        room.roomId,
+        auth,
+        newOperationId(),
+        snapshot.roomVersion,
+      );
+    } on ApiError {
+      // Gone already, or unreachable: the server expires idle rooms.
+    }
+  }
+
+  void _apply(Snapshot snapshot) {
+    _offset = snapshot.serverTime.difference(_now());
+    _snapshot = snapshot;
+    final view = snapshot.view;
+    if (view is BoardView) {
+      _board = view;
+      _room?.board = _boardJson(view);
+      _save();
+    }
+    _syncMedia(view is QuestionView ? view : null);
+    _notify();
+    // Restored mid-question without a board (an older save): go back to
+    // the board to learn it.
+    if (_board == null && view is QuestionView) {
+      _question('return_to_board', view);
+    }
+  }
+
+  void _onError(ApiError e, {bool fetching = false}) {
+    switch (e.code) {
+      case 'CONTROLLER_FENCED' || 'FRESH_CONTROL_SECRET_REQUIRED':
+        _controlLost = true;
+        _notify();
+      case 'ROOM_CLOSED' || 'ROOM_EXPIRED' || 'GAME_EXPIRED' || 'NOT_FOUND':
+        _forget();
+        _notify();
+      default:
+        if (e.status == 410 || (fetching && e.status == 404)) {
+          _forget();
+          _notify();
+        } else if (e.identityRejected && e.status == 401) {
+          _session.signOut();
+        } else if (fetching) {
+          _report(e);
+        }
+    }
+  }
+
+  void _report(ApiError e) {
+    _problem = e;
+    _problemCount++;
+    _notify();
+  }
+
+  void _forget() {
+    _room = null;
+    _snapshot = null;
+    _board = null;
+    _controlLost = false;
+    _actorReady.clear();
+    _syncMedia(null);
+    _prefs?.remove(roomKey);
+  }
+
+  void _save() {
+    final room = _room;
+    if (room != null) _prefs?.setString(roomKey, jsonEncode(room.toJson()));
+  }
+
+  void _setBusy(bool busy) {
+    _busy = busy;
+    _notify();
+  }
+
+  void _notify() {
+    if (!_disposed) notifyListeners();
+  }
+
+  /// Fetches links for the open question's pictures and clips. Held in
+  /// memory only; a clip renews its link before it plays
+  /// ([freshMediaUrl]).
+  void _syncMedia(QuestionView? view) {
+    final refs = <MediaRef>{
+      ?view?.question.image,
+      ?view?.question.clue,
+      ?view?.question.audio,
+      ?view?.answer?.image,
+      ?view?.answer?.forwardAudio,
+    };
+    final set = (refs.map((r) => r.key).toList()..sort()).join('|');
+    if (set == _mediaSet) return;
+    _mediaSet = set;
+    _mediaRefs = refs.toList();
+    _mediaUntil = null;
+    // Keep the links still in use; drop the rest.
+    final keys = refs.map((r) => r.key).toSet();
+    _urls.removeWhere((k, _) => !keys.contains(k));
+    _images.removeWhere((k, _) => !keys.contains(k));
+    if (refs.isNotEmpty) _fetchMedia(_mediaRefs, set);
+  }
+
+  Future<void> _fetchMedia(List<MediaRef> refs, String set) async {
+    final gameId = _snapshot?.gameId;
+    final auth = _hostAuth;
+    if (refs.isEmpty || gameId == null || auth == null) return;
+    // Twice more after a failure, then say so.
+    for (var tries = 0; ; tries++) {
+      try {
+        final links = await _api.mediaAccess(gameId, auth, refs);
+        if (_disposed || set != _mediaSet) return;
+        for (final link in links.links) {
+          _urls[link.ref.key] = link.url;
+        }
+        if (links.links.isNotEmpty) {
+          final soonest = links.links
+              .map((l) => l.expiresAt)
+              .reduce((a, b) => a.isBefore(b) ? a : b);
+          _mediaUntil = _now().add(soonest.difference(links.serverTime));
+        }
+        _notify();
+        return;
+      } on ApiError catch (e) {
+        if (_disposed || set != _mediaSet) return;
+        if (tries >= 2) {
+          _report(e);
+          return;
+        }
+      }
+    }
+  }
+
+  static Map<String, dynamic> _boardJson(BoardView view) => {
+    'phase': 'board',
+    'teams': [
+      for (final t in view.teams)
+        {'number': t.number, 'name': t.name, 'score': '${t.score}'},
+    ],
+    'board': [
+      for (final c in view.board)
+        {
+          'boardPosition': c.boardPosition,
+          'categoryId': c.categoryId,
+          'name': c.name,
+          'tiles': [
+            for (final t in c.tiles)
+              {
+                'questionPosition': t.questionPosition,
+                'basePoints': t.basePoints,
+                'state': t.state.name,
+                'winningTeamNumber': t.winningTeamNumber,
+                'awardedPoints': ?t.awardedPoints,
+              },
+          ],
+        },
+    ],
+  };
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 }
 

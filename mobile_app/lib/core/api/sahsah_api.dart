@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 
 import '../config/app_config.dart';
 import '../i18n/lang.dart';
+import 'game_wire.dart';
 import 'problems.dart';
 import 'wire.dart';
 
@@ -52,6 +53,23 @@ class AccountAuth extends Auth {
   String get bearer => 'Bearer $credential';
 }
 
+/// The host running a room from this device: the account, plus the room's
+/// control proof (secret and generation) that fences off other devices.
+class HostAuth extends Auth {
+  const HostAuth({
+    required this.credential,
+    required this.controlSecret,
+    required this.generation,
+  });
+
+  final String credential;
+  final String controlSecret;
+  final String generation;
+
+  @override
+  String get bearer => 'Bearer $credential';
+}
+
 /// Something went wrong talking to the API. [code] is the problem's stable
 /// code (RFC 9457), or `NETWORK` / `TIMEOUT` / `UNKNOWN` from this side.
 class ApiError implements Exception {
@@ -88,6 +106,14 @@ String newOperationId([Random? random]) {
   final h = [for (final x in b) x.toRadixString(16).padLeft(2, '0')].join();
   return '${h.substring(0, 8)}-${h.substring(8, 12)}-${h.substring(12, 16)}-'
       '${h.substring(16, 20)}-${h.substring(20)}';
+}
+
+/// A 32-byte random secret as unpadded base64url, the shape the API wants
+/// for a room's control secret.
+String newSecret([Random? random]) {
+  final r = random ?? Random.secure();
+  final bytes = List<int>.generate(32, (_) => r.nextInt(256));
+  return base64Url.encode(bytes).replaceAll('=', '');
 }
 
 /// HTTP client for the Sahsah NestJS API, the one the website uses.
@@ -153,6 +179,177 @@ class SahsahApi {
     PreviewSession.fromJson,
   );
 
+  // ---- Packs and rooms ---------------------------------------------------
+
+  /// The first playable pack of [categoryId] this host hasn't played, or
+  /// null when none is left ([freshOnly] false: any playable pack).
+  Future<Pack?> firstPack(
+    String categoryId,
+    Auth auth,
+    ContentLanguage language, {
+    bool freshOnly = true,
+  }) async {
+    final page = _read(
+      await _request(
+        'GET',
+        '/v1/categories/$categoryId/packs',
+        auth: auth,
+        query: {
+          'language': language.name,
+          'limit': '1',
+          if (freshOnly) 'freshOnly': 'true',
+        },
+      ),
+      (j) => Page.fromJson(j, Pack.fromJson),
+    );
+    return page.items.firstOrNull;
+  }
+
+  /// Opens a room for [selections] (board position, category, pack and
+  /// revision) with no players but the host.
+  Future<Receipt> createRoom(
+    AccountAuth auth,
+    String operationId, {
+    required List<String> teamNames,
+    required List<Map<String, Object>> selections,
+    required String controlSecret,
+  }) async => _read(
+    await _request(
+      'POST',
+      '/v1/rooms',
+      auth: auth,
+      operationId: operationId,
+      body: {
+        'teamOneName': teamNames[0],
+        'teamTwoName': teamNames[1],
+        'hostTeamNumber': null,
+        'selections': selections,
+        'proposedControlSecret': controlSecret,
+      },
+    ),
+    Receipt.fromJson,
+  );
+
+  /// The room as the host sees it now: lobby, board, question, answer or
+  /// result.
+  Future<Snapshot> getRoom(
+    String roomId,
+    Auth auth,
+    ContentLanguage language,
+  ) async => _read(
+    await _request(
+      'GET',
+      '/v1/rooms/$roomId',
+      auth: auth,
+      query: {'language': language.name},
+    ),
+    Snapshot.fromJson,
+  );
+
+  /// The room this account has open, if any.
+  Future<CurrentRoom?> currentRoom(AccountAuth auth) async => _read(
+    await _request('GET', '/v1/rooms/current', auth: auth),
+    (j) => j['room'] == null ? null : CurrentRoom.fromJson(j['room'] as Json),
+  );
+
+  Future<Receipt> startGame(
+    String roomId,
+    HostAuth auth,
+    String operationId, {
+    required String roomVersion,
+    required int readyGeneration,
+  }) async => _read(
+    await _request(
+      'POST',
+      '/v1/rooms/$roomId/games',
+      auth: auth,
+      operationId: operationId,
+      body: {
+        'expectedRoomVersion': roomVersion,
+        'expectedReadyGeneration': readyGeneration,
+      },
+    ),
+    Receipt.fromJson,
+  );
+
+  /// One host command (`open_question`, `reveal_answer`, …). [command]
+  /// carries its name and expected game version.
+  Future<Receipt> command(
+    String gameId,
+    HostAuth auth,
+    String operationId,
+    Map<String, Object?> command,
+  ) async => _read(
+    await _request(
+      'POST',
+      '/v1/games/$gameId/commands',
+      auth: auth,
+      operationId: operationId,
+      body: command,
+    ),
+    Receipt.fromJson,
+  );
+
+  /// Short-lived signed links for the open question's pictures and clips.
+  Future<MediaLinks> mediaAccess(
+    String gameId,
+    HostAuth auth,
+    List<MediaRef> refs,
+  ) async => _read(
+    await _request(
+      'POST',
+      '/v1/games/$gameId/media-access',
+      auth: auth,
+      body: {
+        'refs': [for (final r in refs) r.json],
+      },
+    ),
+    MediaLinks.fromJson,
+  );
+
+  Future<Receipt> closeRoom(
+    String roomId,
+    HostAuth auth,
+    String operationId,
+    String roomVersion,
+  ) async => _read(
+    await _request(
+      'POST',
+      '/v1/rooms/$roomId/closure',
+      auth: auth,
+      operationId: operationId,
+      body: {'expectedRoomVersion': roomVersion},
+    ),
+    Receipt.fromJson,
+  );
+
+  Future<ControlStatus> controlStatus(String roomId, AccountAuth auth) async =>
+      _read(
+        await _request('GET', '/v1/rooms/$roomId/control', auth: auth),
+        ControlStatus.fromJson,
+      );
+
+  /// Takes control of a room this account owns from another device.
+  Future<Receipt> takeControl(
+    String roomId,
+    AccountAuth auth,
+    String operationId, {
+    required String expectedGeneration,
+    required String controlSecret,
+  }) async => _read(
+    await _request(
+      'POST',
+      '/v1/rooms/$roomId/control',
+      auth: auth,
+      operationId: operationId,
+      body: {
+        'expectedControllerGeneration': expectedGeneration,
+        'proposedControlSecret': controlSecret,
+      },
+    ),
+    Receipt.fromJson,
+  );
+
   // ---- Transport ---------------------------------------------------------
 
   /// A response body that isn't the shape the contract promises is the
@@ -166,6 +363,8 @@ class SahsahApi {
     } on TypeError {
       throw const ApiError(200, 'INVALID_RESPONSE');
     } on FormatException {
+      throw const ApiError(200, 'INVALID_RESPONSE');
+    } on ArgumentError {
       throw const ApiError(200, 'INVALID_RESPONSE');
     }
   }
@@ -185,6 +384,10 @@ class SahsahApi {
       ..headers['Accept'] = 'application/json, application/problem+json';
     if (auth.bearer case final bearer?) {
       request.headers['Authorization'] = bearer;
+    }
+    if (auth is HostAuth) {
+      request.headers['X-Control-Secret'] = auth.controlSecret;
+      request.headers['X-Controller-Generation'] = auth.generation;
     }
     if (operationId != null) request.headers['Idempotency-Key'] = operationId;
     if (body != null) {

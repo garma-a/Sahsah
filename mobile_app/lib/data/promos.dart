@@ -3,7 +3,7 @@ import 'package:flutter/painting.dart';
 import '../core/i18n/lang.dart';
 import '../core/ui/brand_art.dart';
 import 'catalog.dart';
-import 'categories.dart';
+import 'game_rules.dart';
 
 /// What a promo's button does.
 enum PromoAction {

@@ -5,12 +5,11 @@ import 'package:sahsah_mobile/app.dart';
 import 'package:sahsah_mobile/core/audio/sound.dart';
 import 'package:sahsah_mobile/core/ui/game_button.dart';
 import 'package:sahsah_mobile/core/i18n/lang.dart';
-import 'package:sahsah_mobile/features/game/game_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'sound_test.dart' show FakeSound;
 
-import 'support/fake_api.dart';
+import 'support/fake_server.dart';
 
 Future<void> settle(WidgetTester tester) async {
   await tester.pump();
@@ -51,11 +50,12 @@ void main() {
         null,
       ),
     );
-    final game = GameController();
+    final server = FakeServer();
+    final game = await server.game();
     final sounds = FakeSound();
     await tester.pumpWidget(
       SahsahApp(
-        api: fakeApi(),
+        api: server.api,
         lang: LangController(Lang.ar),
         game: game,
         sound: SoundController(backend: sounds),
@@ -69,12 +69,19 @@ void main() {
       'DeviceOrientation.landscapeRight',
     ]);
 
-    // Home → setup.
+    // Home → setup: six of the server's categories, then name teams.
     await tapText(tester, 'ابدأ لعبة');
     expect(find.text('اختاروا ٦ فئات'), findsOneWidget);
-
-    // Quick pick fills six categories, then name teams.
-    await tapText(tester, 'التحديات الجديدة');
+    for (final name in [
+      'نوستالجيا التسعينات',
+      'الكورة المصرية',
+      'خمّن الكلمة من الإيموجي',
+      'خمّن المكان',
+      'سينما الأبيض والأسود',
+      'موسيقى مصرية',
+    ]) {
+      await tapText(tester, name);
+    }
     expect(find.text('٦ من ٦ فئات'), findsOneWidget);
     await tapText(tester, 'التالي');
     expect(find.text('سمّوا الفريقين'), findsOneWidget);
@@ -82,9 +89,11 @@ void main() {
     await settle(tester);
     await tapText(tester, 'ابدأ اللعبة');
 
-    // Board.
+    // Board: a room and a game on the server.
+    expect(server.room!.gameId, isNotNull);
     expect(game.hasActiveGame, isTrue);
     expect(game.game!.teamNames, ['النسور', 'الجدعان']);
+    expect(game.game!.categoryIds.first, 'cat-90s');
     // The first team's score, and its name on the turn chip.
     expect(find.text('النسور'), findsNWidgets(2));
     expect(game.game!.turn, 0);
@@ -97,15 +106,19 @@ void main() {
     await settle(tester);
     expect(game.game!.turn, 0);
 
-    // Board → the "ثقافة عامة" pack → its first 600 question, a picture
-    // that gets clearer in stages (template 6C).
-    await tester.tap(find.bySemanticsLabel(RegExp('^ثقافة عامة،')).first);
+    // Board → the "نوستالجيا التسعينات" pack → its first 600 question, a
+    // picture that gets clearer in stages (template 6C).
+    await tester.tap(
+      find.bySemanticsLabel(RegExp('^نوستالجيا التسعينات،')).first,
+    );
     await settle(tester);
     expect(find.text('اختاروا سؤال'), findsOneWidget);
     expect(find.text('الدور على النسور'), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey('question-general-4')));
+    await tester.tap(find.byKey(const ValueKey('question-cat-90s-4')));
     await settle(tester);
-    expect(game.game!.activeId, 'general-4');
+    expect(game.game!.activeId, 'cat-90s-4');
+    expect(server.commands, ['open_question']);
+    expect(find.text('سؤال 5 في نوستالجيا التسعينات'), findsOneWidget);
     expect(find.text('إظهار الإجابة'), findsOneWidget);
 
     // Back (button or gesture) asks who took the points first; "keep
@@ -122,7 +135,7 @@ void main() {
     expect(find.text('قبل ما ترجعوا… مين خد النقط؟'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('leave-stay')));
     await settle(tester);
-    expect(game.game!.activeId, 'general-4');
+    expect(game.game!.activeId, 'cat-90s-4');
     expect(game.game!.results, isEmpty);
 
     // The picture opens full screen to zoom in, then closes.
@@ -134,10 +147,11 @@ void main() {
 
     // Clearer picture, fewer points: 600 → 400.
     await tapText(tester, 'وضّح الصورة');
-    expect(game.availablePoints('general-4'), 400);
+    expect(game.availablePoints('cat-90s-4'), 400);
 
     await tapText(tester, 'إظهار الإجابة');
     expect(find.text('مين جاوب صح؟'), findsOneWidget);
+    expect(find.text('إجابة 5 في نوستالجيا التسعينات'), findsOneWidget);
     // The award button, not the team's score card on the side.
     await tester.tap(
       find.ancestor(of: find.text('النسور'), matching: find.byType(GameButton)),
@@ -146,46 +160,32 @@ void main() {
 
     // Back on the pack screen with the points, and the pick moves on.
     expect(game.game!.scores, [400, 0]);
-    expect(game.game!.results['general-4']!.team, 0);
+    expect(game.game!.results['cat-90s-4']!.team, 0);
     expect(game.game!.turn, 1);
     expect(sounds.played, [Sfx.correct]);
+    expect(server.commands.last, 'resolve_question');
     expect(find.text('إظهار الإجابة'), findsNothing);
     expect(find.text('اختاروا سؤال'), findsOneWidget);
     expect(find.text('الدور على الجدعان'), findsOneWidget);
-
-    // Wrong team? "Undo" takes the points back and reopens the question
-    // on its answer, ready to pick again.
-    await tapText(tester, 'تراجع');
-    expect(game.game!.scores, [0, 0]);
-    expect(game.game!.results, isEmpty);
-    expect(game.game!.turn, 0);
-    expect(game.game!.activeId, 'general-4');
-    expect(find.text('مين جاوب صح؟'), findsOneWidget);
-    await tester.tap(
-      find.ancestor(of: find.text('النسور'), matching: find.byType(GameButton)),
-    );
-    await settle(tester);
-    expect(game.game!.scores, [400, 0]);
-    expect(game.game!.turn, 1);
 
     // Leaving a question settles it: back → the second team took it.
     // (Let the award confirmation slide away first.)
     await tester.pump(const Duration(seconds: 5));
     await settle(tester);
-    await tester.tap(find.byKey(const ValueKey('question-general-0')));
+    await tester.tap(find.byKey(const ValueKey('question-cat-90s-0')));
     await settle(tester);
     await tapText(tester, 'رجوع');
     // The host may look at the answer before deciding.
     await tester.tap(find.byKey(const ValueKey('leave-show-answer')));
     await settle(tester);
     expect(find.textContaining('الإجابة: '), findsOneWidget);
-    expect(game.progressOf('general-0').revealed, isTrue);
+    expect(game.progressOf('cat-90s-0').revealed, isTrue);
     await tester.tap(find.byKey(const ValueKey('leave-team-1')));
     await settle(tester);
-    expect(game.game!.results['general-0']!.team, 1);
+    expect(game.game!.results['cat-90s-0']!.team, 1);
     expect(game.game!.scores, [400, 200]);
     expect(game.game!.turn, 0);
-    expect(sounds.played, [Sfx.correct, Sfx.correct, Sfx.correct]);
+    expect(sounds.played, [Sfx.correct, Sfx.correct]);
     expect(find.text('اختاروا سؤال'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('pack-back')));
     await settle(tester);

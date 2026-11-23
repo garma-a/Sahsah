@@ -6,11 +6,10 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../core/i18n/lang.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/ui/brand_art.dart';
 import '../../core/ui/category_cover.dart';
 import '../../core/ui/pressable.dart';
 import '../../core/ui/surfaces.dart';
-import '../../data/categories.dart';
+import '../../data/catalog.dart';
 import 'game_controller.dart';
 import 'model/question.dart';
 import 'pack_screen.dart';
@@ -120,15 +119,21 @@ class _BoardScreenState extends State<BoardScreen> {
       destructive: true,
     );
     if (!ok || !mounted) return;
-    context.game.end();
-    _showResults();
+    final game = context.game;
+    await game.end();
+    if (mounted && (game.game?.finished ?? false)) _showResults();
   }
 
   @override
   Widget build(BuildContext context) {
     final controller = context.game;
     final game = controller.game;
-    if (game == null) return const GameScaffold(child: SizedBox());
+    if (game == null) {
+      return GameScaffold(child: _Gone(loading: controller.hasRoom));
+    }
+    if (controller.controlLost) {
+      return const GameScaffold(child: _ControlLost());
+    }
 
     return PopScope(
       canPop: false,
@@ -809,19 +814,12 @@ class _CategoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final lang = context.lang;
-    final category = allCategories.firstWhere((c) => c.id == categoryId);
     final slot = game.categoryIds.indexOf(categoryId);
     final ids = [for (var r = 0; r < tilePoints.length; r++) '$categoryId-$r'];
     final left = ids.where((id) => !game.results.containsKey(id)).length;
     final done = left == 0;
-    final open =
-        ids.contains(game.activeId) ||
-        ids.any(
-          (id) =>
-              !game.results.containsKey(id) &&
-              game.progress[id]?.revealed == true,
-        );
-    final name = lang.t(category.name, category.nameEn);
+    final open = ids.any(game.opened.contains);
+    final name = game.nameOf(categoryId);
     final winner = done ? _winner(ids) : null;
 
     return Pressable(
@@ -864,7 +862,7 @@ class _CategoryCard extends StatelessWidget {
                       ])
                     : const ColorFilter.mode(Colors.transparent, BlendMode.dst),
                 child: CategoryCover(
-                  image: AssetImage(BrandImages.category(categoryId)),
+                  image: coverOf(context.catalog.byId(categoryId)),
                   name: name,
                   tone: slot,
                   footInset: 12,
@@ -1008,6 +1006,112 @@ class _Pip extends StatelessWidget {
             : team == null
             ? AppColors.ivory.withValues(alpha: 0.2)
             : teamColors[team],
+      ),
+    );
+  }
+}
+
+/// No game to show: still loading it, or the room is gone (closed or
+/// expired on the server).
+class _Gone extends StatelessWidget {
+  const _Gone({required this.loading});
+
+  final bool loading;
+
+  @override
+  Widget build(BuildContext context) {
+    final lang = context.lang;
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (loading) ...[
+            const SizedBox(
+              width: 30,
+              height: 30,
+              child: CircularProgressIndicator(
+                strokeWidth: 3,
+                color: AppColors.gold,
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              lang.t('بنفتح اللعبة…', 'Benfta7 el le3ba…'),
+              style: AppText.display(22),
+            ),
+          ] else ...[
+            Text(
+              lang.t('اللعبة دي خلصت', 'El le3ba di khelset'),
+              style: AppText.display(26),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              lang.t(
+                'الغرفة اتقفلت أو انتهت على السيرفر.',
+                'El oda et2afalet aw entahet 3al server.',
+              ),
+              style: AppText.sans(
+                15,
+                color: AppColors.ivory.withValues(alpha: 0.75),
+              ),
+            ),
+            const SizedBox(height: 18),
+            SizedBox(
+              width: 220,
+              child: GoldButton(
+                label: lang.t('الرئيسية', 'El re2eseya'),
+                icon: LucideIcons600.house,
+                onTap: () => Navigator.of(context).popUntil((r) => r.isFirst),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// The room is being run from another device (the website, another phone).
+class _ControlLost extends StatelessWidget {
+  const _ControlLost();
+
+  @override
+  Widget build(BuildContext context) {
+    final lang = context.lang;
+    final game = context.game;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              lang.t('جهاز تاني خد التحكم', 'Gehaz tany khad el ta7akkom'),
+              style: AppText.display(26),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              lang.t(
+                'اللعبة بتتدار من جهاز تاني دلوقتي. تقدر تاخدها هنا تاني.',
+                'El le3ba betetdar men gehaz tany delwa2ty. Te2dar takhodha hena tany.',
+              ),
+              textAlign: TextAlign.center,
+              style: AppText.sans(
+                15,
+                color: AppColors.ivory.withValues(alpha: 0.75),
+              ),
+            ),
+            const SizedBox(height: 18),
+            SizedBox(
+              width: 260,
+              child: GoldButton(
+                label: lang.t('كمّل من هنا', 'Kammel men hena'),
+                icon: LucideIcons600.smartphone,
+                onTap: game.busy ? null : game.takeControl,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

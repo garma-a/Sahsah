@@ -4,14 +4,13 @@ import 'package:lucide_icons_flutter/lucide_icons_600.dart';
 import 'package:sahsah_mobile/app.dart';
 import 'package:sahsah_mobile/core/audio/sound.dart';
 import 'package:sahsah_mobile/core/i18n/lang.dart';
-import 'package:sahsah_mobile/features/game/game_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'game_flow_test.dart' show settle;
-import 'screen_reader_test.dart' show press;
+import 'screen_reader_test.dart' show pickBoard, press;
 import 'sound_test.dart' show FakeSound;
 
-import 'support/fake_api.dart';
+import 'support/fake_server.dart';
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
@@ -22,10 +21,11 @@ void main() {
     tester.view.physicalSize = const Size(892 * 3, 412 * 3);
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
-    final game = GameController();
+    final server = FakeServer();
+    final game = await server.game();
     await tester.pumpWidget(
       SahsahApp(
-        api: fakeApi(),
+        api: server.api,
         lang: LangController(Lang.ar),
         game: game,
         sound: SoundController(backend: FakeSound()),
@@ -34,7 +34,7 @@ void main() {
     await settle(tester);
 
     await press(tester, RegExp('^ابدأ لعبة'));
-    await press(tester, 'التحديات الجديدة');
+    await pickBoard(tester);
     await press(tester, 'التالي');
     await press(tester, 'ابدأ اللعبة');
     await press(tester, RegExp('باقي ٦ أسئلة'));

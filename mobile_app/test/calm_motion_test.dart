@@ -4,13 +4,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sahsah_mobile/app.dart';
 import 'package:sahsah_mobile/core/audio/sound.dart';
 import 'package:sahsah_mobile/core/i18n/lang.dart';
-import 'package:sahsah_mobile/features/game/game_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'game_flow_test.dart' show settle;
 import 'sound_test.dart' show FakeSound;
 
-import 'support/fake_api.dart';
+import 'support/fake_server.dart';
 
 /// With the phone's animations off (Android's "Remove animations", iOS's
 /// "Reduce motion"), nothing moves: each screen is there on the next frame,
@@ -53,11 +52,12 @@ void main() {
     tester.view.physicalSize = const Size(892 * 3, 412 * 3);
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
+    final server = FakeServer();
     await tester.pumpWidget(
       SahsahApp(
-        api: fakeApi(),
+        api: server.api,
         lang: LangController(Lang.ar),
-        game: GameController(),
+        game: await server.game(),
         sound: SoundController(backend: FakeSound()),
       ),
     );
@@ -65,11 +65,13 @@ void main() {
 
     await tapNow(tester, RegExp('^ابدأ لعبة'));
     still('اختاروا ٦ فئات');
-    await tapNow(tester, 'التحديات الجديدة');
+    for (final name in fakeBoardNames) {
+      await tapNow(tester, name);
+    }
     await tapNow(tester, 'التالي');
     still('سمّوا الفريقين');
     await tapNow(tester, 'ابدأ اللعبة');
-    await tapNow(tester, RegExp('^مين في الصورة؟، باقي'));
+    await tapNow(tester, RegExp('^نوستالجيا التسعينات، باقي'));
     still('اختاروا سؤال');
     await tapNow(tester, RegExp('^سؤال ١،'));
     still('إظهار الإجابة');

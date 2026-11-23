@@ -1,4 +1,4 @@
-import 'categories.dart';
+import 'game_rules.dart';
 
 /// Token packs (`TOKEN_PRESETS` in the prototype). One token is one game.
 /// The production price is 100 EGP a token

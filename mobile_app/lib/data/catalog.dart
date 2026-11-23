@@ -161,9 +161,10 @@ List<Shelf> shelvesOf(List<Category> categories) {
 }
 
 /// A category's cover picture, or null when it has none yet.
-ImageProvider<Object>? coverOf(Category category) => category.coverUrl == null
-    ? null
-    : CatalogImages.provider(category.coverUrl!);
+ImageProvider<Object>? coverOf(Category? category) {
+  final url = category?.coverUrl;
+  return url == null ? null : CatalogImages.provider(url);
+}
 
 /// "فئة" or "فئات" after an Arabic count: plural from 3 to 10.
 String categoryCount(LangController lang, int n) {
