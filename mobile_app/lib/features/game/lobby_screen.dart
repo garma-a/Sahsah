@@ -8,6 +8,7 @@ import '../../core/api/game_wire.dart';
 import '../../core/i18n/lang.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/play_button.dart';
+import '../../core/ui/pressable.dart';
 import '../../core/ui/scan_code.dart';
 import '../../core/ui/surfaces.dart';
 import 'board_screen.dart';
@@ -75,6 +76,27 @@ class _HostLobbyScreenState extends State<HostLobbyScreen> {
     Navigator.of(
       context,
     ).pushReplacement(MaterialPageRoute(builder: (_) => const BoardScreen()));
+  }
+
+  /// Removing a player asks first: it takes them out of the room.
+  Future<void> _remove(Member member) async {
+    final lang = context.lang;
+    final game = context.game;
+    final ok = await confirmDialog(
+      context,
+      title: lang.t(
+        'تشيل ${member.displayName} من الغرفة؟',
+        'Tsheel ${member.displayName} men el oda?',
+      ),
+      message: lang.t(
+        'هيخرج من الغرفة دلوقتي، ويقدر يدخل تاني بالكود.',
+        'Hayokhrog men el oda delwa2ty, w ye2dar yedkhol tany bel code.',
+      ),
+      confirm: lang.t('شيله', 'Sheelo'),
+      cancel: lang.t('خليه', 'Khaleeh'),
+      destructive: true,
+    );
+    if (ok && mounted) await game.removePlayer(member.id);
   }
 
   @override
@@ -165,6 +187,7 @@ class _HostLobbyScreenState extends State<HostLobbyScreen> {
                   if (m.teamNumber == t + 1) m,
               ],
               connected: game.connected,
+              onRemove: game.busy ? null : (m) => _remove(m),
             ),
           ),
         ],
@@ -268,6 +291,7 @@ class TeamRoster extends StatelessWidget {
     this.mine = false,
     this.onJoin,
     this.meId,
+    this.onRemove,
   });
 
   final String name;
@@ -279,6 +303,9 @@ class TeamRoster extends StatelessWidget {
   final bool mine;
   final VoidCallback? onJoin;
   final String? meId;
+
+  /// The host's lobby: each player gets a button that removes them.
+  final ValueChanged<Member>? onRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -344,6 +371,9 @@ class TeamRoster extends StatelessWidget {
                           member: m,
                           online: connected.contains(m.id),
                           me: m.id == meId,
+                          onRemove: onRemove == null
+                              ? null
+                              : () => onRemove!(m),
                         ),
                         const SizedBox(height: 6),
                       ],
@@ -370,11 +400,13 @@ class _MemberRow extends StatelessWidget {
     required this.member,
     required this.online,
     required this.me,
+    this.onRemove,
   });
 
   final Member member;
   final bool online;
   final bool me;
+  final VoidCallback? onRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -452,6 +484,28 @@ class _MemberRow extends StatelessWidget {
               ],
             ),
           ),
+          // The host's way to take a player out: a 44px target around a
+          // small mark, so it isn't hit by accident.
+          if (onRemove != null)
+            Pressable(
+              key: ValueKey('remove-${member.id}'),
+              semanticLabel: lang.t(
+                'شيل ${member.displayName}',
+                'Sheel ${member.displayName}',
+              ),
+              onTap: onRemove,
+              child: const SizedBox(
+                width: 40,
+                height: 36,
+                child: Center(
+                  child: Icon(
+                    LucideIcons.userX,
+                    size: 18,
+                    color: AppColors.inkMuted,
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

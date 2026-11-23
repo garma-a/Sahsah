@@ -436,6 +436,25 @@ class SahsahApi {
     Receipt.fromJson,
   );
 
+  /// The host removes [membershipId] from the lobby. An anonymous player
+  /// can join again with the code.
+  Future<Receipt> removeMember(
+    String roomId,
+    HostAuth auth,
+    String operationId, {
+    required String membershipId,
+    required String roomVersion,
+  }) async => _read(
+    await _request(
+      'POST',
+      '/v1/rooms/$roomId/memberships/$membershipId/removal',
+      auth: auth,
+      operationId: operationId,
+      body: {'expectedRoomVersion': roomVersion},
+    ),
+    Receipt.fromJson,
+  );
+
   Future<ControlStatus> controlStatus(String roomId, AccountAuth auth) async =>
       _read(
         await _request('GET', '/v1/rooms/$roomId/control', auth: auth),

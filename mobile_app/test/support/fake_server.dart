@@ -300,6 +300,11 @@ class FakeServer {
         ),
         ('POST', ['v1', 'rooms', final id, 'memberships', 'me', 'departure']) =>
           _depart(request, id),
+        (
+          'POST',
+          ['v1', 'rooms', final id, 'memberships', final member, 'removal'],
+        ) =>
+          _remove(_host(request, id), member, body),
         ('GET', ['v1', 'rooms', final id]) => _read(request, id),
         ('POST', ['v1', 'rooms', final id, 'games']) => _start(
           _host(request, id),
@@ -571,6 +576,27 @@ class FakeServer {
     _expect(room, me, body);
     me.team = body['teamNumber'] as int;
     room.reshuffle();
+    return _receipt(room);
+  }
+
+  /// The host takes a player out: their socket hears it and closes.
+  http.Response _remove(
+    FakeRoom room,
+    String membershipId,
+    Map<String, dynamic> body,
+  ) {
+    if (room.gameId != null) throw const _Problem(409, 'LOBBY_NOT_OPEN');
+    if (body['expectedRoomVersion'] != '${room.version}') {
+      throw const _Problem(409, 'STALE_ROOM_VERSION');
+    }
+    final player = room.players.where((p) => p.id == membershipId).firstOrNull;
+    if (player == null) throw const _Problem(404, 'NOT_FOUND');
+    room
+      ..players.remove(player)
+      ..reshuffle();
+    for (final socket in _sockets) {
+      if (socket._seat == membershipId) socket.revoke();
+    }
     return _receipt(room);
   }
 
@@ -1155,6 +1181,13 @@ class _FakeSocket implements RoomSocket {
     _seat = player?.$2.id ?? 'host-${room.id}';
     _send('authenticated', {'language': 'ar'});
     push();
+  }
+
+  /// The host removed this seat.
+  void revoke() {
+    _send('membership_revoked', const {});
+    _room = null;
+    close();
   }
 
   /// The room's current view, and who's connected.

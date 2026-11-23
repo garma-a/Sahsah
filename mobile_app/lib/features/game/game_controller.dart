@@ -281,6 +281,9 @@ class GameController extends ChangeNotifier {
 
   /// This seat opened on another phone: this one stops.
   bool _replaced = false;
+
+  /// The host removed this player from the room.
+  bool _removed = false;
   BoardView? _board;
 
   /// Server time minus this phone's time, from the last snapshot.
@@ -340,6 +343,9 @@ class GameController extends ChangeNotifier {
 
   /// This seat opened on another phone.
   bool get replaced => _replaced;
+
+  /// The host removed this player (the seat is gone).
+  bool get removed => _removed;
 
   /// A command or a start is in flight.
   bool get busy => _busy;
@@ -653,6 +659,7 @@ class GameController extends ChangeNotifier {
         reconnectSecret: pending['secret'] as String,
       );
       _prefs?.remove(_pendingJoinKey);
+      _removed = false;
       _seat = _GuestSeat(
         roomId: receipt.roomId,
         code: code,
@@ -704,6 +711,25 @@ class GameController extends ChangeNotifier {
         memberVersion: me.memberVersion,
         readyGeneration: lobby.readyGeneration,
         ready: !me.ready,
+      ),
+    );
+  }
+
+  /// The host removes a player from the lobby. Their phone hears it at
+  /// once; they can join again with the code.
+  Future<void> removePlayer(String membershipId) async {
+    final room = _room;
+    final auth = _hostAuth;
+    final snapshot = _snapshot;
+    if (room == null || auth == null || snapshot?.view is! LobbyView) return;
+    await _player(
+      'remove:$membershipId:${snapshot!.roomVersion}',
+      (key) => _api.removeMember(
+        room.roomId,
+        auth,
+        key,
+        membershipId: membershipId,
+        roomVersion: snapshot.roomVersion,
       ),
     );
   }
@@ -1057,6 +1083,7 @@ class GameController extends ChangeNotifier {
     }
     _prefs?.remove(_pendingKey);
     _seat = null;
+    _removed = false;
     _room = _HostRoom(
       roomId: receipt.roomId,
       controlSecret: pending['controlSecret'] as String,
@@ -1202,8 +1229,11 @@ class GameController extends ChangeNotifier {
       case ChannelStatus.controlLost:
         _controlLost = true;
         _channel = null;
-      case ChannelStatus.closed || ChannelStatus.revoked:
+      case ChannelStatus.closed:
         _forget();
+      case ChannelStatus.revoked:
+        _forget();
+        _removed = true;
       case ChannelStatus.replaced:
         _replaced = true;
         _channel = null;
@@ -1225,6 +1255,7 @@ class GameController extends ChangeNotifier {
     switch (e.code) {
       case 'MEMBERSHIP_REVOKED' || 'PARTICIPATION_ENDED':
         _forget();
+        _removed = e.code == 'MEMBERSHIP_REVOKED';
         _notify();
       case 'CONTROLLER_FENCED' || 'FRESH_CONTROL_SECRET_REQUIRED':
         _controlLost = true;
@@ -1265,6 +1296,7 @@ class GameController extends ChangeNotifier {
     _invitation = null;
     _controlLost = false;
     _replaced = false;
+    _removed = false;
     _actorReady.clear();
     _syncMedia(null);
     _prefs?.remove(roomKey);

@@ -73,6 +73,8 @@ class _GuestRoomScreenState extends State<GuestRoomScreen> {
     final Widget page;
     if (game.replaced) {
       page = const _Notice(kind: _NoticeKind.replaced);
+    } else if (game.removed) {
+      page = const _Notice(kind: _NoticeKind.removed);
     } else if (!game.hasRoom) {
       page = const _Notice(kind: _NoticeKind.gone);
     } else if (lobby != null) {
@@ -278,7 +280,7 @@ class _ViewerBoard extends StatelessWidget {
   }
 }
 
-enum _NoticeKind { loading, gone, replaced }
+enum _NoticeKind { loading, gone, replaced, removed }
 
 class _Notice extends StatelessWidget {
   const _Notice({required this.kind});
@@ -295,6 +297,13 @@ class _Notice extends StatelessWidget {
         lang.t(
           'المضيف قفلها أو شالك منها. تقدر تدخل بكود جديد.',
           'El host 2afalha aw shalak menha. Te2dar todkhol be code gdeed.',
+        ),
+      ),
+      _NoticeKind.removed => (
+        lang.t('المضيف شالك من الغرفة', 'El host shalak men el oda'),
+        lang.t(
+          'تقدر تدخل تاني بالكود لو المضيف عايز.',
+          'Te2dar todkhol tany bel code law el host 3ayez.',
         ),
       ),
       _NoticeKind.replaced => (
