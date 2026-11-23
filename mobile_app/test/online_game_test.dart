@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:sahsah_mobile/app.dart';
@@ -276,6 +277,102 @@ void main() {
     expect(player.hasRoom, isFalse);
     expect(server.room!.players, isEmpty);
     host.dispose();
+    semantics.dispose();
+  });
+
+  testWidgets('the host removes a player, whose phone says so', (tester) async {
+    final semantics = tester.ensureSemantics();
+    tester.view.physicalSize = const Size(892 * 3, 412 * 3);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final server = FakeServer();
+    final host = await server.game();
+    addTearDown(host.dispose);
+    await host.openRoom(
+      categoryIds: [
+        'cat-90s',
+        'cat-football',
+        'cat-emoji',
+        'cat-places',
+        'cat-cinema',
+        'cat-songs',
+      ],
+      teams: ['الفراعنة', 'الجدعان'],
+    );
+
+    // A player's phone joins and sits in its lobby.
+    final player = server.guest();
+    addTearDown(player.dispose);
+    await player.join(code: server.room!.code, name: 'علي', team: 0);
+    await tester.pumpWidget(
+      SahsahApp(
+        api: server.api,
+        lang: LangController(Lang.ar),
+        game: player,
+        sound: SoundController(backend: FakeSound()),
+      ),
+    );
+    await settle(tester);
+    await press(tester, RegExp('^ارجع للغرفة'));
+    expect(find.text('أهلًا علي! اختار فريقك'), findsOneWidget);
+
+    // The host takes them out: they hear it at once, and their seat is gone.
+    await host.removePlayer(server.room!.players.single.id);
+    await settle(tester);
+    expect(server.room!.players, isEmpty);
+    expect(find.text('المضيف شالك من الغرفة'), findsOneWidget);
+    expect(player.hasRoom, isFalse);
+    expect(player.removed, isTrue);
+    semantics.dispose();
+  });
+
+  testWidgets('the host lobby removes a player after asking', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final (server, game) = await pump(tester);
+    await toTeams(tester);
+    await press(tester, 'ابدأ اللعبة');
+    final ali = server.addPlayer('علي');
+    await settle(tester);
+    expect(find.text('علي'), findsOneWidget);
+
+    // Asked first; "keep him" keeps him.
+    await press(tester, 'شيل علي');
+    expect(find.text('تشيل علي من الغرفة؟'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('confirm-cancel')));
+    await settle(tester);
+    expect(server.room!.players, hasLength(1));
+
+    await press(tester, 'شيل علي');
+    await tester.tap(find.byKey(const ValueKey('confirm-ok')));
+    await settle(tester);
+    expect(server.room!.players.where((p) => p.id == ali.id), isEmpty);
+    expect(find.text('علي'), findsNothing);
+    expect(
+      find.text('لسه محدش دخل. استنوا اللاعبين أو ابدأوا.'),
+      findsOneWidget,
+    );
+    expect(game.problem, isNull);
+    semantics.dispose();
+  });
+
+  testWidgets('a landscape lobby keeps a player\'s name whole', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final (server, _) = await pump(tester);
+    await toTeams(tester);
+    await press(tester, 'ابدأ اللعبة');
+    final player = server.addPlayer('لاعب تجربة');
+    await settle(tester);
+
+    // The team column is narrow: the ready label is its icon alone, and
+    // still says what it means; the name isn't cut.
+    final name = tester.renderObject<RenderParagraph>(find.text('لاعب تجربة'));
+    expect(name.didExceedMaxLines, isFalse);
+    expect(find.text('مستنيينه'), findsNothing);
+    expect(find.byKey(ValueKey('status-${player.id}')), findsOneWidget);
+    expect(
+      find.bySemanticsLabel(RegExp('لاعب تجربة\nمستنيينه')),
+      findsOneWidget,
+    );
     semantics.dispose();
   });
 }
