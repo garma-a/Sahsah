@@ -5,6 +5,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/ui/brand_background.dart';
 import '../../core/ui/paper_scroll.dart';
 import '../../core/ui/surfaces.dart';
+import '../../data/catalog.dart';
 import '../../data/promos.dart';
 import '../account/account_page.dart';
 import '../categories/categories_page.dart';
@@ -62,7 +63,10 @@ class _AppShellState extends State<AppShell> with TickerProviderStateMixin {
     if (!mounted || _route != AppRoute.home) return;
     // Not over a game, the setup or another sheet.
     if (ModalRoute.of(context)?.isCurrent != true) return;
-    final promo = homePromos(context.lang).where((p) => p.popup).firstOrNull;
+    final promo = homePromos(
+      context.lang,
+      context.catalog,
+    ).where((p) => p.popup).firstOrNull;
     if (promo == null) return;
     final chosen = await showPromoPopup(context, promo);
     if (!mounted || chosen == null) return;

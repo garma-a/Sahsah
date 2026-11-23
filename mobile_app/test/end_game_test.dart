@@ -11,6 +11,8 @@ import 'game_flow_test.dart' show settle;
 import 'screen_reader_test.dart' show press;
 import 'sound_test.dart' show FakeSound;
 
+import 'support/fake_api.dart';
+
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
@@ -23,6 +25,7 @@ void main() {
     final game = GameController();
     await tester.pumpWidget(
       SahsahApp(
+        api: fakeApi(),
         lang: LangController(Lang.ar),
         game: game,
         sound: SoundController(backend: FakeSound()),

@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
-import 'package:http/testing.dart';
 import 'package:sahsah_mobile/app.dart';
-import 'package:sahsah_mobile/core/api/sahsah_api.dart';
 import 'package:sahsah_mobile/core/i18n/lang.dart';
 import 'package:sahsah_mobile/features/home/promo_banner.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'support/fake_api.dart';
 
 Future<void> pumpApp(
   WidgetTester tester, {
@@ -20,11 +20,9 @@ Future<void> pumpApp(
   addTearDown(tester.view.reset);
   await tester.pumpWidget(
     SahsahApp(
+      api: fakeApi(),
       lang: LangController(lang),
-      api: SahsahApi(
-        baseUrl: 'http://example.test/api',
-        client: MockClient((_) async => http.Response('{}', 200)),
-      ),
+
       launchPromo: launchPromo,
     ),
   );
@@ -61,8 +59,10 @@ void main() {
     );
     expect(find.text('ابدأ لعبة'), findsOneWidget);
     expect(find.text('ادخل بكود'), findsOneWidget);
-    expect(find.text('تحديات جديدة للشلة'), findsOneWidget);
-    expect(find.text('مين في الصورة؟'), findsOneWidget);
+    // The server's catalogue, by section.
+    expect(find.text('باقات تجريبية'), findsOneWidget);
+    expect(find.text('كلاسيكيات'), findsOneWidget);
+    expect(find.text('الكورة المصرية'), findsOneWidget);
     for (final tab in ['الرئيسية', 'الفئات', 'العب', 'المتجر', 'المزيد']) {
       expect(find.text(tab), findsWidgets, reason: tab);
     }
@@ -91,7 +91,8 @@ void main() {
     expect(find.text('يلا نلعب؟'), findsNothing);
 
     await tapText(tester, 'الفئات');
-    expect(find.text('مصر وتراثها'), findsOneWidget);
+    expect(find.text('٨ فئات · اختاروا ٦ للوحة'), findsOneWidget);
+    expect(find.text('كلاسيكيات'), findsOneWidget);
 
     await tapText(tester, 'الرئيسية');
     expect(find.text('يلا نلعب؟'), findsOneWidget);
@@ -121,12 +122,47 @@ void main() {
   testWidgets('tapping a category opens its details', (tester) async {
     await pumpApp(tester);
 
-    await tapText(tester, 'كورة وجمهور');
+    await tapText(tester, 'سينما الأبيض والأسود');
+    expect(find.text('وصف سينما الأبيض والأسود'), findsOneWidget);
     expect(
-      find.text('الأهلي والزمالك والمنتخب وأهداف الزمن الجميل.'),
+      find.text('٨ باقات، كل باقة ٦ أسئلة من ٢٠٠ لـ٦٠٠ نقطة'),
       findsOneWidget,
     );
-    expect(find.text('العب بالفئة دي'), findsOneWidget);
+  });
+
+  testWidgets('a category with no packs yet says so', (tester) async {
+    await pumpApp(tester);
+
+    await tapText(tester, 'فوازير وألغاز');
+    expect(find.text('لسه مفيش باقات جاهزة في الفئة دي.'), findsOneWidget);
+    expect(find.text('قريبًا'), findsWidgets);
+  });
+
+  testWidgets('no server and nothing saved: the real reason and a retry', (
+    tester,
+  ) async {
+    var online = false;
+    tester.view.physicalSize = const Size(412, 892) * 3;
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      SahsahApp(
+        lang: LangController(Lang.ar),
+        api: fakeApi(
+          handler: (_) async =>
+              online ? null : throw http.ClientException('off'),
+        ),
+      ),
+    );
+    await settle(tester);
+    expect(
+      find.text('مفيش اتصال بالسيرفر. اتأكد من النت وجرّب تاني.'),
+      findsOneWidget,
+    );
+
+    online = true;
+    await tapText(tester, 'جرّب تاني');
+    expect(find.text('الكورة المصرية'), findsOneWidget);
   });
 
   testWidgets('landscape: one-screen lobby, menu tiles and back', (
@@ -146,7 +182,7 @@ void main() {
     expect(find.byType(CustomScrollView), findsNothing);
     final play = tester.getCenter(find.text('ابدأ لعبة'));
     // The stage is a banner carousel, opening on the new challenges.
-    final title = tester.getCenter(find.text('تحديات جديدة للشلة'));
+    final title = tester.getCenter(find.text('باقات تجريبية'));
     final menu = tester.getCenter(find.text('الفئات'));
     expect(play.dx, lessThan(title.dx));
     expect(menu.dx, greaterThan(title.dx));
@@ -174,9 +210,10 @@ void main() {
 
     // Category shelf with section tabs.
     await tapText(tester, 'الفئات');
-    expect(find.text('مين في الصورة؟'), findsOneWidget);
-    await tapText(tester, 'مصر وتراثها');
-    expect(find.text('مين في الصورة؟'), findsNothing);
+    expect(find.text('الكورة المصرية'), findsOneWidget);
+    await tapText(tester, 'كلاسيكيات');
+    expect(find.text('الكورة المصرية'), findsNothing);
+    expect(find.text('سينما الأبيض والأسود'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('hud-back')));
     await settle(tester);
 
@@ -205,7 +242,7 @@ void main() {
     );
     await settle(tester);
     expect(popup, findsNothing);
-    expect(find.text('مصر وتراثها'), findsOneWidget);
+    expect(find.text('كلاسيكيات'), findsOneWidget);
   });
 
   testWidgets('with a screen reader on, the banners hold still', (
@@ -215,10 +252,10 @@ void main() {
         const FakeAccessibilityFeatures(accessibleNavigation: true);
     addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
     await pumpApp(tester, size: const Size(892, 412));
-    expect(find.text('تحديات جديدة للشلة'), findsOneWidget);
+    expect(find.text('باقات تجريبية'), findsOneWidget);
     await tester.pump(PromoCarousel.interval * 2);
     await settle(tester);
-    expect(find.text('تحديات جديدة للشلة'), findsOneWidget);
+    expect(find.text('باقات تجريبية'), findsOneWidget);
   });
 
   testWidgets('the launch pop-up closes and stays closed', (tester) async {

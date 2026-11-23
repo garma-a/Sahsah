@@ -7,6 +7,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'home_test.dart' show settle, tapText;
 
+import 'support/fake_api.dart';
+
 /// Records what would have been played.
 class FakeSound implements SoundBackend {
   final played = <Sfx>[];
@@ -66,7 +68,7 @@ void main() {
     final backend = FakeSound();
     final sound = SoundController(backend: backend);
     await tester.pumpWidget(
-      SahsahApp(lang: LangController(Lang.ar), sound: sound),
+      SahsahApp(api: fakeApi(), lang: LangController(Lang.ar), sound: sound),
     );
     await settle(tester);
     await tapText(tester, 'المزيد');

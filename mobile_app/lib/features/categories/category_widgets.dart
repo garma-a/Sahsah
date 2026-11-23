@@ -6,8 +6,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/ui/brand_art.dart';
 import '../../core/ui/play_button.dart';
 import '../../core/ui/pressable.dart';
-import '../../data/categories.dart';
-import '../../data/question_bank.dart';
+import '../../data/catalog.dart';
 import '../game/setup_screen.dart';
 import '../../core/ui/cover_image.dart';
 
@@ -106,11 +105,19 @@ class CategoryPosterButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final lang = context.lang;
     return Pressable(
-      semanticLabel: lang.t(category.name, category.nameEn),
+      semanticLabel: category.playable
+          ? category.name
+          : lang.t('${category.name}، قريبًا', '${category.name}, 2orayeb'),
       onTap: () => showCategorySheet(context, category),
       child: Align(
         alignment: Alignment.topCenter,
-        child: Poster(category: category, tone: tone),
+        child: Poster(
+          id: category.id,
+          name: category.name,
+          cover: coverOf(category),
+          tone: tone,
+          soon: !category.playable,
+        ),
       ),
     );
   }
@@ -158,10 +165,17 @@ Future<void> showCategorySheet(BuildContext context, Category category) {
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(14),
-                    child: CoverAsset(
-                      BrandImages.category(category.id),
+                    child: SizedBox(
                       width: 96,
-                      height: 96 * 297 / 210,
+                      height: 96 / Poster.aspect,
+                      child: switch (coverOf(category)) {
+                        final cover? => CoverPicture(
+                          cover,
+                          errorBuilder: (_, _, _) =>
+                              const ColoredBox(color: AppColors.card),
+                        ),
+                        null => const ColoredBox(color: AppColors.card),
+                      },
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -169,37 +183,34 @@ Future<void> showCategorySheet(BuildContext context, Category category) {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (category.isNew)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 6),
-                            child: Text(
-                              lang.t('تحدي جديد', 'Ta7addy gdeed'),
-                              style: AppText.sans(
-                                12,
-                                weight: FontWeight.w700,
-                                color: AppColors.gold,
-                              ),
-                            ),
-                          ),
                         Text(
-                          lang.t(category.name, category.nameEn),
+                          category.name,
                           style: AppText.display(28, height: 1.15),
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          lang.t(category.help, category.helpEn),
-                          style: AppText.sans(
-                            14,
-                            height: 1.6,
-                            color: AppColors.ivory.withValues(alpha: 0.75),
+                        if (category.description case final about?) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            about,
+                            style: AppText.sans(
+                              14,
+                              height: 1.6,
+                              color: AppColors.ivory.withValues(alpha: 0.75),
+                            ),
                           ),
-                        ),
+                        ],
                         const SizedBox(height: 10),
                         Text(
-                          lang.t(
-                            '٦ أسئلة، من ٢٠٠ لـ٦٠٠ نقطة',
-                            '6 as2ela, men 200 le 600 no2ta',
-                          ),
+                          category.playable
+                              ? lang.t(
+                                  '${_packs(lang, category.publishedPackCount)}، '
+                                      'كل باقة ٦ أسئلة من ٢٠٠ لـ٦٠٠ نقطة',
+                                  '${category.publishedPackCount} ba2a, kol '
+                                      'ba2a 6 as2ela men 200 le 600 no2ta',
+                                )
+                              : lang.t(
+                                  'لسه مفيش باقات جاهزة في الفئة دي.',
+                                  'Lessa mafeesh ba2at gahza fel fe2a di.',
+                                ),
                           style: AppText.sans(
                             12,
                             weight: FontWeight.w600,
@@ -214,10 +225,12 @@ Future<void> showCategorySheet(BuildContext context, Category category) {
               const SizedBox(height: 20),
               PlayButton(
                 height: 58,
-                onPressed: isPlayable(category.id)
+                // Until games run through the server, setup picks from
+                // the offline categories, so this one isn't preselected.
+                onPressed: category.playable
                     ? () {
                         Navigator.of(sheetContext).pop();
-                        openSetup(navigator.context, categoryId: category.id);
+                        openSetup(navigator.context);
                       }
                     : null,
                 child: Row(
@@ -226,8 +239,8 @@ Future<void> showCategorySheet(BuildContext context, Category category) {
                     const Icon(Icons.play_arrow_rounded, size: 24),
                     const SizedBox(width: 10),
                     Text(
-                      isPlayable(category.id)
-                          ? lang.t('العب بالفئة دي', 'El3ab bel fe2a di')
+                      category.playable
+                          ? lang.t('ابدأ لعبة', 'Ebda2 le3ba')
                           : lang.t('قريبًا', '2orayeban'),
                       // No colour: the button dims the label when disabled.
                       style: const TextStyle(
@@ -245,4 +258,63 @@ Future<void> showCategorySheet(BuildContext context, Category category) {
       );
     },
   );
+}
+
+/// "باقة" after an Arabic count: plural from 3 to 10.
+String _packs(LangController lang, int n) =>
+    '${lang.toAr(n)} ${n >= 3 && n <= 10 ? 'باقات' : 'باقة'}';
+
+/// What a catalogue page shows before its categories are in: a quiet
+/// "loading", or the real reason it failed with a way to try again.
+class CatalogStatusView extends StatelessWidget {
+  const CatalogStatusView({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final lang = context.lang;
+    final catalog = context.catalog;
+    final error = catalog.error;
+    final color = context.onPaper ? AppColors.ink : AppColors.ivory;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (error == null) ...[
+              SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(strokeWidth: 3, color: color),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                lang.t('بنجيب الفئات…', 'Bengeeb el fe2at…'),
+                style: AppText.sans(16, weight: FontWeight.w600, color: color),
+              ),
+            ] else ...[
+              Text(
+                error.message(lang),
+                textAlign: TextAlign.center,
+                style: AppText.sans(16, weight: FontWeight.w600, color: color),
+              ),
+              const SizedBox(height: 16),
+              PlayButton(
+                height: 48,
+                onPressed: catalog.retry,
+                child: Text(
+                  lang.t('جرّب تاني', 'Garrab tany'),
+                  style: const TextStyle(
+                    fontFamily: AppFonts.sans,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 }

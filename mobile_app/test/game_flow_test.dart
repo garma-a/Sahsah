@@ -10,6 +10,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'sound_test.dart' show FakeSound;
 
+import 'support/fake_api.dart';
+
 Future<void> settle(WidgetTester tester) async {
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 700));
@@ -53,6 +55,7 @@ void main() {
     final sounds = FakeSound();
     await tester.pumpWidget(
       SahsahApp(
+        api: fakeApi(),
         lang: LangController(Lang.ar),
         game: game,
         sound: SoundController(backend: sounds),

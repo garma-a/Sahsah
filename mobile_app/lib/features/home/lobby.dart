@@ -141,7 +141,7 @@ class _Stage extends StatelessWidget {
           // Inside the sheet's 4px outline.
           borderRadius: BorderRadius.circular(22),
           child: PromoCarousel(
-            promos: homePromos(context.lang),
+            promos: homePromos(context.lang, context.catalog),
             onAction: (promo) => runPromo(context, promo),
           ),
         ),

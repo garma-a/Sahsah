@@ -10,6 +10,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'game_flow_test.dart' show settle;
 import 'sound_test.dart' show FakeSound;
 
+import 'support/fake_api.dart';
+
 /// Presses a control the way TalkBack or VoiceOver does: by its spoken
 /// label, through the semantics tree, never by touching the screen. A
 /// control a screen reader can read but not press fails here.
@@ -42,6 +44,7 @@ void main() {
     final lang = LangController(Lang.ar);
     await tester.pumpWidget(
       SahsahApp(
+        api: fakeApi(),
         lang: lang,
         game: GameController(),
         sound: SoundController(backend: FakeSound()),
@@ -91,6 +94,7 @@ void main() {
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
       SahsahApp(
+        api: fakeApi(),
         lang: LangController(Lang.ar),
         game: GameController(),
         sound: SoundController(backend: FakeSound()),

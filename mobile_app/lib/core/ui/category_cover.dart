@@ -61,7 +61,8 @@ class CategoryCover extends StatelessWidget {
     this.footInset = 0,
   });
 
-  final String image;
+  /// The cover picture; null draws the warm fallback (no cover yet).
+  final ImageProvider<Object>? image;
   final String name;
 
   /// Tone index (see [coverAccents]): the title's offset shadow.
@@ -98,18 +99,14 @@ class CategoryCover extends StatelessWidget {
             fit: StackFit.expand,
             children: [
               const ColoredBox(color: AppColors.card),
-              CoverAsset(
-                image,
-                alignment: const Alignment(0, -0.3),
-                errorBuilder: (_, _, _) => const DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: RadialGradient(
-                      center: Alignment(0, -0.4),
-                      colors: [Color(0xFF7A2E22), AppColors.card],
-                    ),
-                  ),
-                ),
-              ),
+              if (image case final image?)
+                CoverPicture(
+                  image,
+                  alignment: const Alignment(0, -0.3),
+                  errorBuilder: (_, _, _) => const _NoCover(),
+                )
+              else
+                const _NoCover(),
               // The foot darkened for the title (the head, when compact).
               if (showName)
                 DecoratedBox(
@@ -215,6 +212,21 @@ class CategoryCover extends StatelessWidget {
       },
     );
   }
+}
+
+/// What a cover shows without its picture (none yet, or it didn't load).
+class _NoCover extends StatelessWidget {
+  const _NoCover();
+
+  @override
+  Widget build(BuildContext context) => const DecoratedBox(
+    decoration: BoxDecoration(
+      gradient: RadialGradient(
+        center: Alignment(0, -0.4),
+        colors: [Color(0xFF7A2E22), AppColors.card],
+      ),
+    ),
+  );
 }
 
 /// The round sticker on a poster's corner (`components/home/poster.tsx`):

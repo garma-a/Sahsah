@@ -864,7 +864,7 @@ class _CategoryCard extends StatelessWidget {
                       ])
                     : const ColorFilter.mode(Colors.transparent, BlendMode.dst),
                 child: CategoryCover(
-                  image: BrandImages.category(categoryId),
+                  image: AssetImage(BrandImages.category(categoryId)),
                   name: name,
                   tone: slot,
                   footInset: 12,

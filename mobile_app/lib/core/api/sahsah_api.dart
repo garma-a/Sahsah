@@ -1,9 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:http/http.dart' as http;
 
 import '../config/app_config.dart';
+import '../i18n/lang.dart';
+import 'problems.dart';
+import 'wire.dart';
 
 /// Body of `GET /api/health`, matching the web frontend's `HealthResponse`.
 class HealthResponse {
@@ -22,22 +26,76 @@ class HealthResponse {
   bool get isOk => status == 'ok';
 }
 
-class ApiException implements Exception {
-  const ApiException(this.message, {this.statusCode});
+/// Who a request speaks for (the website's `Auth`).
+sealed class Auth {
+  const Auth();
 
-  final String message;
-  final int? statusCode;
-
-  @override
-  String toString() => 'ApiException($statusCode): $message';
+  /// The `Authorization` header's value, if any.
+  String? get bearer;
 }
 
-/// HTTP client for the Sahsah NestJS backend shared with the web app.
+/// Public reads: the catalogue, an invitation's preview.
+class NoAuth extends Auth {
+  const NoAuth();
+
+  @override
+  String? get bearer => null;
+}
+
+/// A signed-in host (the preview credential, until real accounts exist).
+class AccountAuth extends Auth {
+  const AccountAuth(this.credential);
+
+  final String credential;
+
+  @override
+  String get bearer => 'Bearer $credential';
+}
+
+/// Something went wrong talking to the API. [code] is the problem's stable
+/// code (RFC 9457), or `NETWORK` / `TIMEOUT` / `UNKNOWN` from this side.
+class ApiError implements Exception {
+  const ApiError(this.status, this.code, {this.body, this.retryAfter});
+
+  /// 0 when no response came back.
+  final int status;
+  final String code;
+  final Map<String, dynamic>? body;
+
+  /// Seconds, from `Retry-After`.
+  final int? retryAfter;
+
+  /// The player-facing text, in the app's language.
+  String message(LangController lang) => problemMessage(lang, code, status);
+
+  /// The saved sign-in was refused: sign in again.
+  bool get identityRejected => isIdentityRejected(code);
+
+  /// 409: the room moved on; take the current state before retrying.
+  bool get conflict => status == 409;
+
+  @override
+  String toString() => 'ApiError($status, $code)';
+}
+
+/// A fresh `Idempotency-Key`: a random UUID v4. The caller keeps one per
+/// intent, so a retry after a lost response is the same operation.
+String newOperationId([Random? random]) {
+  final r = random ?? Random.secure();
+  final b = List<int>.generate(16, (_) => r.nextInt(256));
+  b[6] = (b[6] & 0x0f) | 0x40;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  final h = [for (final x in b) x.toRadixString(16).padLeft(2, '0')].join();
+  return '${h.substring(0, 8)}-${h.substring(8, 12)}-${h.substring(12, 16)}-'
+      '${h.substring(16, 20)}-${h.substring(20)}';
+}
+
+/// HTTP client for the Sahsah NestJS API, the one the website uses.
 class SahsahApi {
   SahsahApi({
     http.Client? client,
     String? baseUrl,
-    this.timeout = const Duration(seconds: 5),
+    this.timeout = const Duration(seconds: 15),
   }) : _client = client ?? http.Client(),
        _baseUrl = (baseUrl ?? AppConfig.apiBaseUrl).replaceFirst(
          RegExp(r'/+$'),
@@ -50,50 +108,125 @@ class SahsahApi {
 
   String get baseUrl => _baseUrl;
 
-  Future<HealthResponse> getHealth() async {
-    final json = await _getJson('/health');
-    return HealthResponse.fromJson(json);
+  Future<HealthResponse> getHealth() async =>
+      _read(await _request('GET', '/health'), HealthResponse.fromJson);
+
+  // ---- Catalogue ---------------------------------------------------------
+
+  /// Every published category, following the pages (at most 500).
+  Future<List<Category>> listCategories(ContentLanguage language) async {
+    final items = <Category>[];
+    String? cursor;
+    do {
+      final page = _read(
+        await _request(
+          'GET',
+          '/v1/categories',
+          query: {'language': language.name, 'limit': '50', 'cursor': ?cursor},
+        ),
+        (j) => Page.fromJson(j, Category.fromJson),
+      );
+      items.addAll(page.items);
+      cursor = page.nextCursor;
+    } while (cursor != null && items.length < 500);
+    return items;
   }
 
-  Future<Map<String, dynamic>> _getJson(String path) async {
+  // ---- Sign-in -----------------------------------------------------------
+
+  /// Signs this device in as a preview host with the shared [passcode], or
+  /// renews the [credential] it already holds (ADR 0017).
+  Future<PreviewSession> previewSession({
+    String? passcode,
+    String? credential,
+    required String displayName,
+  }) async => _read(
+    await _request(
+      'POST',
+      '/v1/preview/sessions',
+      body: {
+        'passcode': ?passcode,
+        'credential': ?credential,
+        'displayName': displayName,
+      },
+    ),
+    PreviewSession.fromJson,
+  );
+
+  // ---- Transport ---------------------------------------------------------
+
+  /// A response body that isn't the shape the contract promises is the
+  /// server's fault, reported like any other problem rather than a crash.
+  T _read<T>(
+    Map<String, dynamic> json,
+    T Function(Map<String, dynamic>) parse,
+  ) {
+    try {
+      return parse(json);
+    } on TypeError {
+      throw const ApiError(200, 'INVALID_RESPONSE');
+    } on FormatException {
+      throw const ApiError(200, 'INVALID_RESPONSE');
+    }
+  }
+
+  Future<Map<String, dynamic>> _request(
+    String method,
+    String path, {
+    Auth auth = const NoAuth(),
+    Object? body,
+    String? operationId,
+    Map<String, String>? query,
+  }) async {
+    final uri = Uri.parse(
+      '$_baseUrl$path',
+    ).replace(queryParameters: query == null || query.isEmpty ? null : query);
+    final request = http.Request(method, uri)
+      ..headers['Accept'] = 'application/json, application/problem+json';
+    if (auth.bearer case final bearer?) {
+      request.headers['Authorization'] = bearer;
+    }
+    if (operationId != null) request.headers['Idempotency-Key'] = operationId;
+    if (body != null) {
+      request.headers['Content-Type'] = 'application/json';
+      request.body = jsonEncode(body);
+    }
+
     final http.Response response;
     try {
-      response = await _client
-          .get(
-            Uri.parse('$_baseUrl$path'),
-            headers: const {'Accept': 'application/json'},
-          )
-          .timeout(timeout);
+      response = await http.Response.fromStream(
+        await _client.send(request).timeout(timeout),
+      ).timeout(timeout);
     } on TimeoutException {
-      throw const ApiException('Request timed out');
-    } on http.ClientException catch (error) {
-      throw ApiException(error.message);
+      throw const ApiError(0, 'TIMEOUT');
+    } on http.ClientException {
+      throw const ApiError(0, 'NETWORK');
+    } on Exception {
+      // Sockets, TLS and DNS failures all mean "can't reach the server".
+      throw const ApiError(0, 'NETWORK');
     }
+
+    // Decode as UTF-8 explicitly; the server may omit the charset.
+    Object? decoded;
+    try {
+      decoded = response.bodyBytes.isEmpty
+          ? null
+          : jsonDecode(utf8.decode(response.bodyBytes));
+    } on FormatException {
+      decoded = null;
+    }
+    final json = decoded is Map<String, dynamic> ? decoded : null;
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw ApiException(
-        'Request to $path failed',
-        statusCode: response.statusCode,
+      throw ApiError(
+        response.statusCode,
+        json?['code'] as String? ?? 'UNKNOWN',
+        body: json,
+        retryAfter: int.tryParse(response.headers['retry-after'] ?? ''),
       );
     }
-
-    // Decode as UTF-8 explicitly; the backend may omit the charset.
-    final Object? body;
-    try {
-      body = jsonDecode(utf8.decode(response.bodyBytes));
-    } on FormatException {
-      throw ApiException(
-        'Invalid JSON from $path',
-        statusCode: response.statusCode,
-      );
-    }
-    if (body is! Map<String, dynamic>) {
-      throw ApiException(
-        'Unexpected response from $path',
-        statusCode: response.statusCode,
-      );
-    }
-    return body;
+    if (json == null) throw ApiError(response.statusCode, 'INVALID_RESPONSE');
+    return json;
   }
 
   void close() => _client.close();
