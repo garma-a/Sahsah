@@ -508,7 +508,15 @@ class FakeServer {
         throw const _Problem(400, 'INVALID_INPUT');
     }
     room.gameVersion++;
-    return _receipt(room);
+    // A game command's receipt names the game, not the room's version.
+    return _json({
+      'operationId': 'op-${++_ids}',
+      'roomId': room.id,
+      'gameId': room.gameId,
+      'gameVersion': '${room.gameVersion}',
+      'acceptedAt': DateTime.now().toUtc().toIso8601String(),
+      'effect': 'changed',
+    });
   }
 
   http.Response _media(FakeRoom room, Map<String, dynamic> body) {

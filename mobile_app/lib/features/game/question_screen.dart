@@ -1484,18 +1484,22 @@ class _RevealSlab extends StatelessWidget {
 /// and zoom. It comes from a short-lived link; until the link is in, the
 /// frame waits.
 class _Photo extends StatelessWidget {
-  const _Photo({required this.question, required this.image});
+  const _Photo({required this.question, required this.image, this.aspect});
 
   final Question question;
   final MediaRef image;
+
+  /// Width / height of the frame; the question's kind decides by default.
+  final double? aspect;
 
   @override
   Widget build(BuildContext context) {
     final lang = context.lang;
     final provider = context.game.image(image);
+    final frame = aspect ?? _photoAspect(question);
     if (provider == null) {
       return _Framed(
-        aspect: _photoAspect(question),
+        aspect: frame,
         child: const Center(
           child: SizedBox(
             width: 28,
@@ -1515,7 +1519,7 @@ class _Photo extends StatelessWidget {
           : (question.isPictureRound ? BoxFit.contain : BoxFit.cover),
     );
     return _Framed(
-      aspect: _photoAspect(question),
+      aspect: frame,
       child: Semantics(
         button: true,
         label: lang.t('كبّر الصورة', 'Kabbar el soora'),
@@ -1550,7 +1554,9 @@ class _Photo extends StatelessWidget {
   }
 }
 
-/// A clue round: the picture, with the latest clue card beside it.
+/// A clue round: the picture, with the latest clue card under it. Clue
+/// cards are wide, so theirs is a wide frame with as much room as the
+/// picture.
 class _WithClue extends StatelessWidget {
   const _WithClue({required this.question});
 
@@ -1562,13 +1568,15 @@ class _WithClue extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Expanded(
-          flex: 3,
           child: _Photo(question: question, image: question.image!),
         ),
         const SizedBox(height: 8),
         Expanded(
-          flex: 2,
-          child: _Photo(question: question, image: question.clue!),
+          child: _Photo(
+            question: question,
+            image: question.clue!,
+            aspect: 16 / 10,
+          ),
         ),
       ],
     );

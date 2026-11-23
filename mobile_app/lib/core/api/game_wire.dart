@@ -33,7 +33,7 @@ class Pack {
 class Receipt {
   const Receipt({
     required this.roomId,
-    required this.roomVersion,
+    this.roomVersion,
     this.gameId,
     this.gameVersion,
     this.controllerGeneration,
@@ -41,14 +41,16 @@ class Receipt {
 
   factory Receipt.fromJson(Json j) => Receipt(
     roomId: j['roomId'] as String,
-    roomVersion: j['roomVersion'] as String,
+    roomVersion: j['roomVersion'] as String?,
     gameId: j['gameId'] as String?,
     gameVersion: j['gameVersion'] as String?,
     controllerGeneration: j['controllerGeneration'] as String?,
   );
 
   final String roomId;
-  final String roomVersion;
+
+  /// Absent from game commands' receipts.
+  final String? roomVersion;
   final String? gameId;
   final String? gameVersion;
   final String? controllerGeneration;
