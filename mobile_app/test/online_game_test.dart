@@ -89,8 +89,13 @@ void main() {
     await press(tester, RegExp('^سؤال ٥،'));
 
     final qr = tester.widget<QrImageView>(find.byType(QrImageView));
-    expect(qr, isNotNull);
-    expect(find.text('للممثل بس'), findsOneWidget);
+    expect(qr.errorCorrectionLevel, QrErrorCorrectLevel.M);
+    // Big enough to read from across the table on a landscape phone, with
+    // a white margin all round.
+    final card = tester.getSize(find.byKey(const ValueKey('card-qr')));
+    final code = tester.getSize(find.byType(QrImageView));
+    expect(card.width, greaterThanOrEqualTo(220));
+    expect(code.width, lessThan(card.width * 0.85));
 
     // Ready starts a fresh minute on the server.
     await press(tester, 'جاهز');

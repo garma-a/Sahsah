@@ -497,7 +497,7 @@ class _QuestionView extends StatelessWidget {
 
     // The picture, when the question has one.
     final Widget? media = switch (q.kind) {
-      QuestionKind.acting => null,
+      QuestionKind.acting => actingRules ? _CardQr(url: q.cardUrl) : null,
       QuestionKind.audio => _ClipCard(clip: q.audio, hint: q.hint),
       QuestionKind.memory => _MemoryMedia(
         question: q,
@@ -627,8 +627,6 @@ class _QuestionView extends StatelessWidget {
           Expanded(
             child: q.kind != QuestionKind.acting
                 ? Center(child: prompt)
-                : actingRules
-                ? _ActingRules(cardUrl: q.cardUrl)
                 : _ActingLive(prompt: prompt),
           ),
           const SizedBox(height: 12),
@@ -637,9 +635,9 @@ class _QuestionView extends StatelessWidget {
       );
     }
     return _MediaLayout(
-      aspect: _photoAspect(q),
+      aspect: actingRules ? _CardQr.aspect : _photoAspect(q),
       media: media,
-      top: Center(child: prompt),
+      top: actingRules ? const _ActingRules() : Center(child: prompt),
       bottom: bottom,
     );
   }
@@ -926,12 +924,10 @@ class _TimerBar extends StatelessWidget {
 
 // ---- 6B acting -------------------------------------------------------------
 
-/// Before Ready: the rules and the code the actor scans (template 6B). The
-/// card opens on the actor's phone only (ADR 0019).
+/// Before Ready: the three rules beside the code the actor scans
+/// (template 6B). The card opens on the actor's phone only (ADR 0019).
 class _ActingRules extends StatelessWidget {
-  const _ActingRules({required this.cardUrl});
-
-  final String? cardUrl;
+  const _ActingRules();
 
   @override
   Widget build(BuildContext context) {
@@ -947,104 +943,93 @@ class _ActingRules extends StatelessWidget {
       ),
       lang.t('اضغطوا جاهز والوقت يبدأ', 'Edghato gahez wel wa2t yebda2'),
     ];
-    return Column(
-      children: [
-        Text(
-          lang.t(
-            'اقروا القوانين صح… وبعدها اضغطوا جاهز',
-            'E2ro el 2awaneen sa7… w ba3daha edghato gahez',
-          ),
-          textAlign: TextAlign.center,
-          style: AppText.display(24, height: 1.3),
-        ),
-        const SizedBox(height: 10),
-        Expanded(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _CardQr(url: cardUrl),
-              const SizedBox(width: 14),
-              Expanded(
-                // The three rules keep the full width and shrink together
-                // when the card is short (a phone's), rather than spill
-                // under the buttons.
-                child: LayoutBuilder(
-                  builder: (context, box) => Center(
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: SizedBox(
-                        width: box.maxWidth,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            for (final (i, rule) in rules.indexed) ...[
-                              if (i > 0) const SizedBox(height: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(999),
-                                  border: Border.all(
-                                    color: AppColors.ink,
-                                    width: 2,
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 26,
-                                      height: 26,
-                                      alignment: Alignment.center,
-                                      decoration: const BoxDecoration(
-                                        color: AppColors.orange,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: Text(
-                                        lang.toAr(i + 1),
-                                        style: AppText.num(
-                                          13,
-                                          color: AppColors.ink,
-                                          height: 1,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Text(
-                                        rule,
-                                        style: AppText.sans(
-                                          14,
-                                          weight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ],
+    // The title and the rules shrink together when the card is short (a
+    // phone's), rather than spill under the buttons.
+    return LayoutBuilder(
+      builder: (context, box) => Center(
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: SizedBox(
+            width: box.maxWidth,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  lang.t(
+                    'اقروا القوانين صح… وبعدها اضغطوا جاهز',
+                    'E2ro el 2awaneen sa7… w ba3daha edghato gahez',
+                  ),
+                  style: AppText.display(24, height: 1.3),
+                ),
+                const SizedBox(height: 14),
+                for (final (i, rule) in rules.indexed) ...[
+                  if (i > 0) const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 7,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: AppColors.ink, width: 2),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 26,
+                          height: 26,
+                          alignment: Alignment.center,
+                          decoration: const BoxDecoration(
+                            color: AppColors.orange,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Text(
+                            lang.toAr(i + 1),
+                            style: AppText.num(
+                              13,
+                              color: AppColors.ink,
+                              height: 1,
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            rule,
+                            style: AppText.sans(15, weight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
-              ),
-            ],
+                ],
+              ],
+            ),
           ),
         ),
-      ],
+      ),
     );
   }
 }
 
-/// The charades card's address as a QR code, for the actor's phone.
+/// The charades card's address as a QR code the actor's phone can read
+/// from across the table: the card's full height, dark ink on white, a
+/// quiet margin of four modules all round (scanners need it), and medium
+/// error correction against glare. No caption: the rules beside it say
+/// who scans it, and every pixel of height goes to the code.
 class _CardQr extends StatelessWidget {
   const _CardQr({required this.url});
 
   final String? url;
+
+  /// Square: the rules beside it say who scans it.
+  static const aspect = 1.0;
+
+  /// The white margin as a share of the code's side: four modules of a
+  /// version 6–8 code (41–49 modules), the size a card link comes to.
+  static const _quiet = 0.085;
 
   @override
   Widget build(BuildContext context) {
@@ -1056,49 +1041,43 @@ class _CardQr extends StatelessWidget {
         'Code el momasel: emsa7o men mobailo',
       ),
       excludeSemantics: true,
-      child: Container(
-        width: 170,
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: AppColors.paperShade,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppColors.ink, width: 2.5),
-        ),
-        child: Column(
-          children: [
-            Expanded(
-              child: AspectRatio(
-                aspectRatio: 1,
-                child: Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: link == null
-                      ? const Icon(LucideIcons.qrCode, color: AppColors.ink)
-                      : QrImageView(
-                          data: link,
-                          padding: EdgeInsets.zero,
-                          eyeStyle: const QrEyeStyle(
-                            eyeShape: QrEyeShape.square,
-                            color: AppColors.ink,
-                          ),
-                          dataModuleStyle: const QrDataModuleStyle(
-                            dataModuleShape: QrDataModuleShape.square,
-                            color: AppColors.ink,
-                          ),
-                        ),
-                ),
+      child: Center(
+        child: AspectRatio(
+          aspectRatio: 1,
+          child: LayoutBuilder(
+            builder: (context, box) => Container(
+              key: const ValueKey('card-qr'),
+              padding: EdgeInsets.all(box.maxWidth * _quiet),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.ink, width: 3),
+                boxShadow: [inkDrop(5)],
               ),
+              child: link == null
+                  ? const Center(
+                      child: Icon(
+                        LucideIcons.qrCode,
+                        size: 40,
+                        color: AppColors.inkMuted,
+                      ),
+                    )
+                  : QrImageView(
+                      data: link,
+                      padding: EdgeInsets.zero,
+                      backgroundColor: Colors.white,
+                      errorCorrectionLevel: QrErrorCorrectLevel.M,
+                      eyeStyle: const QrEyeStyle(
+                        eyeShape: QrEyeShape.square,
+                        color: AppColors.ink,
+                      ),
+                      dataModuleStyle: const QrDataModuleStyle(
+                        dataModuleShape: QrDataModuleShape.square,
+                        color: AppColors.ink,
+                      ),
+                    ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              lang.t('للممثل بس', 'Lel momasel bas'),
-              maxLines: 1,
-              style: AppText.sans(13, weight: FontWeight.w700),
-            ),
-          ],
+          ),
         ),
       ),
     );
