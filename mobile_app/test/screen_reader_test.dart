@@ -85,6 +85,8 @@ void main() {
     expect(find.text('٦ من ٦ فئات'), findsOneWidget);
     await press(tester, 'التالي');
     await press(tester, 'ابدأ اللعبة');
+    // The lobby: no players joined, so the game starts at once.
+    await press(tester, 'ابدأ اللعبة');
 
     // Board → a category → a question.
     await press(tester, RegExp('باقي ٦ أسئلة'));

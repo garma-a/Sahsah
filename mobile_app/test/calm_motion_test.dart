@@ -71,6 +71,8 @@ void main() {
     await tapNow(tester, 'التالي');
     still('سمّوا الفريقين');
     await tapNow(tester, 'ابدأ اللعبة');
+    still('غرفة اللعب');
+    await tapNow(tester, 'ابدأ اللعبة');
     await tapNow(tester, RegExp('^نوستالجيا التسعينات، باقي'));
     still('اختاروا سؤال');
     await tapNow(tester, RegExp('^سؤال ١،'));

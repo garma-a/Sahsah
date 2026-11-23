@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:lucide_icons_flutter/lucide_icons_600.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../core/api/game_wire.dart' show MediaRef;
 import '../../core/audio/sound.dart';
@@ -15,6 +14,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/ui/game_button.dart';
 import '../../core/ui/play_button.dart';
 import '../../core/ui/pressable.dart';
+import '../../core/ui/scan_code.dart';
 import '../../core/ui/surfaces.dart';
 import 'board_screen.dart' show TeamScore;
 import 'game_controller.dart';
@@ -263,54 +263,57 @@ class _QuestionScreenState extends State<QuestionScreen> {
     final timer = _TimerBar(questionId: id, disabled: timerOff);
     Widget score(int team) => TeamScore(game: game, team: team, compact: true);
 
+    final page = GameScaffold(
+      tv: true,
+      child: LayoutBuilder(
+        builder: (context, box) {
+          final landscape = box.maxWidth > box.maxHeight * 1.1;
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // One slim strip: a score at each corner and the clock
+                // between them, where the whole table can see it. The
+                // card below gets the full width.
+                if (landscape)
+                  Row(
+                    children: [
+                      Expanded(flex: 3, child: score(0)),
+                      const SizedBox(width: 12),
+                      Expanded(flex: 5, child: timer),
+                      const SizedBox(width: 12),
+                      Expanded(flex: 3, child: score(1)),
+                    ],
+                  )
+                else ...[
+                  Row(
+                    children: [
+                      Expanded(child: score(0)),
+                      const SizedBox(width: 8),
+                      Expanded(child: score(1)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  timer,
+                ],
+                const SizedBox(height: 22),
+                Expanded(child: card),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+    // A player's room screen handles back itself.
+    if (controller.isGuest) return page;
     // Back (button or gesture) asks who took the points first.
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _leave();
       },
-      child: GameScaffold(
-        tv: true,
-        child: LayoutBuilder(
-          builder: (context, box) {
-            final landscape = box.maxWidth > box.maxHeight * 1.1;
-            return Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // One slim strip: a score at each corner and the clock
-                  // between them, where the whole table can see it. The
-                  // card below gets the full width.
-                  if (landscape)
-                    Row(
-                      children: [
-                        Expanded(flex: 3, child: score(0)),
-                        const SizedBox(width: 12),
-                        Expanded(flex: 5, child: timer),
-                        const SizedBox(width: 12),
-                        Expanded(flex: 3, child: score(1)),
-                      ],
-                    )
-                  else ...[
-                    Row(
-                      children: [
-                        Expanded(child: score(0)),
-                        const SizedBox(width: 8),
-                        Expanded(child: score(1)),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    timer,
-                  ],
-                  const SizedBox(height: 22),
-                  Expanded(child: card),
-                ],
-              ),
-            );
-          },
-        ),
-      ),
+      child: page,
     );
   }
 }
@@ -497,7 +500,17 @@ class _QuestionView extends StatelessWidget {
 
     // The picture, when the question has one.
     final Widget? media = switch (q.kind) {
-      QuestionKind.acting => actingRules ? _CardQr(url: q.cardUrl) : null,
+      QuestionKind.acting =>
+        actingRules
+            ? ScanCode(
+                data: q.cardUrl,
+                codeKey: const ValueKey('card-qr'),
+                semanticLabel: lang.t(
+                  'كود الممثل: امسحه من موبايله',
+                  'Code el momasel: emsa7o men mobailo',
+                ),
+              )
+            : null,
       QuestionKind.audio => _ClipCard(clip: q.audio, hint: q.hint),
       QuestionKind.memory => _MemoryMedia(
         question: q,
@@ -616,7 +629,17 @@ class _QuestionView extends StatelessWidget {
           _StageLadder(stages: q.pointStages, stage: p.stage),
           const SizedBox(height: 12),
         ],
-        actions,
+        // A player watches; the host's phone runs the question.
+        if (game.isGuest)
+          _Hint(
+            icon: LucideIcons600.tv,
+            label: lang.t(
+              'المضيف بيدير السؤال من موبايله',
+              'El host beyedeer el so2al men mobailo',
+            ),
+          )
+        else
+          actions,
       ],
     );
 
@@ -635,7 +658,7 @@ class _QuestionView extends StatelessWidget {
       );
     }
     return _MediaLayout(
-      aspect: actingRules ? _CardQr.aspect : _photoAspect(q),
+      aspect: actingRules ? 1 : _photoAspect(q),
       media: media,
       top: actingRules ? const _ActingRules() : Center(child: prompt),
       bottom: bottom,
@@ -1014,76 +1037,6 @@ class _ActingRules extends StatelessWidget {
   }
 }
 
-/// The charades card's address as a QR code the actor's phone can read
-/// from across the table: the card's full height, dark ink on white, a
-/// quiet margin of four modules all round (scanners need it), and medium
-/// error correction against glare. No caption: the rules beside it say
-/// who scans it, and every pixel of height goes to the code.
-class _CardQr extends StatelessWidget {
-  const _CardQr({required this.url});
-
-  final String? url;
-
-  /// Square: the rules beside it say who scans it.
-  static const aspect = 1.0;
-
-  /// The white margin as a share of the code's side: four modules of a
-  /// version 6–8 code (41–49 modules), the size a card link comes to.
-  static const _quiet = 0.085;
-
-  @override
-  Widget build(BuildContext context) {
-    final lang = context.lang;
-    final link = url;
-    return Semantics(
-      label: lang.t(
-        'كود الممثل: امسحه من موبايله',
-        'Code el momasel: emsa7o men mobailo',
-      ),
-      excludeSemantics: true,
-      child: Center(
-        child: AspectRatio(
-          aspectRatio: 1,
-          child: LayoutBuilder(
-            builder: (context, box) => Container(
-              key: const ValueKey('card-qr'),
-              padding: EdgeInsets.all(box.maxWidth * _quiet),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.ink, width: 3),
-                boxShadow: [inkDrop(5)],
-              ),
-              child: link == null
-                  ? const Center(
-                      child: Icon(
-                        LucideIcons.qrCode,
-                        size: 40,
-                        color: AppColors.inkMuted,
-                      ),
-                    )
-                  : QrImageView(
-                      data: link,
-                      padding: EdgeInsets.zero,
-                      backgroundColor: Colors.white,
-                      errorCorrectionLevel: QrErrorCorrectLevel.M,
-                      eyeStyle: const QrEyeStyle(
-                        eyeShape: QrEyeShape.square,
-                        color: AppColors.ink,
-                      ),
-                      dataModuleStyle: const QrDataModuleStyle(
-                        dataModuleShape: QrDataModuleShape.square,
-                        color: AppColors.ink,
-                      ),
-                    ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 /// After Ready: what kind of thing is being acted, not the answer.
 class _ActingLive extends StatelessWidget {
   const _ActingLive({required this.prompt});
@@ -1387,13 +1340,23 @@ class _AnswerView extends StatelessWidget {
             label: lang.t('اسمع المقطع صح', 'Esma3 el ma2ta3 sa7'),
           )
         : null;
+    // A player sees the answer; the host says who took it.
+    final Widget foot = context.game.isGuest
+        ? _Hint(
+            icon: LucideIcons600.trophy,
+            label: lang.t(
+              'المضيف هيقول مين جاوب صح',
+              'El host hay2ool meen gaweb sa7',
+            ),
+          )
+        : award;
     if (media == null) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(child: answer),
           const SizedBox(height: 10),
-          award,
+          foot,
         ],
       );
     }
@@ -1401,7 +1364,7 @@ class _AnswerView extends StatelessWidget {
       aspect: _photoAspect(q),
       media: media,
       top: answer,
-      bottom: award,
+      bottom: foot,
     );
   }
 }
@@ -1858,11 +1821,13 @@ class _MemoryMedia extends StatelessWidget {
                   aspect: _photoAspect(question),
                   child: _MemoryPlaceholder(
                     ready: phase == MemoryPhase.ready,
-                    onShow: () => game.showMemory(questionId),
+                    onShow: game.isGuest
+                        ? null
+                        : () => game.showMemory(questionId),
                   ),
                 ),
         ),
-        if (phase != MemoryPhase.ready) ...[
+        if (phase != MemoryPhase.ready && !game.isGuest) ...[
           const SizedBox(height: 8),
           viewing
               ? GoldButton(
@@ -1891,7 +1856,9 @@ class _MemoryPlaceholder extends StatelessWidget {
   const _MemoryPlaceholder({required this.ready, required this.onShow});
 
   final bool ready;
-  final VoidCallback onShow;
+
+  /// Null on a player's phone: only the host shows the picture.
+  final VoidCallback? onShow;
 
   @override
   Widget build(BuildContext context) {
@@ -1915,7 +1882,7 @@ class _MemoryPlaceholder extends StatelessWidget {
               textAlign: TextAlign.center,
               style: AppText.display(22, height: 1.2),
             ),
-            if (ready) ...[
+            if (ready && onShow != null) ...[
               const SizedBox(height: 10),
               PlayButton(
                 height: 48,

@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:sahsah_mobile/core/api/room_channel.dart';
 import 'package:sahsah_mobile/core/api/sahsah_api.dart';
 import 'package:sahsah_mobile/core/session/host_session.dart';
 import 'package:sahsah_mobile/features/game/game_controller.dart';
@@ -125,6 +127,25 @@ class _Question {
   }
 }
 
+/// A player who joined a room with its code.
+class FakePlayer {
+  FakePlayer({
+    required this.id,
+    required this.secret,
+    required this.name,
+    required this.team,
+  });
+
+  final String id;
+  final String secret;
+  final String name;
+
+  /// 1 or 2.
+  int team;
+  bool ready = false;
+  int version = 1;
+}
+
 class FakeRoom {
   FakeRoom({
     required this.id,
@@ -132,6 +153,7 @@ class FakeRoom {
     required this.secret,
     required this.teams,
     required this.selections,
+    required this.code,
   });
 
   final String id;
@@ -142,6 +164,22 @@ class FakeRoom {
   final List<Map<String, dynamic>> selections;
   int version = 1;
   bool closed = false;
+
+  /// The six-digit invitation code.
+  final String code;
+  final players = <FakePlayer>[];
+  int readyGeneration = 1;
+
+  /// Someone joined, left or moved: everyone confirms ready again.
+  void reshuffle() {
+    readyGeneration++;
+    for (final p in players) {
+      p
+        ..ready = false
+        ..version += 1;
+    }
+    version++;
+  }
 
   // The game, once started.
   String? gameId;
@@ -173,6 +211,7 @@ class FakeServer {
 
   final _credentials = <String, String>{}; // credential → account
   final _rooms = <String, FakeRoom>{};
+  final _sockets = <_FakeSocket>[];
   final _played = <String, Set<String>>{}; // account → pack ids
   int _ids = 0;
 
@@ -185,7 +224,51 @@ class FakeServer {
     if (signedIn && !session.signedIn) {
       await session.signIn(passcode: fakePasscode, displayName: 'المضيف');
     }
-    return GameController(api: api, session: session, prefs: prefs);
+    return GameController(
+      api: api,
+      session: session,
+      prefs: prefs,
+      connect: connect,
+    );
+  }
+
+  /// Another phone: a player's, with nothing saved.
+  GameController guest() =>
+      GameController(api: api, session: HostSession(api), connect: connect);
+
+  /// The live updates socket, in memory.
+  Future<RoomSocket> connect(Uri url) async {
+    final socket = _FakeSocket(this);
+    _sockets.add(socket);
+    return socket;
+  }
+
+  /// Sockets still open.
+  int get openSockets => _sockets.where((s) => !s.isClosed).length;
+
+  /// A player joins [room] from another phone (the website, say).
+  FakePlayer addPlayer(String name, {int team = 1, FakeRoom? room}) {
+    final r = room ?? this.room!;
+    final player = FakePlayer(
+      id: 'member-${++_ids}',
+      secret: 'secret-$_ids',
+      name: name,
+      team: team,
+    );
+    r
+      ..players.add(player)
+      ..reshuffle();
+    _push();
+    return player;
+  }
+
+  /// That player says they're ready.
+  void ready(FakePlayer player) {
+    player
+      ..ready = true
+      ..version += 1;
+    room!.version++;
+    _push();
   }
 
   Future<http.Response> _handle(http.Request request) async {
@@ -202,9 +285,25 @@ class FakeServer {
         ('POST', ['v1', 'preview', 'sessions']) => _session(body),
         ('POST', ['v1', 'rooms']) => _create(request, body),
         ('GET', ['v1', 'rooms', 'current']) => _current(request),
-        ('GET', ['v1', 'rooms', final id]) => _snapshot(_host(request, id)),
+        ('GET', ['v1', 'rooms', final id, 'invitation']) => _invitation(
+          _host(request, id),
+        ),
+        ('GET', ['v1', 'room-invitations', final code]) => _preview(code),
+        ('POST', ['v1', 'room-invitations', final code, 'memberships']) =>
+          _join(code, body),
+        ('PUT', ['v1', 'rooms', final id, 'memberships', 'me', 'readiness']) =>
+          _ready(request, id, body),
+        ('PATCH', ['v1', 'rooms', final id, 'memberships', 'me']) => _team(
+          request,
+          id,
+          body,
+        ),
+        ('POST', ['v1', 'rooms', final id, 'memberships', 'me', 'departure']) =>
+          _depart(request, id),
+        ('GET', ['v1', 'rooms', final id]) => _read(request, id),
         ('POST', ['v1', 'rooms', final id, 'games']) => _start(
           _host(request, id),
+          body,
         ),
         ('POST', ['v1', 'rooms', final id, 'closure']) => _close(
           _host(request, id),
@@ -220,11 +319,14 @@ class FakeServer {
           body,
         ),
         ('POST', ['v1', 'games', final id, 'media-access']) => _media(
-          _game(request, id),
+          _seen(request, id),
           body,
         ),
         _ => throw const _Problem(404, 'NOT_FOUND'),
-      };
+      }..also(() {
+        // Every change reaches the open sockets, like the real outbox.
+        if (request.method != 'GET') _push();
+      });
     } on _Problem catch (p) {
       return _json({'code': p.code, 'status': p.status, ...p.extra}, p.status);
     }
@@ -251,6 +353,46 @@ class FakeServer {
       throw const _Problem(403, 'CONTROLLER_FENCED');
     }
     return room;
+  }
+
+  /// The player behind a `g.<membership>.<secret>` proof, and their room.
+  (FakeRoom, FakePlayer)? _player(String authorization, [String? roomId]) {
+    final m = RegExp(r'^Bearer g\.([^.]+)\.(.+)$').firstMatch(authorization);
+    if (m == null) return null;
+    for (final room in _rooms.values) {
+      if (roomId != null && room.id != roomId) continue;
+      for (final p in room.players) {
+        if (p.id == m[1] && p.secret == m[2]) return (room, p);
+      }
+    }
+    return null;
+  }
+
+  (FakeRoom, FakePlayer) _guest(http.Request request, String roomId) {
+    final found = _player(request.headers['Authorization'] ?? '', roomId);
+    if (found == null) throw const _Problem(401, 'INVALID_PROOF');
+    if (found.$1.closed) throw const _Problem(410, 'ROOM_CLOSED');
+    return found;
+  }
+
+  /// A room's view: the host's, or a player's.
+  http.Response _read(http.Request request, String roomId) {
+    final auth = request.headers['Authorization'] ?? '';
+    if (auth.startsWith('Bearer g.')) {
+      return _json(_snapshotJson(_guest(request, roomId).$1, viewer: true));
+    }
+    return _snapshot(_host(request, roomId));
+  }
+
+  /// The game, read by its host or one of its players.
+  FakeRoom _seen(http.Request request, String gameId) {
+    final room = _rooms.values.firstWhere(
+      (r) => r.gameId == gameId,
+      orElse: () => throw const _Problem(404, 'NOT_FOUND'),
+    );
+    final auth = request.headers['Authorization'] ?? '';
+    if (auth.startsWith('Bearer g.')) return _guest(request, room.id).$1;
+    return _host(request, room.id);
   }
 
   FakeRoom _game(http.Request request, String gameId) {
@@ -322,6 +464,7 @@ class FakeServer {
       secret: body['proposedControlSecret'] as String,
       teams: [body['teamOneName'] as String, body['teamTwoName'] as String],
       selections: (body['selections'] as List).cast<Map<String, dynamic>>(),
+      code: '${100000 + _rooms.length * 7919 % 900000}',
     );
     _rooms[room.id] = room;
     return _receipt(room);
@@ -340,8 +483,113 @@ class FakeServer {
     });
   }
 
-  http.Response _start(FakeRoom room) {
+  http.Response _invitation(FakeRoom room) => _json({
+    'code': room.code,
+    'joinUrl': 'https://sa7sa7.test/join/${room.code}',
+    'issuedAt': DateTime.now().toUtc().toIso8601String(),
+    'expiresAt': DateTime.now()
+        .toUtc()
+        .add(const Duration(hours: 24))
+        .toIso8601String(),
+  });
+
+  FakeRoom _byCode(String code) {
+    if (!RegExp(r'^[0-9]{6}$').hasMatch(code)) {
+      throw const _Problem(400, 'INVALID_INVITATION');
+    }
+    return _rooms.values.firstWhere(
+      (r) => r.code == code && !r.closed,
+      orElse: () => throw const _Problem(404, 'INVITATION_UNAVAILABLE'),
+    );
+  }
+
+  http.Response _preview(String code) {
+    final room = _byCode(code);
+    return _json({
+      'joinable': room.gameId == null && room.players.length < 5,
+      'teamOneName': room.teams[0],
+      'teamTwoName': room.teams[1],
+      'availableSeats': 5 - room.players.length,
+      'expiresAt': DateTime.now().toUtc().toIso8601String(),
+      'admission': 'open',
+    });
+  }
+
+  http.Response _join(String code, Map<String, dynamic> body) {
+    final room = _byCode(code);
+    if (room.gameId != null) throw const _Problem(409, 'LOBBY_NOT_OPEN');
+    if (room.players.length >= 5) throw const _Problem(409, 'ROOM_FULL');
+    final player = FakePlayer(
+      id: 'member-${++_ids}',
+      secret: body['reconnectSecret'] as String,
+      name: body['displayName'] as String,
+      team: body['teamNumber'] as int,
+    );
+    room
+      ..players.add(player)
+      ..reshuffle();
+    return _json({
+      'operationId': 'op-${++_ids}',
+      'roomId': room.id,
+      'roomVersion': '${room.version}',
+      'membershipId': player.id,
+      'membershipVersion': '${player.version}',
+      'acceptedAt': DateTime.now().toUtc().toIso8601String(),
+      'effect': 'changed',
+    });
+  }
+
+  void _expect(FakeRoom room, FakePlayer me, Map<String, dynamic> body) {
+    if (body['expectedReadyGeneration'] != room.readyGeneration) {
+      throw const _Problem(409, 'STALE_READY_GENERATION');
+    }
+    if (body['expectedMembershipVersion'] != '${me.version}') {
+      throw const _Problem(409, 'STALE_MEMBER_VERSION');
+    }
+  }
+
+  http.Response _ready(
+    http.Request request,
+    String roomId,
+    Map<String, dynamic> body,
+  ) {
+    final (room, me) = _guest(request, roomId);
+    _expect(room, me, body);
+    me
+      ..ready = body['ready'] as bool
+      ..version += 1;
+    room.version++;
+    return _receipt(room);
+  }
+
+  http.Response _team(
+    http.Request request,
+    String roomId,
+    Map<String, dynamic> body,
+  ) {
+    final (room, me) = _guest(request, roomId);
+    _expect(room, me, body);
+    me.team = body['teamNumber'] as int;
+    room.reshuffle();
+    return _receipt(room);
+  }
+
+  http.Response _depart(http.Request request, String roomId) {
+    final (room, me) = _guest(request, roomId);
+    room
+      ..players.remove(me)
+      ..reshuffle();
+    return _receipt(room);
+  }
+
+  http.Response _start(FakeRoom room, Map<String, dynamic> body) {
     if (room.gameId != null) throw const _Problem(409, 'GAME_ALREADY_STARTED');
+    if (body['expectedReadyGeneration'] != room.readyGeneration) {
+      throw const _Problem(409, 'STALE_READY_GENERATION');
+    }
+    if (room.players.any((p) => !p.ready)) {
+      throw const _Problem(409, 'MEMBERS_NOT_READY');
+    }
     room
       ..gameId = 'game-${++_ids}'
       ..gameVersion = 1
@@ -539,7 +787,9 @@ class FakeServer {
 
   // ---- Views ----------------------------------------------------------------
 
-  http.Response _snapshot(FakeRoom room) {
+  http.Response _snapshot(FakeRoom room) => _json(_snapshotJson(room));
+
+  Map<String, Object?> _snapshotJson(FakeRoom room, {bool viewer = false}) {
     final now = DateTime.now().toUtc();
     final view = room.gameId == null
         ? _lobby(room)
@@ -547,8 +797,8 @@ class FakeServer {
         ? _result(room)
         : room.pointer == null
         ? _board(room)
-        : _question(room, room.pointer!);
-    return _json({
+        : _question(room, room.pointer!, viewer: viewer);
+    return {
       'source': {
         'roomVersion': '${room.version}',
         if (room.gameId != null) ...{
@@ -559,8 +809,8 @@ class FakeServer {
       },
       'serverTime': now.toIso8601String(),
       'language': 'ar',
-      'view': view,
-    });
+      'view': {...view, 'audience': viewer ? 'viewer' : 'host'},
+    };
   }
 
   Map<String, Object?> _lobby(FakeRoom room) => {
@@ -569,9 +819,27 @@ class FakeServer {
     'roomId': room.id,
     'teamOneName': room.teams[0],
     'teamTwoName': room.teams[1],
-    'members': const [],
+    'members': [
+      {
+        'id': 'host-${room.id}',
+        'displayName': 'المضيف',
+        'teamNumber': null,
+        'host': true,
+        'memberVersion': '1',
+        'ready': false,
+      },
+      for (final p in room.players)
+        {
+          'id': p.id,
+          'displayName': p.name,
+          'teamNumber': p.team,
+          'host': false,
+          'memberVersion': '${p.version}',
+          'ready': p.ready,
+        },
+    ],
     'selections': room.selections,
-    'readyGeneration': 0,
+    'readyGeneration': room.readyGeneration,
     'idleExpiresAt': DateTime.now().toUtc().toIso8601String(),
   };
 
@@ -631,7 +899,11 @@ class FakeServer {
     'variantNumber': variant,
   };
 
-  Map<String, Object?> _question(FakeRoom room, (int, int) at) {
+  Map<String, Object?> _question(
+    FakeRoom room,
+    (int, int) at, {
+    bool viewer = false,
+  }) {
     final q = room.questions[at]!;
     q.settle();
     final categoryId =
@@ -720,7 +992,7 @@ class FakeServer {
           'deadlineAt': q.deadline!.toUtc().toIso8601String(),
       },
       'idleExpiresAt': DateTime.now().toUtc().toIso8601String(),
-      'question': question,
+      'question': viewer ? ({...question}..remove('audio')) : question,
       if (q.revealed)
         'answer': {
           'format': q.format,
@@ -731,7 +1003,8 @@ class FakeServer {
           if (q.format == 'AUDIO_REVERSE')
             'forwardAudio': _ref(at, 'answer_audio', kind: 'audio'),
         },
-      'controls': controls,
+      // A player's view has no controls and no clip of its own.
+      'controls': viewer ? const <String>[] : controls,
     };
   }
 
@@ -781,6 +1054,13 @@ class FakeServer {
     },
   };
 
+  /// Sends every open socket its room's current view.
+  void _push() {
+    for (final socket in _sockets.toList()) {
+      socket.push();
+    }
+  }
+
   http.Response _receipt(FakeRoom room) => _json({
     'operationId': 'op-${++_ids}',
     'roomId': room.id,
@@ -806,4 +1086,99 @@ class _Problem implements Exception {
   final int status;
   final String code;
   final Map<String, Object?> extra;
+}
+
+extension<T> on T {
+  T also(void Function() f) {
+    f();
+    return this;
+  }
+}
+
+/// One live socket: it signs in with its first frame like the real one,
+/// then gets the room's complete view after every change.
+class _FakeSocket implements RoomSocket {
+  _FakeSocket(this.server);
+
+  final FakeServer server;
+  final _out = StreamController<String>();
+  FakeRoom? _room;
+  bool _viewer = false;
+  String _seat = '';
+  int _sequence = 0;
+  final _stream = 'stream-${DateTime.now().microsecondsSinceEpoch}';
+
+  bool get isClosed => _out.isClosed;
+
+  @override
+  Stream<String> get messages => _out.stream;
+
+  void _send(String event, Map<String, Object?> data) {
+    if (_out.isClosed) return;
+    _out.add(
+      jsonEncode({
+        'event': event,
+        'data': {
+          'protocolVersion': 1,
+          'streamId': _stream,
+          'sequence': '${_sequence++}',
+          'serverTime': DateTime.now().toUtc().toIso8601String(),
+          ...data,
+        },
+      }),
+    );
+  }
+
+  @override
+  void send(String frame) {
+    final f = jsonDecode(frame) as Map<String, dynamic>;
+    if (f['event'] != 'authenticate') return;
+    final data = f['data'] as Map<String, dynamic>;
+    final roomId = data['roomId'] as String;
+    final authorization = data['authorization'] as String;
+    final room = server._rooms[roomId];
+    final player = server._player(authorization, roomId);
+    final host =
+        room != null &&
+        server._credentials[authorization.replaceFirst('Bearer ', '')] ==
+            room.account;
+    if (room == null || (player == null && !host)) {
+      _send('protocol_error', {'code': 'UNAUTHENTICATED'});
+      return;
+    }
+    if (host && player == null && data['controllerSecret'] != room.secret) {
+      _send('protocol_error', {'code': 'CONTROLLER_FENCED'});
+      return;
+    }
+    _room = room;
+    _viewer = player != null;
+    _seat = player?.$2.id ?? 'host-${room.id}';
+    _send('authenticated', {'language': 'ar'});
+    push();
+  }
+
+  /// The room's current view, and who's connected.
+  void push() {
+    final room = _room;
+    if (room == null || _out.isClosed) return;
+    if (room.closed) {
+      _send('room_closed', const {});
+      close();
+      return;
+    }
+    final snapshot = server._snapshotJson(room, viewer: _viewer);
+    _send('state', {'source': snapshot['source'], 'view': snapshot['view']});
+    _send('presence', {
+      'members': [
+        for (final s in server._sockets)
+          if (!s.isClosed && s._room == room)
+            {'membershipId': s._seat, 'connected': true},
+      ],
+    });
+  }
+
+  @override
+  Future<void> close() async {
+    if (!_out.isClosed) await _out.close();
+  }
 }

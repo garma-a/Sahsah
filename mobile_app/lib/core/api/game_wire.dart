@@ -37,6 +37,7 @@ class Receipt {
     this.gameId,
     this.gameVersion,
     this.controllerGeneration,
+    this.membershipId,
   });
 
   factory Receipt.fromJson(Json j) => Receipt(
@@ -45,6 +46,7 @@ class Receipt {
     gameId: j['gameId'] as String?,
     gameVersion: j['gameVersion'] as String?,
     controllerGeneration: j['controllerGeneration'] as String?,
+    membershipId: j['membershipId'] as String?,
   );
 
   final String roomId;
@@ -54,6 +56,75 @@ class Receipt {
   final String? gameId;
   final String? gameVersion;
   final String? controllerGeneration;
+
+  /// A join's new seat.
+  final String? membershipId;
+}
+
+/// The room's code and link for players to join with.
+class Invitation {
+  const Invitation({required this.code, required this.joinUrl});
+
+  factory Invitation.fromJson(Json j) =>
+      Invitation(code: j['code'] as String, joinUrl: j['joinUrl'] as String);
+
+  /// Six digits.
+  final String code;
+  final String joinUrl;
+}
+
+/// What a code opens, before joining.
+class InvitationPreview {
+  const InvitationPreview({
+    required this.joinable,
+    required this.teamNames,
+    required this.availableSeats,
+    required this.paused,
+  });
+
+  factory InvitationPreview.fromJson(Json j) => InvitationPreview(
+    joinable: j['joinable'] as bool,
+    teamNames: [j['teamOneName'] as String, j['teamTwoName'] as String],
+    availableSeats: _int(j['availableSeats']),
+    paused: j['admission'] == 'paused',
+  );
+
+  final bool joinable;
+  final List<String> teamNames;
+  final int availableSeats;
+
+  /// The server isn't taking new players right now.
+  final bool paused;
+}
+
+/// Someone in the lobby: the host or a player.
+class Member {
+  const Member({
+    required this.id,
+    required this.displayName,
+    required this.teamNumber,
+    required this.host,
+    required this.memberVersion,
+    required this.ready,
+  });
+
+  factory Member.fromJson(Json j) => Member(
+    id: j['id'] as String,
+    displayName: j['displayName'] as String,
+    teamNumber: _intOrNull(j['teamNumber']),
+    host: j['host'] as bool,
+    memberVersion: j['memberVersion'] as String,
+    ready: j['ready'] as bool,
+  );
+
+  final String id;
+  final String displayName;
+
+  /// 1, 2, or null before picking.
+  final int? teamNumber;
+  final bool host;
+  final String memberVersion;
+  final bool ready;
 }
 
 class CurrentRoom {
@@ -79,18 +150,30 @@ class ControlStatus {
 }
 
 class Team {
-  const Team({required this.number, required this.name, required this.score});
+  const Team({
+    required this.number,
+    required this.name,
+    required this.score,
+    this.players = const [],
+  });
 
   factory Team.fromJson(Json j) => Team(
     number: _int(j['number']),
     name: j['name'] as String,
     score: int.tryParse(j['score'].toString()) ?? 0,
+    players: [
+      for (final p in (j['players'] as List?) ?? const [])
+        (p as Json)['displayName'] as String,
+    ],
   );
 
   /// 1 or 2.
   final int number;
   final String name;
   final int score;
+
+  /// The names of the players seated on this team.
+  final List<String> players;
 }
 
 enum TileState { unopened, opened, revealed, resolved }
@@ -247,15 +330,47 @@ sealed class RoomView {
 }
 
 class LobbyView extends RoomView {
-  const LobbyView({required this.readyGeneration, required this.teamNames});
+  const LobbyView({
+    required this.readyGeneration,
+    required this.teamNames,
+    this.members = const [],
+    this.categoryIds = const [],
+  });
 
   factory LobbyView.fromJson(Json j) => LobbyView(
     readyGeneration: _int(j['readyGeneration']),
     teamNames: [j['teamOneName'] as String, j['teamTwoName'] as String],
+    members: [
+      for (final m in (j['members'] as List?) ?? const [])
+        Member.fromJson(m as Json),
+    ],
+    categoryIds: [
+      for (final s
+          in ([...((j['selections'] as List?) ?? const [])]..sort(
+            (a, b) => _int(
+              (a as Json)['boardPosition'],
+            ).compareTo(_int((b as Json)['boardPosition'])),
+          )))
+        (s as Json)['categoryId'] as String,
+    ],
   );
 
   final int readyGeneration;
   final List<String> teamNames;
+
+  /// The host and the players.
+  final List<Member> members;
+
+  /// The six categories, in board order.
+  final List<String> categoryIds;
+
+  List<Member> get players => [
+    for (final m in members)
+      if (!m.host) m,
+  ];
+
+  /// Every player who joined has said they're ready (none joined counts).
+  bool get everyoneReady => players.every((m) => m.ready);
 }
 
 List<Team> _teams(Object? j) =>
@@ -379,6 +494,7 @@ class Snapshot {
     required this.roomVersion,
     this.gameId,
     this.gameVersion,
+    this.gameProjectionVersion,
     required this.serverTime,
     required this.view,
   });
@@ -389,6 +505,7 @@ class Snapshot {
       roomVersion: source['roomVersion'] as String,
       gameId: source['gameId'] as String?,
       gameVersion: source['gameVersion'] as String?,
+      gameProjectionVersion: source['gameProjectionVersion'] as String?,
       serverTime: DateTime.parse(j['serverTime'] as String),
       view: RoomView.fromJson(j['view'] as Json),
     );
@@ -397,6 +514,7 @@ class Snapshot {
   final String roomVersion;
   final String? gameId;
   final String? gameVersion;
+  final String? gameProjectionVersion;
   final DateTime serverTime;
   final RoomView view;
 }

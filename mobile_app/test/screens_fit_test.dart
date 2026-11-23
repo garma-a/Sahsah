@@ -68,6 +68,8 @@ void main() {
       await pickBoard(tester);
       await press(tester, 'التالي');
       await press(tester, 'ابدأ اللعبة');
+      // The lobby: no players joined, so the game starts at once.
+      await press(tester, 'ابدأ اللعبة');
       await press(tester, RegExp('^خمّن المكان، باقي'));
       await press(tester, RegExp('^سؤال ٥،'));
       expect(find.text('اضغطوا جاهز والوقت يبدأ'), findsOneWidget);

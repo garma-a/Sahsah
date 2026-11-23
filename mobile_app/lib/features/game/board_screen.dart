@@ -12,6 +12,7 @@ import '../../core/ui/surfaces.dart';
 import '../../data/catalog.dart';
 import 'game_controller.dart';
 import 'model/question.dart';
+import 'lobby_screen.dart';
 import 'pack_screen.dart';
 import 'question_screen.dart';
 import 'results_screen.dart';
@@ -128,6 +129,16 @@ class _BoardScreenState extends State<BoardScreen> {
   Widget build(BuildContext context) {
     final controller = context.game;
     final game = controller.game;
+    // Back in the lobby (a game not started yet): the lobby takes over.
+    if (controller.isHost && controller.lobby != null && !_leaving) {
+      _leaving = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const HostLobbyScreen()),
+        );
+      });
+    }
     if (game == null) {
       return GameScaffold(child: _Gone(loading: controller.hasRoom));
     }
@@ -149,7 +160,7 @@ class _BoardScreenState extends State<BoardScreen> {
               child: _TopBar(game: game, onExit: _exit, onEnd: _endGame),
             ),
             Expanded(
-              child: _Board(game: game, onOpen: _openPack),
+              child: BoardGrid(game: game, onOpen: _openPack),
             ),
           ],
         ),
@@ -327,11 +338,19 @@ class _TeamScoreState extends State<TeamScore>
     const ink = AppColors.ink;
     final leading = game.leader == team;
     final pill = Pressable(
-      semanticLabel: lang.t(
-        '${game.teamNames[team]}: ${game.scores[team]} نقطة، عدّل النقط',
-        '${game.teamNames[team]}: ${game.scores[team]} no2ta, 3addel el no2at',
-      ),
-      onTap: game.finished ? null : () => _editScore(context, game, team),
+      semanticLabel: context.game.isHost
+          ? lang.t(
+              '${game.teamNames[team]}: ${game.scores[team]} نقطة، عدّل النقط',
+              '${game.teamNames[team]}: ${game.scores[team]} no2ta, 3addel el no2at',
+            )
+          : lang.t(
+              '${game.teamNames[team]}: ${game.scores[team]} نقطة',
+              '${game.teamNames[team]}: ${game.scores[team]} no2ta',
+            ),
+      // Only the host corrects a score.
+      onTap: game.finished || !context.game.isHost
+          ? null
+          : () => _editScore(context, game, team),
       child: AnimatedContainer(
         duration: motionFor(context, const Duration(milliseconds: 200)),
         height: compact ? 44 : 52,
@@ -742,11 +761,13 @@ class _Step extends StatelessWidget {
   }
 }
 
-class _Board extends StatelessWidget {
-  const _Board({required this.game, required this.onOpen});
+/// The six packs as poster cards. With no [onOpen] (a player's phone) the
+/// cards are only shown.
+class BoardGrid extends StatelessWidget {
+  const BoardGrid({super.key, required this.game, this.onOpen});
 
   final Game game;
-  final ValueChanged<String> onOpen;
+  final ValueChanged<String>? onOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -806,7 +827,7 @@ class _CategoryCard extends StatelessWidget {
 
   final String categoryId;
   final Game game;
-  final ValueChanged<String> onOpen;
+  final ValueChanged<String>? onOpen;
 
   /// Small enough for two rows on a landscape phone.
   static const minHeight = 140.0;
@@ -830,7 +851,7 @@ class _CategoryCard extends StatelessWidget {
               '$name, ba2y $left as2ela',
             ),
       scale: 0.97,
-      onTap: done ? null : () => onOpen(categoryId),
+      onTap: done || onOpen == null ? null : () => onOpen!(categoryId),
       // The website's board card: the film-still cover in its tone's
       // frame, a count chip, and a "done" stamp in the winner's colour.
       child: Container(

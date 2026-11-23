@@ -37,6 +37,8 @@ void main() {
     await pickBoard(tester);
     await press(tester, 'التالي');
     await press(tester, 'ابدأ اللعبة');
+    // The lobby: no players joined, so the game starts at once.
+    await press(tester, 'ابدأ اللعبة');
 
     // A memory question: before it's asked there's no answer to show, so
     // a hint says so instead of a faded button.

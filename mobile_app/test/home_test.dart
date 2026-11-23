@@ -110,13 +110,14 @@ void main() {
     expect(find.text('4'), findsOneWidget);
     await tester.tap(find.text('ادخل'));
     await settle(tester);
-    expect(find.textContaining('غرف اللعب'), findsNothing);
+    expect(find.text('لقينا الغرفة!'), findsNothing);
 
+    // A code the server doesn't know says so.
     await tester.enterText(find.byKey(const ValueKey('join-code')), '123456');
     await settle(tester);
     await tester.tap(find.text('ادخل'));
     await settle(tester);
-    expect(find.textContaining('غرف اللعب'), findsOneWidget);
+    expect(find.text('ملقيناش اللي بتدور عليه.'), findsOneWidget);
   });
 
   testWidgets('tapping a category opens its details', (tester) async {

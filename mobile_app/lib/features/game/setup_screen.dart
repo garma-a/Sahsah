@@ -16,7 +16,7 @@ import '../../data/catalog.dart';
 import '../../data/game_rules.dart';
 import '../categories/category_widgets.dart' show CatalogStatusView;
 import 'sign_in_sheet.dart';
-import 'board_screen.dart';
+import 'lobby_screen.dart';
 import 'game_controller.dart';
 import 'ui/game_ui.dart';
 import '../../core/ui/motion.dart';
@@ -192,15 +192,16 @@ class _SetupScreenState extends State<SetupScreen> {
     if (!mounted) return;
     setState(() => _starting = true);
     try {
-      await game.start(
+      await game.openRoom(
         categoryIds: _selected,
         teams: names,
         names: {for (final c in catalog.categories) c.id: c.name},
       );
       if (!mounted) return;
-      Navigator.of(
-        context,
-      ).pushReplacement(MaterialPageRoute(builder: (_) => const BoardScreen()));
+      // The room's lobby: players join with its code, then the game starts.
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const HostLobbyScreen()),
+      );
     } on SignInNeeded {
       if (mounted) setState(() => _starting = false);
       return _start();

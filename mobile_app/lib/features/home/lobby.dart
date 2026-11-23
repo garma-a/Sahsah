@@ -179,9 +179,10 @@ class _PlayColumn extends StatelessWidget {
     final lang = context.lang;
     final nav = ShellNav.of(context);
     final game = active;
-    void resume() => Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => const BoardScreen()));
+    final controller = context.game;
+    // A room is held: a game, its lobby, or a seat in someone's room.
+    final held = game != null || controller.hasRoom;
+    void resume() => openHeldRoom(context);
     // A lone Arabic zero is a small dot, so say it.
     String score(int n) => n == 0 && lang.ar ? 'صفر' : lang.toAr(n);
 
@@ -207,7 +208,7 @@ class _PlayColumn extends StatelessWidget {
                 borderColor: AppColors.cyan,
                 borderWidth: 4,
                 edgeColor: AppColors.pressDeep,
-                onTap: game == null ? () => nav.go(AppRoute.play) : resume,
+                onTap: held ? resume : () => nav.go(AppRoute.play),
                 child: Padding(
                   padding: const EdgeInsets.all(8),
                   child: FittedBox(
@@ -221,17 +222,32 @@ class _PlayColumn extends StatelessWidget {
                           color: Colors.white,
                         ),
                         Text(
-                          game == null
+                          !held
                               ? lang.t('ابدأ لعبة', 'Ebda2 le3ba')
+                              : game == null
+                              ? lang.t('ارجع للغرفة', 'Erga3 lel oda')
                               : lang.t('كمّلوا لعبتكم', 'Kammelo le3betkom'),
                           style: AppText.display(
-                            game == null ? 34 : 30,
+                            !held ? 34 : 30,
                             height: 1.1,
                             color: Colors.white,
                           ),
                         ),
                         const SizedBox(height: 2),
-                        if (game == null)
+                        if (held && game == null)
+                          Text(
+                            controller.isGuest
+                                ? lang.t(
+                                    'إنت لاعب في غرفة',
+                                    'Enta la3eb fe oda',
+                                  )
+                                : lang.t(
+                                    'الغرفة مستنية اللاعبين',
+                                    'El oda mestanya el la3eebeen',
+                                  ),
+                            style: sub,
+                          )
+                        else if (game == null)
                           Text(
                             lang.t(
                               // "و", not "·": next to "٣٦" a dot reads as a
@@ -258,7 +274,7 @@ class _PlayColumn extends StatelessWidget {
             ),
           ),
         ),
-        if (game != null) ...[
+        if (held) ...[
           const SizedBox(height: 10),
           GameButton(
             key: const ValueKey('lobby-new'),

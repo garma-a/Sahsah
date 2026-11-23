@@ -15,7 +15,7 @@ import '../../data/catalog.dart';
 import '../../data/game_rules.dart';
 import '../../data/promos.dart';
 import '../categories/category_widgets.dart';
-import '../game/board_screen.dart';
+import '../game/room_route.dart';
 import '../game/game_controller.dart';
 import '../game/ui/game_ui.dart';
 import '../shell/app_route.dart';
@@ -326,9 +326,7 @@ class _ResumeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final lang = context.lang;
-    void resume() => Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => const BoardScreen()));
+    void resume() => openHeldRoom(context);
 
     return Semantics(
       button: true,

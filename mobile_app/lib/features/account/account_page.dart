@@ -6,7 +6,7 @@ import '../../core/i18n/lang.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/game_button.dart';
 import '../../data/shop.dart';
-import '../game/board_screen.dart';
+import '../game/room_route.dart';
 import '../game/game_controller.dart';
 import '../game/setup_screen.dart';
 import '../game/ui/game_ui.dart';
@@ -315,9 +315,7 @@ class _GameRow extends StatelessWidget {
       depth: 5,
       color: AppColors.ink,
       borderColor: AppColors.cyan.withValues(alpha: 0.7),
-      onTap: () => Navigator.of(
-        context,
-      ).push(MaterialPageRoute(builder: (_) => const BoardScreen())),
+      onTap: () => openHeldRoom(context),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12),
         child: Row(
