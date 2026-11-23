@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/api/game_wire.dart';
+import '../../core/api/room_channel.dart';
 import '../../core/api/sahsah_api.dart';
 import '../../core/api/wire.dart';
 import '../../core/session/host_session.dart';
@@ -165,20 +166,67 @@ class _HostRoom {
   };
 }
 
+/// A player's seat in someone else's room, from joining with a code. The
+/// secret is this phone's proof; with the last board it survives a restart.
+class _GuestSeat {
+  _GuestSeat({
+    required this.roomId,
+    required this.code,
+    required this.membershipId,
+    required this.secret,
+    required this.displayName,
+    this.board,
+  });
+
+  factory _GuestSeat.fromJson(Map<String, dynamic> j) => _GuestSeat(
+    roomId: j['roomId'] as String,
+    code: j['code'] as String,
+    membershipId: j['membershipId'] as String,
+    secret: j['secret'] as String,
+    displayName: j['displayName'] as String,
+    board: j['board'] as Map<String, dynamic>?,
+  );
+
+  final String roomId;
+  final String code;
+  final String membershipId;
+  final String secret;
+  final String displayName;
+  Map<String, dynamic>? board;
+
+  GuestAuth get auth => GuestAuth(membershipId: membershipId, secret: secret);
+
+  Map<String, dynamic> toJson() => {
+    'roomId': roomId,
+    'code': code,
+    'membershipId': membershipId,
+    'secret': secret,
+    'displayName': displayName,
+    'board': ?board,
+  };
+}
+
 /// Runs the host's game through the Sahsah API: the room and its game live
 /// on the server, and every host action is a command there
 /// (`docs/api/question-lifecycle.md`). This phone keeps the room's control
 /// proof so the game survives the app closing.
+///
+/// The same controller runs a player's seat instead, after joining someone
+/// else's room with its code: the views are the server's viewer views (no
+/// controls), and only the player's own lobby actions are sent. Live
+/// updates come over the room's socket ([RoomChannel]).
 class GameController extends ChangeNotifier {
   GameController({
     SahsahApi? api,
     HostSession? session,
     SharedPreferences? prefs,
     DateTime Function()? now,
+    RoomSocketConnector? connect,
   }) : _api = api ?? SahsahApi(),
        _session = session ?? HostSession(api ?? SahsahApi()),
        _prefs = prefs,
-       _now = now ?? DateTime.now {
+       _now = now ?? DateTime.now,
+       _connect = connect {
     final raw = _prefs?.getString(roomKey);
     if (raw != null) {
       try {
@@ -189,12 +237,24 @@ class GameController extends ChangeNotifier {
         _prefs?.remove(roomKey);
       }
     }
+    final seat = _prefs?.getString(seatKey);
+    if (_room == null && seat != null) {
+      try {
+        _seat = _GuestSeat.fromJson(jsonDecode(seat) as Map<String, dynamic>);
+        final board = _seat!.board;
+        if (board != null) _board = BoardView.fromJson(board);
+      } on Object {
+        _prefs?.remove(seatKey);
+      }
+    }
     // The offline game of earlier versions can't be resumed.
     _prefs?.remove('sahsah.game.v1');
   }
 
   static const roomKey = 'sahsah.room.v1';
+  static const seatKey = 'sahsah.seat.v1';
   static const _pendingKey = 'sahsah.room.pending.v1';
+  static const _pendingJoinKey = 'sahsah.join.pending.v1';
   static const answerMs = 60000;
 
   /// Restores the room this phone runs, if any; [refresh] then fetches it.
@@ -207,12 +267,20 @@ class GameController extends ChangeNotifier {
   final HostSession _session;
   final SharedPreferences? _prefs;
   final DateTime Function() _now;
+  final RoomSocketConnector? _connect;
 
   HostSession get session => _session;
 
   ContentLanguage _language = ContentLanguage.ar;
   _HostRoom? _room;
+  _GuestSeat? _seat;
   Snapshot? _snapshot;
+  Invitation? _invitation;
+  RoomChannel? _channel;
+  Set<String> _connected = const {};
+
+  /// This seat opened on another phone: this one stops.
+  bool _replaced = false;
   BoardView? _board;
 
   /// Server time minus this phone's time, from the last snapshot.
@@ -241,8 +309,37 @@ class GameController extends ChangeNotifier {
 
   // ---- What the screens read -----------------------------------------------
 
-  /// A room is held on this phone (it may still be loading).
-  bool get hasRoom => _room != null;
+  /// A room is held on this phone, as host or player (it may still be
+  /// loading).
+  bool get hasRoom => _room != null || _seat != null;
+
+  /// This phone runs the room.
+  bool get isHost => _room != null;
+
+  /// This phone is a player in someone else's room.
+  bool get isGuest => _seat != null;
+
+  /// The room before its game starts (and between games).
+  LobbyView? get lobby {
+    final view = _snapshot?.view;
+    return view is LobbyView ? view : null;
+  }
+
+  /// This player's seat in the lobby.
+  Member? get me {
+    final id = _seat?.membershipId;
+    if (id == null) return null;
+    return lobby?.members.where((m) => m.id == id).firstOrNull;
+  }
+
+  /// The room's code and join link (host).
+  Invitation? get invitation => _invitation;
+
+  /// Seats with a live connection.
+  Set<String> get connected => _connected;
+
+  /// This seat opened on another phone.
+  bool get replaced => _replaced;
 
   /// A command or a start is in flight.
   bool get busy => _busy;
@@ -433,14 +530,18 @@ class GameController extends ChangeNotifier {
   void setLanguage(ContentLanguage language) {
     if (language == _language) return;
     _language = language;
-    if (_room != null) refresh();
+    if (hasRoom) {
+      _stopChannel();
+      refresh();
+    }
   }
 
-  /// Starts a game of [categoryIds] (in board order) for [teams]: picks each
-  /// category's next unplayed pack, opens a room and starts it. Any room
-  /// this phone already runs is closed first. Throws [StartProblem] or
+  /// Opens a room for a game of [categoryIds] (in board order) and [teams]:
+  /// picks each category's next unplayed pack and opens the room's lobby,
+  /// where players join with its code; [startGame] starts it. Any room this
+  /// phone already holds is closed first. Throws [StartProblem] or
   /// [ApiError].
-  Future<void> start({
+  Future<void> openRoom({
     required List<String> categoryIds,
     required List<String> teams,
     Map<String, String> names = const {},
@@ -450,7 +551,7 @@ class GameController extends ChangeNotifier {
     if (auth == null) throw const SignInNeeded();
     _setBusy(true);
     try {
-      if (_room != null) await _closeHeld();
+      if (hasRoom) await _leaveHeld();
       final packs = await Future.wait([
         for (final id in categoryIds) _api.firstPack(id, auth, _language),
       ]);
@@ -483,35 +584,180 @@ class GameController extends ChangeNotifier {
             'observedRevision': packs[i]!.contentRevision,
           },
       ];
-      final receipt = await _create(auth, teams, selections);
+      await _create(auth, teams, selections);
       _board = null;
       _snapshot = null;
       _actorReady.clear();
       _save();
-      final lobby = await _api.getRoom(receipt.roomId, _hostAuth!, _language);
-      await _startFrom(lobby);
       await refresh();
     } finally {
       _setBusy(false);
     }
   }
 
-  /// Fetches the room as it is now.
-  Future<void> refresh() async {
-    final room = _room;
-    final auth = _hostAuth;
-    if (room == null || auth == null) return;
+  /// Starts the game from the lobby, once every player who joined is ready.
+  Future<void> startGame() async {
+    final snapshot = _snapshot;
+    if (_busy || _room == null || snapshot?.view is! LobbyView) return;
+    _setBusy(true);
     try {
-      final snapshot = await _api.getRoom(room.roomId, auth, _language);
-      if (_room != room) return;
-      if (snapshot.view is LobbyView) {
-        // A room made but never started (the app closed in between).
-        await _startFrom(snapshot);
-        return refresh();
-      }
-      _apply(snapshot);
+      await _startFrom(snapshot!);
+      await refresh();
     } on ApiError catch (e) {
-      if (_room != room) return;
+      _report(e);
+      if (e.conflict) await refresh();
+    } finally {
+      _setBusy(false);
+    }
+  }
+
+  // ---- Players ---------------------------------------------------------------
+
+  /// What [code] opens, before joining. Throws [ApiError].
+  Future<InvitationPreview> preview(String code) =>
+      _api.previewInvitation(code);
+
+  /// Joins the room of [code] as [name] on [team] (0 or 1). A room this
+  /// phone holds is left first. The key and seat secret are saved before
+  /// sending, so a retry after a lost answer recovers the same seat.
+  /// Throws [ApiError].
+  Future<void> join({
+    required String code,
+    required String name,
+    required int team,
+  }) async {
+    _setBusy(true);
+    try {
+      if (hasRoom) await _leaveHeld();
+      final signature = jsonEncode([code, name, team]);
+      Map<String, dynamic>? pending;
+      try {
+        final raw = _prefs?.getString(_pendingJoinKey);
+        if (raw != null) pending = jsonDecode(raw) as Map<String, dynamic>;
+      } on Object {
+        pending = null;
+      }
+      if (pending?['signature'] != signature) {
+        pending = {
+          'signature': signature,
+          'operationId': newOperationId(),
+          'secret': newSecret(),
+        };
+        _prefs?.setString(_pendingJoinKey, jsonEncode(pending));
+      }
+      final receipt = await _api.join(
+        code,
+        pending!['operationId'] as String,
+        displayName: name,
+        teamNumber: team + 1,
+        reconnectSecret: pending['secret'] as String,
+      );
+      _prefs?.remove(_pendingJoinKey);
+      _seat = _GuestSeat(
+        roomId: receipt.roomId,
+        code: code,
+        membershipId: receipt.membershipId!,
+        secret: pending['secret'] as String,
+        displayName: name,
+      );
+      _board = null;
+      _snapshot = null;
+      _save();
+      await refresh();
+    } finally {
+      _setBusy(false);
+    }
+  }
+
+  /// Moves this player to team [team] (0 or 1) in the lobby.
+  Future<void> setTeam(int team) async {
+    final me = this.me;
+    final lobby = this.lobby;
+    final seat = _seat;
+    if (me == null || lobby == null || seat == null) return;
+    if (me.teamNumber == team + 1) return;
+    await _player(
+      'team:$team:${me.memberVersion}:${lobby.readyGeneration}',
+      (key) => _api.setTeam(
+        seat.roomId,
+        seat.auth,
+        key,
+        memberVersion: me.memberVersion,
+        readyGeneration: lobby.readyGeneration,
+        teamNumber: team + 1,
+      ),
+    );
+  }
+
+  /// Says (or takes back) that this player is ready to start.
+  Future<void> toggleReady() async {
+    final me = this.me;
+    final lobby = this.lobby;
+    final seat = _seat;
+    if (me == null || lobby == null || seat == null) return;
+    await _player(
+      'ready:${!me.ready}:${me.memberVersion}:${lobby.readyGeneration}',
+      (key) => _api.setReady(
+        seat.roomId,
+        seat.auth,
+        key,
+        memberVersion: me.memberVersion,
+        readyGeneration: lobby.readyGeneration,
+        ready: !me.ready,
+      ),
+    );
+  }
+
+  /// Leaves the room this phone holds: a player's seat is given up; a
+  /// host's room is closed.
+  Future<void> leaveRoom() async {
+    await _leaveHeld();
+    _notify();
+  }
+
+  Future<void> _player(
+    String signature,
+    Future<Receipt> Function(String key) action,
+  ) async {
+    if (_busy) return;
+    final key = _keys.putIfAbsent(signature, newOperationId);
+    _setBusy(true);
+    try {
+      await action(key);
+      _keys.remove(signature);
+      await refresh();
+    } on ApiError catch (e) {
+      _report(e);
+      _onError(e);
+      if (e.conflict) await refresh();
+    } finally {
+      _setBusy(false);
+    }
+  }
+
+  Future<void> _leaveHeld() async {
+    final seat = _seat;
+    if (seat == null) return _closeHeld();
+    _forget();
+    try {
+      await _api.leave(seat.roomId, seat.auth, newOperationId());
+    } on ApiError {
+      // Gone already, or unreachable.
+    }
+  }
+
+  /// Fetches the room as it is now, and keeps its live updates coming.
+  Future<void> refresh() async {
+    final roomId = _roomId;
+    final auth = _auth;
+    if (roomId == null || auth == null) return;
+    try {
+      final snapshot = await _api.getRoom(roomId, auth, _language);
+      if (_roomId != roomId) return;
+      _accept(snapshot);
+      _ensureChannel();
+    } on ApiError catch (e) {
+      if (_roomId != roomId) return;
       _onError(e, fetching: true);
     }
   }
@@ -522,9 +768,9 @@ class GameController extends ChangeNotifier {
   /// Closes the room on the server and forgets it (after the results, or
   /// to start fresh).
   Future<void> discard() async {
-    if (_room == null) return;
-    await _closeHeld();
-    notifyListeners();
+    if (!hasRoom) return;
+    await _leaveHeld();
+    _notify();
   }
 
   /// Another device took control: take it back on this phone.
@@ -548,6 +794,7 @@ class GameController extends ChangeNotifier {
         ..generation = receipt.controllerGeneration ?? room.generation;
       _controlLost = false;
       _save();
+      _stopChannel();
       await refresh();
     } on ApiError catch (e) {
       _report(e);
@@ -663,6 +910,11 @@ class GameController extends ChangeNotifier {
   }
 
   // ---- Internals -------------------------------------------------------------
+
+  String? get _roomId => _room?.roomId ?? _seat?.roomId;
+
+  /// The host's proof, or the player's seat.
+  Auth? get _auth => _hostAuth ?? _seat?.auth;
 
   HostAuth? get _hostAuth {
     final room = _room;
@@ -804,6 +1056,7 @@ class GameController extends ChangeNotifier {
       return _create(auth, teams, selections);
     }
     _prefs?.remove(_pendingKey);
+    _seat = null;
     _room = _HostRoom(
       roomId: receipt.roomId,
       controlSecret: pending['controlSecret'] as String,
@@ -868,6 +1121,13 @@ class GameController extends ChangeNotifier {
     }
   }
 
+  /// A snapshot from a request or the socket, unless it's older than what's
+  /// on screen.
+  void _accept(Snapshot snapshot) {
+    if (isStale(_snapshot, snapshot)) return;
+    _apply(snapshot);
+  }
+
   void _apply(Snapshot snapshot) {
     _offset = snapshot.serverTime.difference(_now());
     _snapshot = snapshot;
@@ -875,19 +1135,97 @@ class GameController extends ChangeNotifier {
     if (view is BoardView) {
       _board = view;
       _room?.board = _boardJson(view);
+      _seat?.board = _boardJson(view);
       _save();
+    }
+    if (view is LobbyView && _room != null && _invitation == null) {
+      _fetchInvitation();
     }
     _syncMedia(view is QuestionView ? view : null);
     _notify();
     // Restored mid-question without a board (an older save): go back to
     // the board to learn it.
-    if (_board == null && view is QuestionView) {
+    if (_board == null && view is QuestionView && _room != null) {
       _question('return_to_board', view);
     }
   }
 
+  Future<void> _fetchInvitation() async {
+    final room = _room;
+    final auth = _hostAuth;
+    if (room == null || auth == null) return;
+    try {
+      final invitation = await _api.invitation(room.roomId, auth);
+      if (_room != room) return;
+      _invitation = invitation;
+      _notify();
+    } on ApiError catch (e) {
+      _report(e);
+    }
+  }
+
+  // ---- Live updates ------------------------------------------------------------
+
+  void _ensureChannel() {
+    final roomId = _roomId;
+    if (_channel != null || _disposed || roomId == null || _replaced) return;
+    final channel = RoomChannel(
+      url: _api.realtimeUrl,
+      roomId: roomId,
+      language: _language,
+      credentials: _credentials,
+      onState: (snapshot) {
+        if (_roomId == roomId) _accept(snapshot);
+      },
+      onStatus: _onChannel,
+      onPresence: (connected) {
+        _connected = connected;
+        _notify();
+      },
+      onReconnected: refresh,
+      connect: _connect,
+    );
+    _channel = channel;
+    channel.start();
+  }
+
+  ({String authorization, String? controllerSecret}) _credentials() {
+    final host = _hostAuth;
+    if (host != null) {
+      return (authorization: host.bearer, controllerSecret: host.controlSecret);
+    }
+    return (authorization: _seat?.auth.bearer ?? '', controllerSecret: null);
+  }
+
+  void _onChannel(ChannelStatus status) {
+    switch (status) {
+      case ChannelStatus.controlLost:
+        _controlLost = true;
+        _channel = null;
+      case ChannelStatus.closed || ChannelStatus.revoked:
+        _forget();
+      case ChannelStatus.replaced:
+        _replaced = true;
+        _channel = null;
+      case ChannelStatus.failed:
+        _channel = null;
+      default:
+        return;
+    }
+    _notify();
+  }
+
+  void _stopChannel() {
+    _channel?.stop();
+    _channel = null;
+    _connected = const {};
+  }
+
   void _onError(ApiError e, {bool fetching = false}) {
     switch (e.code) {
+      case 'MEMBERSHIP_REVOKED' || 'PARTICIPATION_ENDED':
+        _forget();
+        _notify();
       case 'CONTROLLER_FENCED' || 'FRESH_CONTROL_SECRET_REQUIRED':
         _controlLost = true;
         _notify();
@@ -899,7 +1237,13 @@ class GameController extends ChangeNotifier {
           _forget();
           _notify();
         } else if (e.identityRejected && e.status == 401) {
-          _session.signOut();
+          // A player's seat proof refused: the seat is gone.
+          if (_seat != null) {
+            _forget();
+            _notify();
+          } else {
+            _session.signOut();
+          }
         } else if (fetching) {
           _report(e);
         }
@@ -913,18 +1257,25 @@ class GameController extends ChangeNotifier {
   }
 
   void _forget() {
+    _stopChannel();
     _room = null;
+    _seat = null;
     _snapshot = null;
     _board = null;
+    _invitation = null;
     _controlLost = false;
+    _replaced = false;
     _actorReady.clear();
     _syncMedia(null);
     _prefs?.remove(roomKey);
+    _prefs?.remove(seatKey);
   }
 
   void _save() {
     final room = _room;
+    final seat = _seat;
     if (room != null) _prefs?.setString(roomKey, jsonEncode(room.toJson()));
+    if (seat != null) _prefs?.setString(seatKey, jsonEncode(seat.toJson()));
   }
 
   void _setBusy(bool busy) {
@@ -961,7 +1312,7 @@ class GameController extends ChangeNotifier {
 
   Future<void> _fetchMedia(List<MediaRef> refs, String set) async {
     final gameId = _snapshot?.gameId;
-    final auth = _hostAuth;
+    final auth = _auth;
     if (refs.isEmpty || gameId == null || auth == null) return;
     // Twice more after a failure, then say so.
     for (var tries = 0; ; tries++) {
@@ -1018,6 +1369,7 @@ class GameController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _stopChannel();
     super.dispose();
   }
 }

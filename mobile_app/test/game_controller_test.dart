@@ -19,7 +19,8 @@ const board = [
 Future<(FakeServer, GameController)> started() async {
   final server = FakeServer();
   final game = await server.game();
-  await game.start(categoryIds: board, teams: ['النسور', 'الجدعان']);
+  await game.openRoom(categoryIds: board, teams: ['النسور', 'الجدعان']);
+  await game.startGame();
   return (server, game);
 }
 
@@ -41,7 +42,7 @@ void main() {
   test('hosting needs the passcode first', () async {
     final game = await FakeServer().game(signedIn: false);
     expect(
-      () => game.start(categoryIds: board, teams: ['أ', 'ب']),
+      () => game.openRoom(categoryIds: board, teams: ['أ', 'ب']),
       throwsA(isA<SignInNeeded>()),
     );
   });
@@ -49,7 +50,7 @@ void main() {
   test('a category with nothing to play stops the start', () async {
     final game = await FakeServer().game();
     await expectLater(
-      game.start(
+      game.openRoom(
         categoryIds: [...board.take(5), 'cat-soon'],
         teams: ['أ', 'ب'],
         names: {'cat-soon': 'فوازير وألغاز'},
@@ -224,7 +225,10 @@ void main() {
   test('a new game closes the old room, even one opened elsewhere', () async {
     final (server, game) = await started();
     final first = server.room!.id;
-    await game.start(categoryIds: board.reversed.toList(), teams: ['أ', 'ب']);
+    await game.openRoom(
+      categoryIds: board.reversed.toList(),
+      teams: ['أ', 'ب'],
+    );
     expect(server.room!.id, isNot(first));
 
     // Another phone signed in as the same host (here: a fresh controller
@@ -236,8 +240,8 @@ void main() {
     });
     final other = await server.game();
     expect(other.hasRoom, isFalse);
-    await other.start(categoryIds: board, teams: ['ج', 'د']);
-    expect(other.game!.teamNames, ['ج', 'د']);
+    await other.openRoom(categoryIds: board, teams: ['ج', 'د']);
+    expect(other.lobby!.teamNames, ['ج', 'د']);
     expect(server.room!.teams, ['ج', 'د']);
   });
 

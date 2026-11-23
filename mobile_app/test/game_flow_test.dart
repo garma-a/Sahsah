@@ -88,6 +88,8 @@ void main() {
     await tester.enterText(find.byKey(const ValueKey('team-0')), 'النسور');
     await settle(tester);
     await tapText(tester, 'ابدأ اللعبة');
+    // The lobby: no players joined, so the game starts at once.
+    await tapText(tester, 'ابدأ اللعبة');
 
     // Board: a room and a game on the server.
     expect(server.room!.gameId, isNotNull);

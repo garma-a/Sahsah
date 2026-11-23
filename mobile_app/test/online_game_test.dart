@@ -4,6 +4,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:sahsah_mobile/app.dart';
 import 'package:sahsah_mobile/core/audio/sound.dart';
 import 'package:sahsah_mobile/core/i18n/lang.dart';
+import 'package:sahsah_mobile/core/ui/play_button.dart';
 import 'package:sahsah_mobile/features/game/game_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -75,6 +76,10 @@ void main() {
     await settle(tester);
     expect(game.session.signedIn, isTrue);
     expect(game.session.displayName, 'سارة');
+    // The room's lobby, then the game.
+    expect(server.room, isNotNull);
+    expect(find.text('غرفة اللعب'), findsOneWidget);
+    await press(tester, 'ابدأ اللعبة');
     expect(server.room!.gameId, isNotNull);
     expect(find.byKey(const ValueKey('turn-chip')), findsOneWidget);
     semantics.dispose();
@@ -84,6 +89,8 @@ void main() {
     final semantics = tester.ensureSemantics();
     final (server, game) = await pump(tester);
     await toTeams(tester);
+    await press(tester, 'ابدأ اللعبة');
+    // The lobby: no players joined, so the game starts at once.
     await press(tester, 'ابدأ اللعبة');
     await press(tester, RegExp('^خمّن المكان، باقي'));
     await press(tester, RegExp('^سؤال ٥،'));
@@ -110,6 +117,8 @@ void main() {
     await pump(tester);
     await toTeams(tester);
     await press(tester, 'ابدأ اللعبة');
+    // The lobby: no players joined, so the game starts at once.
+    await press(tester, 'ابدأ اللعبة');
     await press(tester, RegExp('^خمّن المكان، باقي'));
     await press(tester, RegExp('^سؤال ٢،'));
 
@@ -124,6 +133,8 @@ void main() {
     final (_, game) = await pump(tester);
     await toTeams(tester);
     await press(tester, 'ابدأ اللعبة');
+    // The lobby: no players joined, so the game starts at once.
+    await press(tester, 'ابدأ اللعبة');
     await press(tester, RegExp('^خمّن الكلمة من الإيموجي، باقي'));
     await press(tester, RegExp('^سؤال ٥،'));
     expect(find.bySemanticsLabel('كبّر الصورة'), findsOneWidget);
@@ -132,6 +143,139 @@ void main() {
     expect(game.availablePoints('cat-emoji-4'), 400);
     // The picture stays; the clue card joins it.
     expect(find.bySemanticsLabel('كبّر الصورة'), findsNWidgets(2));
+    semantics.dispose();
+  });
+
+  testWidgets('the host lobby: code, live players, start when ready', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    final (server, game) = await pump(tester);
+    await toTeams(tester);
+    await press(tester, 'ابدأ اللعبة');
+
+    // The code to join with, as digits and as a big QR of the join link.
+    expect(find.text('١٠٠٠٠٠'), findsOneWidget);
+    final qr = tester.getSize(find.byKey(const ValueKey('join-qr')));
+    expect(qr.width, greaterThanOrEqualTo(180));
+    expect(
+      find.text('لسه محدش دخل. استنوا اللاعبين أو ابدأوا.'),
+      findsOneWidget,
+    );
+    expect(server.openSockets, 1);
+
+    // A player joins from another phone: they show up at once, and the
+    // start waits for them.
+    final sara = server.addPlayer('سارة', team: 2);
+    await settle(tester);
+    expect(find.text('سارة'), findsOneWidget);
+    expect(find.text('لسه ١ من اللاعبين مش جاهزين'), findsOneWidget);
+    final start = tester.widget<PlayButton>(
+      find.byKey(const ValueKey('lobby-start')),
+    );
+    expect(start.onPressed, isNull);
+
+    server.ready(sara);
+    await settle(tester);
+    expect(find.text('كله جاهز. يلا نبدأ!'), findsOneWidget);
+    await press(tester, 'ابدأ اللعبة');
+    expect(server.room!.gameId, isNotNull);
+    expect(find.byKey(const ValueKey('turn-chip')), findsOneWidget);
+    expect(game.game!.teamNames, ['الفراعنة', 'الجدعان']);
+    semantics.dispose();
+  });
+
+  testWidgets('a player joins by code and follows the host\'s game', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    tester.view.physicalSize = const Size(892 * 3, 412 * 3);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final server = FakeServer();
+    // The host's phone opens a room.
+    final host = await server.game();
+    await host.openRoom(
+      categoryIds: [
+        'cat-90s',
+        'cat-football',
+        'cat-emoji',
+        'cat-places',
+        'cat-cinema',
+        'cat-songs',
+      ],
+      teams: ['الفراعنة', 'الجدعان'],
+    );
+    final code = server.room!.code;
+
+    // This phone is a player's.
+    final player = server.guest();
+    addTearDown(player.dispose);
+    await tester.pumpWidget(
+      SahsahApp(
+        api: server.api,
+        lang: LangController(Lang.ar),
+        game: player,
+        sound: SoundController(backend: FakeSound()),
+      ),
+    );
+    await settle(tester);
+
+    // A wrong code says so; the right one opens the room's teams.
+    await press(tester, 'ادخل بكود');
+    await tester.enterText(find.byKey(const ValueKey('join-code')), '999999');
+    await settle(tester);
+    await tester.tap(find.text('ادخل'));
+    await settle(tester);
+    expect(find.text('الكود ده مش شغال. تأكد منه مع المضيف.'), findsOneWidget);
+    await tester.enterText(find.byKey(const ValueKey('join-code')), code);
+    await settle(tester);
+    await tester.tap(find.text('ادخل'));
+    await settle(tester);
+    expect(find.text('لقينا الغرفة!'), findsOneWidget);
+    await tester.enterText(find.byKey(const ValueKey('join-name')), 'سارة');
+    await tester.tap(find.byKey(const ValueKey('join-team-1')));
+    await settle(tester);
+    await tester.tap(find.byKey(const ValueKey('join-go')));
+    await settle(tester);
+    await settle(tester);
+
+    // The player's lobby, live.
+    expect(player.isGuest, isTrue);
+    expect(find.text('أهلًا سارة! اختار فريقك'), findsOneWidget);
+    expect(server.room!.players.single.team, 2);
+    await press(tester, 'أنا جاهز');
+    expect(server.room!.players.single.ready, isTrue);
+
+    // The host starts: the player's phone follows to the board.
+    await host.startGame();
+    await settle(tester);
+    expect(find.text('المضيف بيختار السؤال الجاي…'), findsOneWidget);
+
+    // The host opens a question: the player sees it, but runs nothing.
+    await host.open('cat-90s-1');
+    await settle(tester);
+    expect(find.text('سؤال 2 في نوستالجيا التسعينات'), findsOneWidget);
+    expect(find.text('المضيف بيدير السؤال من موبايله'), findsOneWidget);
+    expect(find.text('إظهار الإجابة'), findsNothing);
+
+    // The answer, then the award, as the host decides.
+    await host.reveal('cat-90s-1');
+    await settle(tester);
+    expect(find.text('إجابة 2 في نوستالجيا التسعينات'), findsOneWidget);
+    expect(find.text('المضيف هيقول مين جاوب صح'), findsOneWidget);
+    await host.award('cat-90s-1', 1);
+    await settle(tester);
+    expect(player.game!.scores, [0, 200]);
+    expect(find.text('المضيف بيختار السؤال الجاي…'), findsOneWidget);
+
+    // Leaving gives the seat up.
+    await press(tester, 'اخرج من الغرفة');
+    await tester.tap(find.byKey(const ValueKey('confirm-ok')));
+    await settle(tester);
+    expect(player.hasRoom, isFalse);
+    expect(server.room!.players, isEmpty);
+    host.dispose();
     semantics.dispose();
   });
 }

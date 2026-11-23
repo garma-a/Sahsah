@@ -70,6 +70,18 @@ class HostAuth extends Auth {
   String get bearer => 'Bearer $credential';
 }
 
+/// A player's seat in a room, from joining with a code. The secret stays on
+/// this phone.
+class GuestAuth extends Auth {
+  const GuestAuth({required this.membershipId, required this.secret});
+
+  final String membershipId;
+  final String secret;
+
+  @override
+  String get bearer => 'Bearer g.$membershipId.$secret';
+}
+
 /// Something went wrong talking to the API. [code] is the problem's stable
 /// code (RFC 9457), or `NETWORK` / `TIMEOUT` / `UNKNOWN` from this side.
 class ApiError implements Exception {
@@ -133,6 +145,10 @@ class SahsahApi {
   final Duration timeout;
 
   String get baseUrl => _baseUrl;
+
+  /// The live updates socket (`/api/v1/realtime`), on the same host.
+  Uri get realtimeUrl =>
+      Uri.parse('$_baseUrl/v1/realtime'.replaceFirst(RegExp('^http'), 'ws'));
 
   Future<HealthResponse> getHealth() async =>
       _read(await _request('GET', '/health'), HealthResponse.fromJson);
@@ -293,7 +309,7 @@ class SahsahApi {
   /// Short-lived signed links for the open question's pictures and clips.
   Future<MediaLinks> mediaAccess(
     String gameId,
-    HostAuth auth,
+    Auth auth,
     List<MediaRef> refs,
   ) async => _read(
     await _request(
@@ -319,6 +335,103 @@ class SahsahApi {
       auth: auth,
       operationId: operationId,
       body: {'expectedRoomVersion': roomVersion},
+    ),
+    Receipt.fromJson,
+  );
+
+  // ---- Players -------------------------------------------------------------
+
+  /// The room's current code and join link (host).
+  Future<Invitation> invitation(String roomId, HostAuth auth) async => _read(
+    await _request('GET', '/v1/rooms/$roomId/invitation', auth: auth),
+    Invitation.fromJson,
+  );
+
+  /// What a six-digit [code] opens, before joining.
+  Future<InvitationPreview> previewInvitation(String code) async => _read(
+    await _request('GET', '/v1/room-invitations/$code'),
+    InvitationPreview.fromJson,
+  );
+
+  /// Joins with [code] as [displayName] on [teamNumber] (1 or 2). The
+  /// [reconnectSecret] becomes this phone's seat proof.
+  Future<Receipt> join(
+    String code,
+    String operationId, {
+    required String displayName,
+    required int teamNumber,
+    required String reconnectSecret,
+  }) async => _read(
+    await _request(
+      'POST',
+      '/v1/room-invitations/$code/memberships',
+      operationId: operationId,
+      body: {
+        'identity': 'anonymous',
+        'displayName': displayName,
+        'teamNumber': teamNumber,
+        'reconnectSecret': reconnectSecret,
+      },
+    ),
+    Receipt.fromJson,
+  );
+
+  Future<Receipt> setReady(
+    String roomId,
+    GuestAuth auth,
+    String operationId, {
+    required String memberVersion,
+    required int readyGeneration,
+    required bool ready,
+  }) async => _read(
+    await _request(
+      'PUT',
+      '/v1/rooms/$roomId/memberships/me/readiness',
+      auth: auth,
+      operationId: operationId,
+      body: {
+        'expectedMembershipVersion': memberVersion,
+        'expectedReadyGeneration': readyGeneration,
+        'ready': ready,
+      },
+    ),
+    Receipt.fromJson,
+  );
+
+  Future<Receipt> setTeam(
+    String roomId,
+    GuestAuth auth,
+    String operationId, {
+    required String memberVersion,
+    required int readyGeneration,
+    required int teamNumber,
+  }) async => _read(
+    await _request(
+      'PATCH',
+      '/v1/rooms/$roomId/memberships/me',
+      auth: auth,
+      operationId: operationId,
+      body: {
+        'expectedMembershipVersion': memberVersion,
+        'expectedReadyGeneration': readyGeneration,
+        'teamNumber': teamNumber,
+      },
+    ),
+    Receipt.fromJson,
+  );
+
+  /// A player leaves the room.
+  Future<Receipt> leave(
+    String roomId,
+    GuestAuth auth,
+    String operationId,
+  ) async => _read(
+    await _request(
+      'POST',
+      '/v1/rooms/$roomId/memberships/me/departure',
+      auth: auth,
+      operationId: operationId,
+      body: const <String, Object>{},
     ),
     Receipt.fromJson,
   );

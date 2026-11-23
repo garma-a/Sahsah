@@ -79,33 +79,36 @@ class _ResultsScreenState extends State<ResultsScreen> {
             onTap: _home,
           ),
         ),
-        const SizedBox(width: 10),
-        Expanded(
-          flex: 3,
-          child: PlayButton(
-            height: 56,
-            onPressed: _replay,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(LucideIcons600.rotateCcw, size: 20),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    lang.t('العبوا مرة تانية', 'El3abo marra tanya'),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppText.sans(
-                      18,
-                      weight: FontWeight.w700,
-                      color: Colors.white,
+        // Only the host starts the next game.
+        if (!context.game.isGuest) ...[
+          const SizedBox(width: 10),
+          Expanded(
+            flex: 3,
+            child: PlayButton(
+              height: 56,
+              onPressed: _replay,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(LucideIcons600.rotateCcw, size: 20),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      lang.t('العبوا مرة تانية', 'El3abo marra tanya'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppText.sans(
+                        18,
+                        weight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
+        ],
       ],
     );
     final scores = Row(
