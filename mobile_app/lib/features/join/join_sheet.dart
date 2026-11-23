@@ -16,6 +16,7 @@ import '../game/game_controller.dart';
 import '../game/guest_room_screen.dart';
 import '../game/ui/game_ui.dart' show teamColors;
 import '../shared/form_widgets.dart';
+import 'scan_screen.dart';
 
 /// Opens the "join with code" bottom sheet guests use to enter a room.
 Future<void> showJoinSheet(BuildContext context) {
@@ -144,14 +145,14 @@ class _JoinSheetState extends State<JoinSheet> {
     }
   }
 
-  void _scan() {
-    final lang = context.lang;
-    setState(
-      () => _message = lang.t(
-        'امسح الـQR بكاميرا موبايلك وهتدخل من الموقع، أو اكتب الكود هنا.',
-        'Emsa7 el QR be camera mobailak w hatodkhol mel website, aw ekteb el code hena.',
-      ),
-    );
+  /// The camera reads the host's QR; its code fills the boxes and is
+  /// checked at once.
+  Future<void> _scan() async {
+    final code = await JoinScanner.scan(context);
+    if (code == null || !mounted) return;
+    _code.text = code;
+    setState(() => _message = null);
+    await _check();
   }
 
   @override
