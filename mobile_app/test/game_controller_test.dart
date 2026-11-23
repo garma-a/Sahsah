@@ -1,248 +1,253 @@
-import 'dart:convert';
-
+import 'package:flutter/painting.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sahsah_mobile/core/session/host_session.dart';
 import 'package:sahsah_mobile/features/game/game_controller.dart';
 import 'package:sahsah_mobile/features/game/model/question.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-const categories = ['cinema', 'music', 'football', 'person', 'color', 'memory'];
+import 'support/fake_server.dart';
+
+const board = [
+  'cat-football',
+  'cat-90s',
+  'cat-emoji',
+  'cat-places',
+  'cat-cinema',
+  'cat-songs',
+];
+
+Future<(FakeServer, GameController)> started() async {
+  final server = FakeServer();
+  final game = await server.game();
+  await game.start(categoryIds: board, teams: ['النسور', 'الجدعان']);
+  return (server, game);
+}
 
 void main() {
-  late DateTime now;
-  late GameController game;
+  TestWidgetsFlutterBinding.ensureInitialized();
+  setUp(() => SharedPreferences.setMockInitialValues({}));
 
-  setUp(() {
-    now = DateTime(2026, 11, 6, 12);
-    game = GameController(now: () => now)
-      ..start(categoryIds: categories, teams: ['A', 'B']);
+  test('start opens a room on the server and plays its board', () async {
+    final (server, game) = await started();
+
+    expect(server.room!.gameId, isNotNull);
+    expect(game.hasActiveGame, isTrue);
+    expect(game.game!.categoryIds, board);
+    expect(game.game!.teamNames, ['النسور', 'الجدعان']);
+    expect(game.game!.nameOf('cat-90s'), 'نوستالجيا التسعينات');
+    expect(game.game!.scores, [0, 0]);
   });
 
-  void advance(int ms) => now = now.add(Duration(milliseconds: ms));
-
-  test('opening a question starts the 60 s clock automatically', () {
-    game.open('cinema-0');
-    final p = game.progressOf('cinema-0');
-    expect(game.timerStatus(p), TimerStatus.running);
-    advance(15000);
-    expect(game.remainingMs(p), 45000);
-    advance(50000);
-    expect(game.remainingMs(p), 0);
-    // Timeout alone doesn't reveal or resolve.
-    expect(game.timerStatus(p), TimerStatus.elapsed);
-    expect(p.revealed, isFalse);
-  });
-
-  test('back to the board pauses; reopening resumes the saved time', () {
-    game.open('cinema-0');
-    advance(20000);
-    game.leave();
-    final p = game.progressOf('cinema-0');
-    expect(game.timerStatus(p), TimerStatus.paused);
-    advance(99000);
-    expect(game.remainingMs(p), 40000);
-    game.open('cinema-0');
-    expect(game.timerStatus(p), TimerStatus.running);
-    advance(10000);
-    expect(game.remainingMs(p), 30000);
-  });
-
-  test('a host pause stays paused after going back and forth', () {
-    game.open('cinema-0');
-    game.toggleTimer('cinema-0');
-    game.leave();
-    game.open('cinema-0');
-    expect(game.timerStatus(game.progressOf('cinema-0')), TimerStatus.paused);
-  });
-
-  test('memory clock starts on the first hide only', () {
-    game.open('memory-0');
-    final p = game.progressOf('memory-0');
-    expect(game.timerStatus(p), TimerStatus.ready);
-    game.showMemory('memory-0');
-    game.hideMemory('memory-0');
-    expect(game.timerStatus(p), TimerStatus.running);
-    advance(10000);
-    game.showMemory('memory-0');
-    game.hideMemory('memory-0');
-    expect(game.remainingMs(p), 50000);
-  });
-
-  test('award adds the tile points once; nobody adds none', () {
-    game.open('music-5');
-    game.reveal('music-5');
-    game.award('music-5', 1);
-    game.award('music-5', 0); // Ignored: already resolved.
-    game.open('music-0');
-    game.award('music-0', null);
-    final g = game.game!;
-    expect(g.scores, [0, 600]);
-    expect(g.results['music-0']!.team, isNull);
-    expect(g.resolvedCount, 2);
-    expect(g.activeId, isNull);
-  });
-
-  test('the 36th resolution finishes the game', () {
-    for (final c in categories) {
-      for (var r = 0; r < 6; r++) {
-        game.open('$c-$r');
-        game.award('$c-$r', r.isEven ? 0 : null);
-      }
-    }
-    final g = game.game!;
-    expect(g.finished, isTrue);
-    expect(g.scores[0], 6 * (200 + 400 + 600));
-    expect(game.hasActiveGame, isFalse);
-  });
-
-  test('score correction takes a nonnegative total and locks at the end', () {
-    game.setScore(0, 1000);
-    game.setScore(1, -5);
-    expect(game.game!.scores, [1000, 0]);
-    game.end();
-    game.setScore(0, 0);
-    expect(game.game!.scores[0], 1000);
-  });
-
-  test('saved games survive a restart and expire after 24 hours', () async {
-    game.open('cinema-0');
-    game.award('cinema-0', 0);
-    final saved = game.game!.toJson();
-
-    Future<GameController> loadWith(DateTime lastAction) {
-      final copy = Game.fromJson(saved)..lastActionAt = lastAction;
-      SharedPreferences.setMockInitialValues({
-        GameController.storageKey: jsonEncode(copy.toJson()),
-      });
-      return GameController.load();
-    }
-
-    final stale = await loadWith(
-      DateTime.now().subtract(const Duration(hours: 25)),
+  test('hosting needs the passcode first', () async {
+    final game = await FakeServer().game(signedIn: false);
+    expect(
+      () => game.start(categoryIds: board, teams: ['أ', 'ب']),
+      throwsA(isA<SignInNeeded>()),
     );
-    expect(stale.game, isNull);
+  });
 
-    final recent = await loadWith(
-      DateTime.now().subtract(const Duration(hours: 2)),
+  test('a category with nothing to play stops the start', () async {
+    final game = await FakeServer().game();
+    await expectLater(
+      game.start(
+        categoryIds: [...board.take(5), 'cat-soon'],
+        teams: ['أ', 'ب'],
+        names: {'cat-soon': 'فوازير وألغاز'},
+      ),
+      throwsA(
+        isA<NoPackLeft>().having((e) => e.empty, 'empty', ['فوازير وألغاز']),
+      ),
     );
-    expect(recent.game!.scores, [200, 0]);
-    expect(recent.game!.results.keys, ['cinema-0']);
   });
 
-  test('acting (6B): the clock waits for Ready', () {
-    final acting = GameController(now: () => now)
-      ..start(
-        categoryIds: [
-          'acting',
-          'music',
-          'football',
-          'person',
-          'color',
-          'memory',
-        ],
-        teams: ['A', 'B'],
-      );
-    acting.open('acting-2');
-    final p = acting.progressOf('acting-2');
-    expect(acting.question('acting-2').kind, QuestionKind.acting);
-    expect(acting.timerStatus(p), TimerStatus.ready);
-    acting.toggleTimer('acting-2'); // "جاهز"
-    expect(acting.timerStatus(p), TimerStatus.running);
-    expect(acting.remainingMs(p), GameController.answerMs);
+  test('opening runs the clock; back to the board pauses it', () async {
+    final (_, game) = await started();
+    await game.open('cat-football-1');
+
+    expect(game.game!.activeId, 'cat-football-1');
+    final p = game.progressOf('cat-football-1');
+    expect(game.timerStatus(p), TimerStatus.running);
+    expect(game.remainingMs(p), greaterThan(55000));
+    expect(game.question('cat-football-1').prompt, 'سؤال 2 في الكورة المصرية');
+
+    await game.leave();
+    expect(game.game!.activeId, isNull);
+    expect(game.game!.opened, contains('cat-football-1'));
+
+    await game.open('cat-football-1');
+    expect(
+      game.timerStatus(game.progressOf('cat-football-1')),
+      TimerStatus.running,
+    );
   });
 
-  test('staged (6C): each clearer picture lowers the points', () {
-    // football-0 is a blur picture worth 200 → 150 → 50.
-    expect(game.question('football-0').kind, QuestionKind.staged);
-    game.open('football-0');
-    expect(game.availablePoints('football-0'), 200);
-    game.advanceStage('football-0');
-    expect(game.availablePoints('football-0'), 150);
-    game.advanceStage('football-0');
-    game.advanceStage('football-0'); // Already the clearest: no change.
-    expect(game.availablePoints('football-0'), 50);
-    expect(game.progressOf('football-0').stage, 2);
+  test(
+    'a host pause stays paused, and the server lists what is allowed',
+    () async {
+      final (_, game) = await started();
+      await game.open('cat-football-1');
+      expect(game.can('cat-football-1', 'pause_timer'), isTrue);
+      expect(game.can('cat-football-1', 'resume_timer'), isFalse);
 
-    // The stage survives a save, and the award uses it.
-    final saved = Game.fromJson(game.game!.toJson());
-    expect(saved.progress['football-0']!.stage, 2);
-    game.reveal('football-0');
-    game.advanceStage('football-0'); // Ignored after the reveal.
-    game.award('football-0', 1);
-    expect(game.game!.scores, [0, 50]);
+      game.toggleTimer('cat-football-1');
+      await pumpEventQueue();
+      expect(game.progressOf('cat-football-1').status, TimerStatus.paused);
+      expect(game.can('cat-football-1', 'resume_timer'), isTrue);
+    },
+  );
+
+  test('memory: the clock starts on the first hide only', () async {
+    final (_, game) = await started();
+    const id = 'cat-emoji-2';
+    await game.open(id);
+    expect(game.question(id).kind, QuestionKind.memory);
+    expect(game.progressOf(id).memory, MemoryPhase.ready);
+    expect(game.timerStatus(game.progressOf(id)), TimerStatus.ready);
+    expect(game.can(id, 'reveal_answer'), isFalse);
+
+    game.showMemory(id);
+    await pumpEventQueue();
+    expect(game.progressOf(id).memory, MemoryPhase.viewing);
+    expect(game.question(id).image, isNotNull);
+
+    game.hideMemory(id);
+    await pumpEventQueue();
+    expect(game.progressOf(id).memory, MemoryPhase.hidden);
+    expect(game.progressOf(id).memoryAsked, isTrue);
+    expect(game.timerStatus(game.progressOf(id)), TimerStatus.running);
+    expect(game.question(id).prompt, 'سؤال 3 في خمّن الكلمة من الإيموجي');
   });
 
-  test('other questions have one stage and ignore clarify', () {
-    game.open('cinema-4');
-    game.advanceStage('cinema-4');
-    expect(game.progressOf('cinema-4').stage, 0);
-    expect(game.availablePoints('cinema-4'), 600);
+  test('staged: each clearer picture lowers the points, twice', () async {
+    final (_, game) = await started();
+    const id = 'cat-90s-4';
+    await game.open(id);
+    expect(game.question(id).kind, QuestionKind.staged);
+    expect(game.question(id).pointStages, [600, 400, 200]);
+    expect(game.availablePoints(id), 600);
+
+    game.advanceStage(id);
+    await pumpEventQueue();
+    expect(game.availablePoints(id), 400);
+    expect(game.progressOf(id).stage, 1);
+    game.advanceStage(id);
+    await pumpEventQueue();
+    expect(game.availablePoints(id), 200);
+    expect(game.can(id, 'advance_hint'), isFalse);
   });
 
-  test('the turn passes after every settled question', () {
-    expect(game.game!.turn, 0);
-    game.open('cinema-0');
-    game.award('cinema-0', 1); // Whoever scores, the pick moves on.
+  test('award reveals first, counts once, and passes the turn', () async {
+    final (_, game) = await started();
+    await game.open('cat-football-2');
+    await game.award('cat-football-2', 0);
+
+    expect(game.game!.scores, [400, 0]);
+    expect(game.game!.results['cat-football-2']!.team, 0);
+    expect(game.game!.results['cat-football-2']!.points, 400);
     expect(game.game!.turn, 1);
-    game.open('cinema-1');
-    game.award('cinema-1', null);
+
+    await game.open('cat-football-0');
+    await game.award('cat-football-0', null);
+    expect(game.game!.scores, [400, 0]);
+    expect(game.game!.results['cat-football-0']!.team, isNull);
     expect(game.game!.turn, 0);
-
-    // The host can hand the pick over, and it survives a save.
-    game.switchTurn();
-    expect(game.game!.turn, 1);
-    expect(Game.fromJson(game.game!.toJson()).turn, 1);
-    // Saves from before turns existed start with the first team.
-    final old = game.game!.toJson()..remove('turn');
-    expect(Game.fromJson(old).turn, 0);
   });
 
-  test('the last award can be taken back once', () {
-    game.open('football-0'); // Staged: 200 → 150.
-    game.advanceStage('football-0');
-    game.reveal('football-0');
-    game.award('football-0', 0);
-    expect(game.game!.scores, [150, 0]);
-    expect(game.canUndoAward, isTrue);
-
-    expect(game.undoAward('cinema-0'), isFalse); // Not the last award.
-    expect(game.undoAward('football-0'), isTrue);
-    final g = game.game!;
-    expect(g.scores, [0, 0]);
-    expect(g.results, isEmpty);
-    expect(g.turn, 0);
-    // The tile is open again exactly as it was left.
-    final p = game.progressOf('football-0');
-    expect(p.revealed, isTrue);
-    expect(p.stage, 1);
-    expect(game.undoAward('football-0'), isFalse);
-
-    // Awarding again works, this time to the other team.
-    game.open('football-0');
-    game.award('football-0', 1);
-    expect(g.scores, [0, 150]);
-    expect(g.turn, 1);
+  test('a colour answer brings its colour; a picture gets its link', () async {
+    final (_, game) = await started();
+    const id = 'cat-90s-3';
+    await game.open(id);
+    await pumpEventQueue(); // The links come in after the view.
+    expect(game.image(game.question(id).image), isNotNull);
+    await game.reveal(id);
+    expect(game.progressOf(id).revealed, isTrue);
+    expect(game.question(id).answer, 'إجابة 4 في نوستالجيا التسعينات');
+    expect(game.question(id).color, const Color(0xFFC0392B));
   });
 
-  test('the award that ends the game cannot be undone', () {
-    for (final c in categories) {
-      for (var r = 0; r < 6; r++) {
-        game.open('$c-$r');
-        game.award('$c-$r', 0);
-      }
-    }
+  test('score correction sets a total on the server', () async {
+    final (_, game) = await started();
+    await game.setScore(1, 750);
+    expect(game.game!.scores, [0, 750]);
+  });
+
+  test('ending locks the result with each category\'s points', () async {
+    final (_, game) = await started();
+    await game.open('cat-cinema-5');
+    await game.award('cat-cinema-5', 1);
+    await game.end();
+
     expect(game.game!.finished, isTrue);
-    expect(game.canUndoAward, isFalse);
-    expect(game.undoAward('memory-5'), isFalse);
+    expect(game.hasActiveGame, isFalse);
+    expect(game.game!.categoryPoints('cat-cinema'), [0, 600]);
+    expect(game.game!.leader, 1);
   });
 
-  test('every board slot has a question', () {
-    for (final c in [...categories, 'acting', 'general', 'travel']) {
-      for (var r = 0; r < 6; r++) {
-        final q = game.question('$c-$r');
-        expect(q.prompt, isNotEmpty);
-        expect(q.answer, isNotEmpty);
-        expect(q.answerEn, isNotEmpty);
-      }
-    }
+  test('the room survives a restart, mid-question, with the turn', () async {
+    final (server, game) = await started();
+    await game.open('cat-football-1');
+    await game.award('cat-football-1', 0);
+    await game.open('cat-songs-3');
+
+    final prefs = await SharedPreferences.getInstance();
+    final again = GameController(
+      api: server.api,
+      session: HostSession(server.api, prefs),
+      prefs: prefs,
+    );
+    expect(again.hasRoom, isTrue);
+    await again.refresh();
+    expect(again.game!.activeId, 'cat-songs-3');
+    expect(again.game!.turn, 1);
+    expect(again.game!.scores, [200, 0]);
+  });
+
+  test('another device taking the room is said, and can be undone', () async {
+    final (server, game) = await started();
+    server.takeControlElsewhere();
+    await game.refresh();
+    expect(game.controlLost, isTrue);
+
+    await game.takeControl();
+    expect(game.controlLost, isFalse);
+    expect(game.hasActiveGame, isTrue);
+  });
+
+  test('a room closed on the server is forgotten', () async {
+    final (server, game) = await started();
+    server.room!.closed = true;
+    await game.refresh();
+    expect(game.hasRoom, isFalse);
+    expect(game.game, isNull);
+  });
+
+  test('a new game closes the old room, even one opened elsewhere', () async {
+    final (server, game) = await started();
+    final first = server.room!.id;
+    await game.start(categoryIds: board.reversed.toList(), teams: ['أ', 'ب']);
+    expect(server.room!.id, isNot(first));
+
+    // Another phone signed in as the same host (here: a fresh controller
+    // that holds no room) still gets a new game.
+    SharedPreferences.setMockInitialValues({
+      HostSession.storageKey: (await SharedPreferences.getInstance()).getString(
+        HostSession.storageKey,
+      )!,
+    });
+    final other = await server.game();
+    expect(other.hasRoom, isFalse);
+    await other.start(categoryIds: board, teams: ['ج', 'د']);
+    expect(other.game!.teamNames, ['ج', 'د']);
+    expect(server.room!.teams, ['ج', 'د']);
+  });
+
+  test('a refused command is reported, not thrown', () async {
+    final (server, game) = await started();
+    await game.open('cat-football-1');
+    server.offline = true;
+    await game.reveal('cat-football-1');
+    expect(game.problem!.code, 'NETWORK');
+    expect(game.problemCount, 1);
+    server.offline = false;
   });
 }

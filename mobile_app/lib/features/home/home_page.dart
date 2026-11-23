@@ -12,7 +12,7 @@ import '../../core/ui/play_button.dart';
 import '../../core/ui/pressable.dart';
 import '../../core/ui/surfaces.dart';
 import '../../data/catalog.dart';
-import '../../data/categories.dart';
+import '../../data/game_rules.dart';
 import '../../data/promos.dart';
 import '../categories/category_widgets.dart';
 import '../game/board_screen.dart';

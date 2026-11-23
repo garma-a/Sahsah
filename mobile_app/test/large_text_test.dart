@@ -3,15 +3,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sahsah_mobile/app.dart';
 import 'package:sahsah_mobile/core/audio/sound.dart';
 import 'package:sahsah_mobile/core/i18n/lang.dart';
-import 'package:sahsah_mobile/features/game/game_controller.dart';
 import 'package:sahsah_mobile/features/home/promo_banner.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'game_flow_test.dart' show settle;
-import 'screen_reader_test.dart' show press;
+import 'screen_reader_test.dart' show pickBoard, press;
 import 'sound_test.dart' show FakeSound;
 
-import 'support/fake_api.dart';
+import 'support/fake_server.dart';
 
 /// The app caps system text at 130%. At that size, on a phone and on a
 /// small phone, no screen may overflow: an overflow fails the test.
@@ -24,11 +23,12 @@ void main() {
     tester.platformDispatcher.textScaleFactorTestValue = 1.3;
     addTearDown(tester.view.reset);
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    final server = FakeServer();
     await tester.pumpWidget(
       SahsahApp(
-        api: fakeApi(),
+        api: server.api,
         lang: LangController(lang),
-        game: GameController(),
+        game: await server.game(),
         sound: SoundController(backend: FakeSound()),
       ),
     );
@@ -53,7 +53,7 @@ void main() {
       await everyBanner(tester);
 
       await press(tester, RegExp('^ابدأ لعبة'));
-      await press(tester, 'التحديات الجديدة');
+      await pickBoard(tester);
       await press(tester, 'التالي');
       await press(tester, 'ابدأ اللعبة');
       await press(tester, RegExp('باقي ٦ أسئلة'));

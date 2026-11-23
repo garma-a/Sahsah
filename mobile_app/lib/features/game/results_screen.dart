@@ -8,18 +8,17 @@ import 'package:lucide_icons_flutter/lucide_icons_600.dart';
 import '../../core/audio/sound.dart';
 import '../../core/i18n/lang.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/ui/brand_art.dart';
+import '../../core/ui/brand_art.dart' show Logo;
 import '../../core/ui/play_button.dart';
 import '../../core/ui/surfaces.dart';
-import '../../data/categories.dart';
+import '../../data/catalog.dart';
 import 'game_controller.dart';
-import 'model/question.dart';
 import 'setup_screen.dart';
 import 'ui/game_ui.dart';
 import '../../core/ui/motion.dart';
 import '../../core/ui/cover_image.dart';
 
-/// Final scores. Scores are locked; the saved game is cleared on leaving.
+/// Final scores, locked on the server. Leaving closes the room.
 class ResultsScreen extends StatefulWidget {
   const ResultsScreen({super.key});
 
@@ -558,29 +557,30 @@ class _CategoryRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final lang = context.lang;
-    final category = allCategories.firstWhere((c) => c.id == categoryId);
-    final totals = [0, 0];
-    for (var r = 0; r < tilePoints.length; r++) {
-      final result = game.results['$categoryId-$r'];
-      if (result?.team != null) totals[result!.team!] += result.points;
-    }
+    final totals = game.categoryPoints(categoryId);
+    final cover = coverOf(context.catalog.byId(categoryId));
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       child: Row(
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(10),
-            child: CoverAsset(
-              BrandImages.category(categoryId),
+            child: SizedBox(
               width: 40,
               height: 40,
+              child: cover == null
+                  ? const ColoredBox(color: AppColors.card)
+                  : CoverPicture(
+                      cover,
+                      errorBuilder: (_, _, _) =>
+                          const ColoredBox(color: AppColors.card),
+                    ),
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              lang.t(category.name, category.nameEn),
+              game.nameOf(categoryId),
               // Two lines before an ellipsis: the slots leave the name
               // less room than one line of "مين في الصورة؟".
               maxLines: 2,

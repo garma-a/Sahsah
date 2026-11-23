@@ -7,7 +7,7 @@ import '../../core/ui/pressable.dart';
 import '../../core/ui/retro.dart';
 import '../../core/ui/surfaces.dart';
 import '../../data/catalog.dart';
-import '../../data/categories.dart';
+import '../../data/game_rules.dart';
 import 'category_widgets.dart';
 import '../../core/ui/motion.dart';
 

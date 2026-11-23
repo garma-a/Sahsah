@@ -10,21 +10,9 @@ import 'motion.dart';
 abstract final class BrandImages {
   static const plaque = 'assets/logo/plaque.png';
   static const divider = 'assets/logo/divider.png';
-  static const hero = 'assets/img/hero.webp';
   static const herowide = 'assets/img/herowide.webp';
   static const coins = 'assets/img/coins.webp';
   static const contact = 'assets/img/contact.webp';
-  static const comedy = 'assets/img/comedy.webp';
-  static const cinema = 'assets/img/cinema.webp';
-  static const football = 'assets/img/football.webp';
-  static const music = 'assets/img/music.webp';
-  static const ramadan = 'assets/img/ramadan.webp';
-
-  /// Cover art per category. The acting pack borrows the cinema poster
-  /// until it has its own artwork.
-  static String category(String id) => 'assets/img/${_coverFor[id] ?? id}.webp';
-
-  static const _coverFor = {'acting': 'cinema'};
 }
 
 /// The brand mark: the stacked retro "صح صح" ([RetroLogo]), [size] tall.

@@ -225,12 +225,10 @@ Future<void> showCategorySheet(BuildContext context, Category category) {
               const SizedBox(height: 20),
               PlayButton(
                 height: 58,
-                // Until games run through the server, setup picks from
-                // the offline categories, so this one isn't preselected.
                 onPressed: category.playable
                     ? () {
                         Navigator.of(sheetContext).pop();
-                        openSetup(navigator.context);
+                        openSetup(navigator.context, categoryId: category.id);
                       }
                     : null,
                 child: Row(
@@ -240,7 +238,7 @@ Future<void> showCategorySheet(BuildContext context, Category category) {
                     const SizedBox(width: 10),
                     Text(
                       category.playable
-                          ? lang.t('ابدأ لعبة', 'Ebda2 le3ba')
+                          ? lang.t('العب بالفئة دي', 'El3ab bel fe2a di')
                           : lang.t('قريبًا', '2orayeban'),
                       // No colour: the button dims the label when disabled.
                       style: const TextStyle(

@@ -23,6 +23,9 @@ class SahsahField extends StatelessWidget {
     this.maxLength,
     this.onChanged,
     this.autofillHints,
+    this.obscure = false,
+    this.onSubmitted,
+    this.textInputAction,
   });
 
   final String label;
@@ -40,6 +43,11 @@ class SahsahField extends StatelessWidget {
   final int? maxLength;
   final ValueChanged<String>? onChanged;
   final Iterable<String>? autofillHints;
+
+  /// Hides what's typed (a passcode).
+  final bool obscure;
+  final ValueChanged<String>? onSubmitted;
+  final TextInputAction? textInputAction;
 
   @override
   Widget build(BuildContext context) {
@@ -80,7 +88,12 @@ class SahsahField extends StatelessWidget {
             maxLines: maxLines,
             maxLength: maxLength,
             onChanged: onChanged,
+            onSubmitted: onSubmitted,
+            textInputAction: textInputAction,
             autofillHints: autofillHints,
+            obscureText: obscure,
+            autocorrect: !obscure,
+            enableSuggestions: !obscure,
             textDirection: ltr ? TextDirection.ltr : null,
             textAlign: TextAlign.start,
             style: AppText.sans(

@@ -5,14 +5,13 @@ import 'package:sahsah_mobile/app.dart';
 import 'package:sahsah_mobile/core/audio/sound.dart';
 import 'package:sahsah_mobile/core/i18n/lang.dart';
 import 'package:sahsah_mobile/core/ui/tablet_scale.dart';
-import 'package:sahsah_mobile/features/game/game_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'game_flow_test.dart' show settle;
-import 'screen_reader_test.dart' show press;
+import 'screen_reader_test.dart' show pickBoard, press;
 import 'sound_test.dart' show FakeSound;
 
-import 'support/fake_api.dart';
+import 'support/fake_server.dart';
 
 /// The screens group 3 of the design review looked at (the acting rules,
 /// More, contact) fit on a phone, a small phone and a tablet, at normal
@@ -27,11 +26,12 @@ void main() {
     tester.platformDispatcher.textScaleFactorTestValue = text;
     addTearDown(tester.view.reset);
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    final server = FakeServer();
     await tester.pumpWidget(
       SahsahApp(
-        api: fakeApi(),
+        api: server.api,
         lang: LangController(Lang.ar),
-        game: GameController(),
+        game: await server.game(),
         sound: SoundController(backend: FakeSound()),
       ),
     );
@@ -63,15 +63,13 @@ void main() {
       final semantics = tester.ensureSemantics();
       await pump(tester, size, text);
 
-      // A game with acting in it: swap one quick pick for "مثّلها".
+      // A game with acting in it: "خمّن المكان" ends with charades.
       await press(tester, RegExp('^ابدأ لعبة'));
-      await press(tester, 'التحديات الجديدة');
-      await press(tester, 'مين في الصورة؟');
-      await press(tester, 'مثّلها');
+      await pickBoard(tester);
       await press(tester, 'التالي');
       await press(tester, 'ابدأ اللعبة');
-      await press(tester, RegExp('^مثّلها، باقي'));
-      await press(tester, RegExp('^سؤال ١،'));
+      await press(tester, RegExp('^خمّن المكان، باقي'));
+      await press(tester, RegExp('^سؤال ٥،'));
       expect(find.text('اضغطوا جاهز والوقت يبدأ'), findsOneWidget);
       await press(tester, 'رجوع');
       await press(tester, 'ولا حد');

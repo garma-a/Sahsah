@@ -6,6 +6,7 @@ import '../../../core/ui/brand_background.dart';
 import '../../../core/ui/game_button.dart';
 import '../../../core/ui/pressable.dart';
 import '../../../core/ui/surfaces.dart';
+import '../game_controller.dart';
 
 /// Team colours from the website (`teamTone` in components/brand/tones.ts):
 /// cyan for the first team, yellow for the second. Red is the main button
@@ -33,6 +34,10 @@ class GameScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return _ProblemNotes(child: _frame(context));
+  }
+
+  Widget _frame(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.deep,
       resizeToAvoidBottomInset: true,
@@ -302,4 +307,66 @@ class _Label extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Shows what went wrong with a game command, once, as a message on the
+/// screen in front (a game played on the server can refuse or fail).
+class _ProblemNotes extends StatefulWidget {
+  const _ProblemNotes({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_ProblemNotes> createState() => _ProblemNotesState();
+}
+
+class _ProblemNotesState extends State<_ProblemNotes> {
+  GameController? _game;
+  int _seen = 0;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final game = context
+        .dependOnInheritedWidgetOfExactType<GameScope>()
+        ?.notifier;
+    if (game == _game) return;
+    _game?.removeListener(_check);
+    _game = game;
+    _seen = game?.problemCount ?? 0;
+    game?.addListener(_check);
+  }
+
+  @override
+  void dispose() {
+    _game?.removeListener(_check);
+    super.dispose();
+  }
+
+  void _check() {
+    final game = _game;
+    if (game == null || game.problemCount == _seen) return;
+    _seen = game.problemCount;
+    final problem = game.problem;
+    // Only the screen in front speaks; the ones under it stay quiet.
+    if (problem == null || !(ModalRoute.of(context)?.isCurrent ?? true)) {
+      return;
+    }
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          width: 460,
+          backgroundColor: AppColors.ui,
+          content: Text(
+            problem.message(context.lang),
+            style: AppText.sans(15, weight: FontWeight.w600),
+          ),
+        ),
+      );
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
