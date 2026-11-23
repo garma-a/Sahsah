@@ -408,8 +408,23 @@ class _MemberRow extends StatelessWidget {
   final bool me;
   final VoidCallback? onRemove;
 
+  /// Below this width (a team column on a landscape phone) the ready label
+  /// shrinks to its icon, so the name keeps the room.
+  static const compactWidth = 300.0;
+
   @override
   Widget build(BuildContext context) {
+    final lang = context.lang;
+    final status = member.ready
+        ? lang.t('جاهز', 'Gahez')
+        : lang.t('مستنيينه', 'Mestanyeeno');
+    return LayoutBuilder(
+      builder: (context, box) =>
+          _row(context, status, compact: box.maxWidth < compactWidth),
+    );
+  }
+
+  Widget _row(BuildContext context, String status, {required bool compact}) {
     final lang = context.lang;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -445,7 +460,8 @@ class _MemberRow extends StatelessWidget {
                       '${member.displayName} (enta)',
                     )
                   : member.displayName,
-              maxLines: 1,
+              // A long name wraps once before it is cut.
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: AppText.sans(
                 15,
@@ -454,34 +470,43 @@ class _MemberRow extends StatelessWidget {
               ),
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            decoration: BoxDecoration(
-              color: member.ready
-                  ? AppColors.green
-                  : AppColors.ink.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  member.ready ? LucideIcons600.check : LucideIcons.clock,
-                  size: 13,
-                  color: AppColors.ink,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  member.ready
-                      ? lang.t('جاهز', 'Gahez')
-                      : lang.t('مستنيينه', 'Mestanyeeno'),
-                  style: AppText.sans(
-                    12,
-                    weight: FontWeight.w700,
+          const SizedBox(width: 6),
+          Semantics(
+            label: compact ? status : null,
+            excludeSemantics: compact,
+            child: Container(
+              key: ValueKey('status-${member.id}'),
+              padding: EdgeInsets.symmetric(
+                horizontal: compact ? 5 : 8,
+                vertical: compact ? 4 : 2,
+              ),
+              decoration: BoxDecoration(
+                color: member.ready
+                    ? AppColors.green
+                    : AppColors.ink.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    member.ready ? LucideIcons600.check : LucideIcons.clock,
+                    size: 13,
                     color: AppColors.ink,
                   ),
-                ),
-              ],
+                  if (!compact) ...[
+                    const SizedBox(width: 4),
+                    Text(
+                      status,
+                      style: AppText.sans(
+                        12,
+                        weight: FontWeight.w700,
+                        color: AppColors.ink,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
           ),
           // The host's way to take a player out: a 44px target around a

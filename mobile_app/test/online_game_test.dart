@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:sahsah_mobile/app.dart';
@@ -351,6 +352,27 @@ void main() {
       findsOneWidget,
     );
     expect(game.problem, isNull);
+    semantics.dispose();
+  });
+
+  testWidgets('a landscape lobby keeps a player\'s name whole', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final (server, _) = await pump(tester);
+    await toTeams(tester);
+    await press(tester, 'ابدأ اللعبة');
+    final player = server.addPlayer('لاعب تجربة');
+    await settle(tester);
+
+    // The team column is narrow: the ready label is its icon alone, and
+    // still says what it means; the name isn't cut.
+    final name = tester.renderObject<RenderParagraph>(find.text('لاعب تجربة'));
+    expect(name.didExceedMaxLines, isFalse);
+    expect(find.text('مستنيينه'), findsNothing);
+    expect(find.byKey(ValueKey('status-${player.id}')), findsOneWidget);
+    expect(
+      find.bySemanticsLabel(RegExp('لاعب تجربة\nمستنيينه')),
+      findsOneWidget,
+    );
     semantics.dispose();
   });
 }
