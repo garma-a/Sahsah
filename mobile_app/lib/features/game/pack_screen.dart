@@ -189,7 +189,7 @@ class _PackCover extends StatelessWidget {
     required this.game,
   });
 
-  final Category category;
+  final LocalCategory category;
   final Color frame;
   final int tone;
   final Game game;
@@ -216,7 +216,7 @@ class _PackCover extends StatelessWidget {
         fit: StackFit.expand,
         children: [
           CategoryCover(
-            image: BrandImages.category(category.id),
+            image: AssetImage(BrandImages.category(category.id)),
             name: lang.t(category.name, category.nameEn),
             tone: tone,
             showName: false,

@@ -72,10 +72,7 @@ class CoverImageKey {
   int get hashCode => Object.hash(inner, width, height);
 }
 
-/// An asset shown with [BoxFit.cover], decoded at the size it's drawn
-/// rather than the file's full size (a 1800px cover in a 40px thumbnail
-/// otherwise takes 7MB of memory). Sizes round up to 64px steps, so
-/// nearby boxes share one decoded copy.
+/// An asset shown with [BoxFit.cover] (see [CoverPicture]).
 class CoverAsset extends StatelessWidget {
   const CoverAsset(
     this.asset, {
@@ -87,6 +84,36 @@ class CoverAsset extends StatelessWidget {
   });
 
   final String asset;
+  final AlignmentGeometry alignment;
+  final double? width;
+  final double? height;
+  final ImageErrorWidgetBuilder? errorBuilder;
+
+  @override
+  Widget build(BuildContext context) => CoverPicture(
+    AssetImage(asset),
+    alignment: alignment,
+    width: width,
+    height: height,
+    errorBuilder: errorBuilder,
+  );
+}
+
+/// A picture shown with [BoxFit.cover], decoded at the size it's drawn
+/// rather than the file's full size (a 1800px cover in a 40px thumbnail
+/// otherwise takes 7MB of memory). Sizes round up to 64px steps, so
+/// nearby boxes share one decoded copy.
+class CoverPicture extends StatelessWidget {
+  const CoverPicture(
+    this.image, {
+    super.key,
+    this.alignment = Alignment.center,
+    this.width,
+    this.height,
+    this.errorBuilder,
+  });
+
+  final ImageProvider<Object> image;
   final AlignmentGeometry alignment;
   final double? width;
   final double? height;
@@ -106,7 +133,7 @@ class CoverAsset extends StatelessWidget {
           final h = box.hasBoundedHeight ? box.maxHeight : (height ?? 512);
           return Image(
             image: CoverImage(
-              AssetImage(asset),
+              image,
               width: _step(w * ratio),
               height: _step(h * ratio),
             ),

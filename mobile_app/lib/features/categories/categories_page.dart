@@ -6,6 +6,7 @@ import '../../core/ui/brand_art.dart';
 import '../../core/ui/pressable.dart';
 import '../../core/ui/retro.dart';
 import '../../core/ui/surfaces.dart';
+import '../../data/catalog.dart';
 import '../../data/categories.dart';
 import 'category_widgets.dart';
 import '../../core/ui/motion.dart';
@@ -18,7 +19,11 @@ class CategoriesPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final lang = context.lang;
+    final catalog = context.catalog;
     final size = MediaQuery.sizeOf(context);
+    if (catalog.status != CatalogStatus.ready) {
+      return const CatalogStatusView();
+    }
     if (size.width > size.height) return const _Shelf();
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
@@ -32,17 +37,14 @@ class CategoriesPage extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             lang.t(
-              '${lang.toAr(allCategories.length)} فئة · اختاروا ${lang.toAr(boardCategories)} للوحة',
-              '${allCategories.length} fe2a · ekhtaro $boardCategories lel lo7a',
+              '${categoryCount(lang, catalog.categories.length)} · اختاروا ${lang.toAr(boardCategories)} للوحة',
+              '${categoryCount(lang, catalog.categories.length)} · ekhtaro $boardCategories lel lo7a',
             ),
             style: AppText.sans(14, color: context.mutedText),
           ),
-          for (final section in categorySections) ...[
+          for (final section in catalog.shelves) ...[
             const SizedBox(height: 24),
-            Text(
-              lang.t(section.name, section.nameEn),
-              style: AppText.display(22, height: 1.2),
-            ),
+            Text(section.title(lang), style: AppText.display(22, height: 1.2)),
             const SizedBox(height: 12),
             LayoutBuilder(
               builder: (context, box) {
@@ -102,7 +104,9 @@ class _ShelfState extends State<_Shelf> {
   @override
   Widget build(BuildContext context) {
     final lang = context.lang;
-    final section = categorySections[_section];
+    final shelves = context.catalog.shelves;
+    // A refresh can bring fewer sections than were on screen.
+    final section = shelves[_section.clamp(0, shelves.length - 1)];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -113,14 +117,14 @@ class _ShelfState extends State<_Shelf> {
             scrollDirection: Axis.horizontal,
             // The shell already keeps clear of cutouts.
             padding: EdgeInsets.zero,
-            itemCount: categorySections.length,
+            itemCount: shelves.length,
             separatorBuilder: (_, _) => const SizedBox(width: 8),
             itemBuilder: (context, i) {
-              final s = categorySections[i];
+              final s = shelves[i];
               return _SectionTab(
-                label: lang.t(s.name, s.nameEn),
+                label: s.title(lang),
                 count: s.categories.length,
-                selected: i == _section,
+                selected: s == section,
                 onTap: () => _select(i),
               );
             },
@@ -140,7 +144,7 @@ class _ShelfState extends State<_Shelf> {
     );
   }
 
-  Widget _posters(CategorySection section) {
+  Widget _posters(Shelf section) {
     return LayoutBuilder(
       builder: (context, box) {
         // Posters as tall as the space allows.
@@ -149,7 +153,7 @@ class _ShelfState extends State<_Shelf> {
         return AnimatedSwitcher(
           duration: motionFor(context, const Duration(milliseconds: 200)),
           child: ListView.separated(
-            key: ValueKey(_section),
+            key: ValueKey(section.id),
             controller: _scroll,
             scrollDirection: Axis.horizontal,
             // The shell already keeps clear of cutouts.

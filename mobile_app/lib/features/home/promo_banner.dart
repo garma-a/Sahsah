@@ -6,10 +6,10 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/i18n/lang.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/ui/brand_art.dart';
 import '../../core/ui/category_cover.dart';
 import '../../core/ui/game_button.dart';
 import '../../core/ui/surfaces.dart';
+import '../../data/catalog.dart';
 import '../../data/promos.dart';
 import '../game/ui/game_ui.dart';
 import '../../core/ui/motion.dart';
@@ -202,7 +202,6 @@ class _Art extends StatelessWidget {
     }
     final stamp = promo.stamp;
     if (stamp != null) return _Ticket(stamp: stamp, textRight: textRight);
-    final lang = context.lang;
     return ColoredBox(
       color: AppColors.press,
       child: LayoutBuilder(
@@ -242,8 +241,8 @@ class _Art extends StatelessWidget {
                         boxShadow: [inkDrop(5)],
                       ),
                       child: CategoryCover(
-                        image: BrandImages.category(c.id),
-                        name: lang.t(c.name, c.nameEn),
+                        image: coverOf(c),
+                        name: c.name,
                         tone: i + 1,
                       ),
                     ),

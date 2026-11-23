@@ -1,8 +1,9 @@
-/// Category names and one-line descriptions from
-/// `sahsah_prototype/src/lib/data.ts`. Content will come from the backend
-/// once it exposes a catalogue endpoint.
-class Category {
-  const Category(
+/// The built-in offline categories (names and one-line descriptions from
+/// `sahsah_prototype/src/lib/data.ts`), which the offline game still plays
+/// until games run through the server. The shelf shows the server's
+/// catalogue ([CatalogController] in `catalog.dart`).
+class LocalCategory {
+  const LocalCategory(
     this.id,
     this.name,
     this.nameEn,
@@ -23,16 +24,16 @@ class Category {
   final bool isNew;
 }
 
-class CategorySection {
-  const CategorySection(this.id, this.name, this.nameEn, this.categories);
+class LocalSection {
+  const LocalSection(this.id, this.name, this.nameEn, this.categories);
 
   final String id;
   final String name;
   final String nameEn;
-  final List<Category> categories;
+  final List<LocalCategory> categories;
 }
 
-const _person = Category(
+const _person = LocalCategory(
   'person',
   'مين في الصورة؟',
   'Meen fel Soora?',
@@ -40,7 +41,7 @@ const _person = Category(
   'Goz2 men soret wa7ed mashhoor. Etfa2o 3al esm, w el host ye2shef el egaba.',
   isNew: true,
 );
-const _color = Category(
+const _color = LocalCategory(
   'color',
   'اللون الأصلي إيه؟',
   'El Loon El Asly Eh?',
@@ -48,7 +49,7 @@ const _color = Category(
   'El soora men gheir alwan. Khamenoo loon el 7aga el matlooba.',
   isNew: true,
 );
-const _riddle = Category(
+const _riddle = LocalCategory(
   'riddle',
   'الصورة بتقول إيه؟',
   'El Soora Bet2ool Eh?',
@@ -56,7 +57,7 @@ const _riddle = Category(
   'Erbotoo tafaseel el rasma 3ashan tewsalo lel masal el masry.',
   isNew: true,
 );
-const _voice = Category(
+const _voice = LocalCategory(
   'voice',
   'مين صاحب الصوت؟',
   'Meen Sa7b El Soot?',
@@ -64,7 +65,7 @@ const _voice = Category(
   'Esma3o el ma2ta3 w khamenoo el shakhseya.',
   isNew: true,
 );
-const _memory = Category(
+const _memory = LocalCategory(
   'memory',
   'ركز معايا',
   'Rakez M3aya',
@@ -72,7 +73,7 @@ const _memory = Category(
   'E7fazo el soora, w ba3d ma tekhtefy gawbo 3al so2al.',
   isNew: true,
 );
-const _acting = Category(
+const _acting = LocalCategory(
   'acting',
   'مثّلها',
   'Massel-ha',
@@ -80,84 +81,84 @@ const _acting = Category(
   'Wa7ed men el fare2 yemassel men gher wala kelma, wel ba2y ykhammen 2abl ma el wa2t yekhlas.',
   isNew: true,
 );
-const _cinema = Category(
+const _cinema = LocalCategory(
   'cinema',
   'سينما مصرية',
   'Cinema Masreya',
   'أفلام وممثلين ومشاهد عمرها ما تتنسي.',
   'Aflam w momasseleen w mashahed 3omraha ma tetnesy.',
 );
-const _music = Category(
+const _music = LocalCategory(
   'music',
   'طرب وكاسيت',
   'Tarab w Cassette',
   'أغاني وفنانين من أيام الشريط والكاسيت.',
   'Aghany w fananeen men ayam el shereet wel cassette.',
 );
-const _football = Category(
+const _football = LocalCategory(
   'football',
   'كورة وجمهور',
   'Kora w Gomhoor',
   'الأهلي والزمالك والمنتخب وأهداف الزمن الجميل.',
   'El Ahly wel Zamalek wel Montakhab w ahdaf el zaman el gameel.',
 );
-const _general = Category(
+const _general = LocalCategory(
   'general',
   'ثقافة عامة',
   'Sa2afa 3ama',
   'معلومات من كل حتة عن مصر والعالم.',
   'Ma3lomat men kol 7etta 3an Masr wel 3alam.',
 );
-const _ramadan = Category(
+const _ramadan = LocalCategory(
   'ramadan',
   'رمضانيات',
   'Ramadaneyat',
   'مسلسلات وفوازير ومدفع الإفطار.',
   'Mosalsalat w fawazeer w madfa3 el eftar.',
 );
-const _comedy = Category(
+const _comedy = LocalCategory(
   'comedy',
   'قفشات وضحك',
   '2afshat w Da7k',
   'إفيهات ومشاهد كوميدي بتفكّرك بأيام حلوة.',
   'Efeehat w mashahed comedy betfakarak b ayam 7elwa.',
 );
-const _ancient = Category(
+const _ancient = LocalCategory(
   'ancient',
   'مصر القديمة',
   'Masr El 2adeema',
   'فراعنة وأهرامات ومعابد وأسرار الحضارة.',
   'Fara3na w ahramat w ma3abed w asrar el 7adara.',
 );
-const _street = Category(
+const _street = LocalCategory(
   'street',
   'أكل الشارع',
   'Akl El Share3',
   'كشري وفلافل وعصير قصب وكل اللي بنحبه.',
   'Koshary w ta3meya w 3aseer 2asab w kol elly bn7ebboh.',
 );
-const _travel = Category(
+const _travel = LocalCategory(
   'travel',
   'رحلة في مصر',
   'Re7la fe Masr',
   'أماكن وآثار ومدن من أسوان للإسكندرية.',
   'Amaken w asar w modon men Aswan lel Eskendereya.',
 );
-const _childhood = Category(
+const _childhood = LocalCategory(
   'childhood',
   'ألعاب الطفولة',
   'Al3ab El Tofoola',
   'بلي وطيارة ورق وكل لعب أيام زمان.',
   'Bely w tayara wara2 w kol le3ab ayam zaman.',
 );
-const _alex = Category(
+const _alex = LocalCategory(
   'alex',
   'صيف إسكندرية',
   'Seif Eskendereya',
   'بحر وقلعة وذرة مشوية وذكريات الكورنيش.',
   'Ba7r w 2al3a w dora mashweya w zekrayat el corniche.',
 );
-const _crafts = Category(
+const _crafts = LocalCategory(
   'crafts',
   'الحرف والسوق',
   'El 7eraf wel Soo2',
@@ -167,7 +168,7 @@ const _crafts = Category(
 
 /// The web's `SECTIONS`, in the same order.
 const categorySections = [
-  CategorySection('new-games', 'تحديات جديدة للشلة', 'Ta7adyat Gdeeda', [
+  LocalSection('new-games', 'تحديات جديدة للشلة', 'Ta7adyat Gdeeda', [
     _person,
     _color,
     _riddle,
@@ -175,20 +176,20 @@ const categorySections = [
     _memory,
     _acting,
   ]),
-  CategorySection('popular', 'الأكثر شعبية', 'El Akthar Sha3beya', [
+  LocalSection('popular', 'الأكثر شعبية', 'El Akthar Sha3beya', [
     _cinema,
     _music,
     _football,
     _ramadan,
     _comedy,
   ]),
-  CategorySection('egypt', 'مصر وتراثها', 'Masr w Toraasha', [
+  LocalSection('egypt', 'مصر وتراثها', 'Masr w Toraasha', [
     _ancient,
     _travel,
     _alex,
     _crafts,
   ]),
-  CategorySection('fun', 'لمّة وذكريات', 'Lamma w Zekrayat', [
+  LocalSection('fun', 'لمّة وذكريات', 'Lamma w Zekrayat', [
     _street,
     _childhood,
     _general,

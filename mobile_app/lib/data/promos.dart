@@ -2,8 +2,8 @@ import 'package:flutter/painting.dart';
 
 import '../core/i18n/lang.dart';
 import '../core/ui/brand_art.dart';
+import 'catalog.dart';
 import 'categories.dart';
-import 'question_bank.dart';
 
 /// What a promo's button does.
 enum PromoAction {
@@ -66,30 +66,30 @@ class Promo {
 }
 
 /// The lobby's banners, in order. The first marked [Promo.popup] opens the
-/// app.
-List<Promo> homePromos(LangController lang) {
-  final fresh = categorySections.first;
+/// app. The catalogue's banner shows once the server's categories are in.
+List<Promo> homePromos(LangController lang, CatalogController catalog) {
+  final shelf = catalog.shelves.firstOrNull;
   final playable = [
-    for (final c in fresh.categories)
-      if (isPlayable(c.id)) c,
+    for (final c in shelf?.categories ?? const <Category>[])
+      if (c.playable) c,
   ];
-  String name(Category c) => lang.t(c.name, c.nameEn);
   final off = (giftDiscount * 100).round();
   return [
-    Promo(
-      id: 'new-pack',
-      title: lang.t(fresh.name, fresh.nameEn),
-      body: lang.t(
-        '${lang.toAr(playable.length)} فئات جديدة تلعبوها دلوقتي، زي '
-            '«${name(playable[0])}» و«${name(playable[1])}»',
-        '${playable.length} fe2at gdeeda tel3aboha delwa2ty, zay '
-            '"${name(playable[0])}" w "${name(playable[1])}"',
+    if (shelf != null && playable.length >= 2)
+      Promo(
+        id: 'new-pack',
+        title: shelf.title(lang),
+        body: lang.t(
+          '${categoryCount(lang, playable.length)} تلعبوها دلوقتي، زي '
+              '«${playable[0].name}» و«${playable[1].name}»',
+          '${categoryCount(lang, playable.length)} tel3aboha delwa2ty, zay '
+              '"${playable[0].name}" w "${playable[1].name}"',
+        ),
+        cta: lang.t('شوفوها', 'Shoofoha'),
+        action: PromoAction.newPack,
+        posters: playable.take(3).toList(),
+        popup: true,
       ),
-      cta: lang.t('شوفوها', 'Shoofoha'),
-      action: PromoAction.newPack,
-      posters: playable.take(3).toList(),
-      popup: true,
-    ),
     Promo(
       id: 'gift-discount',
       title: lang.t(

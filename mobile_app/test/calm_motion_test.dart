@@ -10,6 +10,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'game_flow_test.dart' show settle;
 import 'sound_test.dart' show FakeSound;
 
+import 'support/fake_api.dart';
+
 /// With the phone's animations off (Android's "Remove animations", iOS's
 /// "Reduce motion"), nothing moves: each screen is there on the next frame,
 /// with no fade, zoom or slide around it, and counts land at their value.
@@ -53,6 +55,7 @@ void main() {
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
       SahsahApp(
+        api: fakeApi(),
         lang: LangController(Lang.ar),
         game: GameController(),
         sound: SoundController(backend: FakeSound()),

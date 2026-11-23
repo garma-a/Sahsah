@@ -11,6 +11,8 @@ import 'game_flow_test.dart' show settle;
 import 'screen_reader_test.dart' show press;
 import 'sound_test.dart' show FakeSound;
 
+import 'support/fake_api.dart';
+
 /// The app caps system text at 130%. At that size, on a phone and on a
 /// small phone, no screen may overflow: an overflow fails the test.
 void main() {
@@ -24,6 +26,7 @@ void main() {
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
     await tester.pumpWidget(
       SahsahApp(
+        api: fakeApi(),
         lang: LangController(lang),
         game: GameController(),
         sound: SoundController(backend: FakeSound()),

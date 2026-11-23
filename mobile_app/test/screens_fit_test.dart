@@ -12,6 +12,8 @@ import 'game_flow_test.dart' show settle;
 import 'screen_reader_test.dart' show press;
 import 'sound_test.dart' show FakeSound;
 
+import 'support/fake_api.dart';
+
 /// The screens group 3 of the design review looked at (the acting rules,
 /// More, contact) fit on a phone, a small phone and a tablet, at normal
 /// and 130% text: any overflow fails. Their social links are named links a
@@ -27,6 +29,7 @@ void main() {
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
     await tester.pumpWidget(
       SahsahApp(
+        api: fakeApi(),
         lang: LangController(Lang.ar),
         game: GameController(),
         sound: SoundController(backend: FakeSound()),

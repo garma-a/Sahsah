@@ -11,6 +11,8 @@ import 'game_flow_test.dart' show settle;
 import 'screen_reader_test.dart' show press;
 import 'sound_test.dart' show FakeSound;
 
+import 'support/fake_api.dart';
+
 /// What players feel mid-game: big enough timer buttons, a memory question
 /// that says why there's no answer yet, packs that don't repeat themselves,
 /// and an undo that doesn't cover the tiles.
@@ -24,6 +26,7 @@ void main() {
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
       SahsahApp(
+        api: fakeApi(),
         lang: LangController(Lang.ar),
         game: GameController(),
         sound: SoundController(backend: FakeSound()),

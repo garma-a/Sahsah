@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-import '../../data/categories.dart';
 import '../i18n/lang.dart';
 import '../theme/app_theme.dart';
 import 'category_cover.dart';
@@ -124,7 +123,10 @@ class SocialIcon extends StatelessWidget {
 class Poster extends StatelessWidget {
   const Poster({
     super.key,
-    required this.category,
+    required this.id,
+    required this.name,
+    required this.cover,
+    this.isNew = false,
     this.tone,
     this.showNewBadge = true,
     this.badge = true,
@@ -133,7 +135,13 @@ class Poster extends StatelessWidget {
     this.soon = false,
   });
 
-  final Category category;
+  /// The category's id (for its tone when [tone] is null).
+  final String id;
+  final String name;
+  final ImageProvider<Object>? cover;
+
+  /// One of the new challenge formats ("جديد").
+  final bool isNew;
 
   /// Tone index; derived from the category when null.
   final int? tone;
@@ -168,7 +176,7 @@ class Poster extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final lang = context.lang;
-    final t = tone ?? toneFor(category.id);
+    final t = tone ?? toneFor(id);
     final frame = AnimatedContainer(
       duration: motionFor(context, const Duration(milliseconds: 200)),
       decoration: BoxDecoration(
@@ -197,8 +205,8 @@ class Poster extends StatelessWidget {
                   ? const ColorFilter.matrix(_greyscale)
                   : const ColorFilter.mode(Color(0x00000000), BlendMode.dst),
               child: CategoryCover(
-                image: BrandImages.category(category.id),
-                name: lang.t(category.name, category.nameEn),
+                image: cover,
+                name: name,
                 tone: t,
                 // The title sits clear of the corner sticker.
                 footInset: badge && !soon ? 36 - badgeRoom : 0,
@@ -235,7 +243,7 @@ class Poster extends StatelessWidget {
                   ),
                 ),
               )
-            else if (showNewBadge && category.isNew)
+            else if (showNewBadge && isNew)
               PositionedDirectional(
                 top: 6,
                 start: 6,

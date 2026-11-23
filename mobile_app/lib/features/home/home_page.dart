@@ -11,6 +11,7 @@ import '../../core/ui/game_button.dart';
 import '../../core/ui/play_button.dart';
 import '../../core/ui/pressable.dart';
 import '../../core/ui/surfaces.dart';
+import '../../data/catalog.dart';
 import '../../data/categories.dart';
 import '../../data/promos.dart';
 import '../categories/category_widgets.dart';
@@ -54,18 +55,22 @@ class HomePage extends StatelessWidget {
 
     final resume = active == null ? null : padded(_ResumeCard(game: active));
     final play = padded(_PlayCard(tokens: tokens));
+    final catalog = context.catalog;
     final rows = [
-      for (final section in categorySections)
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SectionHeader(
-              title: lang.t(section.name, section.nameEn),
-              onSeeAll: () => nav.go(AppRoute.categories),
-            ),
-            PosterRow(categories: section.categories, width: 132),
-          ],
-        ),
+      if (catalog.status != CatalogStatus.ready)
+        const CatalogStatusView()
+      else
+        for (final section in catalog.shelves)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SectionHeader(
+                title: section.title(lang),
+                onSeeAll: () => nav.go(AppRoute.categories),
+              ),
+              PosterRow(categories: section.categories, width: 132),
+            ],
+          ),
     ];
     final howTo = padded(
       Column(

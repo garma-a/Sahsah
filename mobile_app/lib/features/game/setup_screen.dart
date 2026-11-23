@@ -593,7 +593,7 @@ class _SelectablePoster extends StatelessWidget {
     required this.onTap,
   });
 
-  final Category category;
+  final LocalCategory category;
   final int tone;
 
   /// When it rises onto the shelf.
@@ -625,7 +625,10 @@ class _SelectablePoster extends StatelessWidget {
           child: Align(
             alignment: Alignment.topCenter,
             child: Poster(
-              category: category,
+              id: category.id,
+              name: name,
+              cover: AssetImage(BrandImages.category(category.id)),
+              isNew: category.isNew,
               tone: tone,
               showNewBadge: !selected,
               selected: selected,
