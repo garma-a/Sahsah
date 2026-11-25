@@ -1,10 +1,35 @@
+"use client";
+
+import { useEffect } from "react";
 import { Smartphone } from "lucide-react";
+
+type LockableOrientation = ScreenOrientation & { lock?: (o: string) => Promise<void>; unlock?: () => void };
+
+/** Turns a fullscreen phone sideways. Locking works only while fullscreen, and not every browser allows it. */
+function lockLandscape() {
+  if (!document.fullscreenElement) return;
+  (screen.orientation as LockableOrientation).lock?.("landscape").catch(() => {});
+}
 
 /**
  * The game is played sideways: on a phone or tablet held upright this covers the screen and asks the player
  * to turn the device. Pure CSS (see the `portrait-touch` variant), so it follows the device without script.
+ * While mounted it also locks landscape when the page is fullscreen; other pages stay free to turn.
  */
 export default function RotateNotice() {
+  useEffect(() => {
+    lockLandscape();
+    document.addEventListener("fullscreenchange", lockLandscape);
+    return () => {
+      document.removeEventListener("fullscreenchange", lockLandscape);
+      try {
+        (screen.orientation as LockableOrientation).unlock?.();
+      } catch {
+        // Nothing was locked.
+      }
+    };
+  }, []);
+
   return (
     <div
       role="alert"
