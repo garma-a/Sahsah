@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Alexandria, Lalezar, Rakkas } from "next/font/google";
 import SessionKeeper from "@/components/setup/session-keeper";
+import FullscreenToggle from "@/components/ui/fullscreen-toggle";
 import GameStoreProvider from "@/providers/game-store-provider";
 import "./globals.css";
 
@@ -33,6 +34,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <GameStoreProvider>
           <SessionKeeper />
           {children}
+          <FullscreenToggle />
         </GameStoreProvider>
       </body>
     </html>
