@@ -24,9 +24,9 @@ function canEnter() {
 async function enterFullscreen() {
   if (!canEnter()) return;
   try {
+    // No orientation lock here: the home page and the passcode dialog are used upright. The game screens lock
+    // landscape themselves (components/ui/rotate-notice.tsx).
     await document.documentElement.requestFullscreen({ navigationUI: "hide" });
-    // The game is played sideways; locking only works while fullscreen and not every browser allows it.
-    await (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> }).lock?.("landscape");
   } catch {
     // Refused (no user gesture, or the browser said no): the page keeps working with the address bar.
   }
