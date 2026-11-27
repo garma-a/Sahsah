@@ -53,10 +53,10 @@ const Inbox = ({ navigate, setNotice }) => {
             <tbody>
               {data.rows.map((row) => (
                 <tr key={row.id}>
-                  <td style={td}><Link navigate={navigate} to={`${PAGE}?view=message&id=${row.id}`}>{when(row.createdAt)}</Link></td>
+                  <td style={{ ...td, whiteSpace: "nowrap" }}><Link navigate={navigate} to={`${PAGE}?view=message&id=${row.id}`}>{when(row.createdAt)}</Link></td>
                   <td style={td}><strong>{KIND[row.kind]}</strong><br /><span style={{ color: colors.muted, fontSize: 12 }}>{detailOf(row)}</span></td>
-                  <td style={td}>{row.name ?? <span style={{ color: colors.muted }}>No name</span>}<br /><span style={{ color: colors.muted, fontSize: 12 }}>{row.email ?? "No email"}</span></td>
-                  <td style={{ ...td, maxWidth: 360 }}>{row.preview ?? <span style={{ color: colors.muted }}>No text</span>}</td>
+                  <td style={{ ...td, overflowWrap: "anywhere" }}><span dir="auto">{row.name ?? "No name"}</span><br /><span dir="auto" style={{ color: colors.muted, fontSize: 12 }}>{row.email ?? "No email"}</span></td>
+                  <td style={{ ...td, maxWidth: 360, overflowWrap: "anywhere" }}><div dir="auto">{row.preview ?? <span style={{ color: colors.muted }}>No text</span>}</div></td>
                   <td style={td}>{row.state === "open" ? <Badge kind="gold">Open</Badge> : <Badge>Closed</Badge>}{row.replied && <Badge kind="green">Replied</Badge>}</td>
                 </tr>
               ))}
@@ -73,7 +73,7 @@ const Inbox = ({ navigate, setNotice }) => {
 // ---- one message -----------------------------------------------------------------------------------
 
 const REPLY_STATUS = { sending: ["Sending", "gold"], sent: ["Sent by email", "green"], failed: ["Failed: not sent", "red"], external: ["Answered from an email app", "green"] };
-const Fact = ({ label, children }) => <div><Text color="grey60">{label}</Text><strong>{children}</strong></div>;
+const Fact = ({ label, children }) => <div style={{ minWidth: 0, overflowWrap: "anywhere" }}><Text color="grey60">{label}</Text><strong>{children}</strong></div>;
 
 /** The staff's own mail app, with the address, subject and the original quoted. */
 const mailtoOf = (message, subject) => {
@@ -113,14 +113,14 @@ const MessageView = ({ id, navigate, setNotice }) => {
           {message.kind === "support" && <Fact label="Reason">{REASON[message.supportReason] ?? message.supportReason}</Fact>}
           {message.kind === "business" && <Fact label="Enquiry">{BUSINESS[message.businessKind] ?? message.businessKind}</Fact>}
           {message.kind === "experience" && <Fact label="Rating">{message.rating ? <Stars rating={message.rating} /> : "No rating"}</Fact>}
-          <Fact label="Name">{message.name ?? "Not given"}</Fact>
-          <Fact label="Email">{message.email ?? "Not given"}</Fact>
-          {message.handle && <Fact label="Handle">{message.handle}</Fact>}
-          <Fact label="Account">{message.accountId ? <Link navigate={navigate} to={`/admin/pages/players?view=account&id=${message.accountId}`}>{message.accountPhone ?? message.accountName ?? "(deleted)"}</Link> : "Not signed in"}</Fact>
+          <Fact label="Name"><span dir="auto">{message.name ?? "Not given"}</span></Fact>
+          <Fact label="Email"><span dir="auto">{message.email ?? "Not given"}</span></Fact>
+          {message.handle && <Fact label="Handle"><span dir="auto">{message.handle}</span></Fact>}
+          <Fact label="Account">{message.accountId ? <Link navigate={navigate} to={`/admin/pages/players?view=account&id=${message.accountId}`}><span dir="auto">{message.accountPhone ?? message.accountName ?? "(deleted)"}</span></Link> : "Not signed in"}</Fact>
           {message.closedAt && <Fact label="Closed">{when(message.closedAt)} by {message.closedBy}</Fact>}
         </div>
         <Text color="grey60">Message</Text>
-        <p style={{ whiteSpace: "pre-wrap", margin: "4px 0 0" }}>{message.message ?? "No text, rating only."}</p>
+        <p dir="auto" style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere", margin: "4px 0 0" }}>{message.message ?? "No text, rating only."}</p>
         <Text mt="md" color="grey60" fontSize="sm">The email address is what the sender typed; it is not verified.</Text>
       </div>
 
@@ -133,7 +133,7 @@ const MessageView = ({ id, navigate, setNotice }) => {
             <div key={reply.id} style={{ borderTop: `1px solid ${colors.line}`, padding: "10px 0" }}>
               <div><Badge kind={kind}>{label}</Badge> <span style={{ color: colors.muted, fontSize: 13 }}>{reply.staffEmail}, {when(reply.createdAt)}</span></div>
               {reply.status === "failed" && <Text color="error">{messageFor(reply.errorCode)}</Text>}
-              <p style={{ whiteSpace: "pre-wrap", margin: "6px 0 0" }}>{reply.body}</p>
+              <p dir="auto" style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere", margin: "6px 0 0" }}>{reply.body}</p>
             </div>
           );
         })}

@@ -1,7 +1,7 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Box, H3, Text } from "@adminjs/design-system";
 import { useLocation, useNavigate } from "react-router";
-import { Field, Notice, button, card, colors, get, input, useSend } from "./content-ui";
+import { Field, Notice, button, card, colors, get, input, messageFor, useSend } from "./content-ui";
 
 const PAGE = "/admin/pages/shop";
 const PAGE_NAME = "shop";
@@ -21,20 +21,33 @@ const Link = ({ to, navigate, children }) => <a href={to} onClick={(e) => { e.pr
 const LoadMore = ({ cursor, onClick }) => (cursor ? <div style={{ marginTop: 12 }}><button style={button("secondary")} onClick={() => onClick(cursor)}>Load more</button></div> : null);
 
 /** Fetches a keyset-paged list; "Load more" appends the next page. */
-function usePaged(params, setNotice, message) {
-  const [data, setData] = useState(null);
+function usePaged(params, message) {
+  const [result, setResult] = useState(null);
+  const latestRequest = useRef(0);
   const key = JSON.stringify(params);
   const fetchRows = useCallback(async (cursor) => {
+    const request = ++latestRequest.current;
     try {
       const next = await load({ ...JSON.parse(key), cursor });
-      setData((previous) => (cursor && previous ? { ...next, rows: [...previous.rows, ...next.rows] } : next));
+      if (request !== latestRequest.current) return;
+      setResult((previous) => ({
+        key,
+        data: cursor && previous?.key === key && previous.data ? { ...next, rows: [...previous.data.rows, ...next.rows] } : next,
+      }));
     } catch (error) {
-      setData({ rows: [], nextCursor: null });
-      setNotice({ kind: "danger", text: error?.response?.data?.error === "invalid_search" ? "Search with a phone number or at least the last 4 digits of one." : message });
+      if (request !== latestRequest.current) return;
+      const code = error?.response?.data?.error;
+      const text = code === "invalid_search" ? messageFor(code)
+        : code === "invalid_promotion_id" ? "Enter a valid UUID in Promotion ID." : message;
+      setResult({ key, error: { kind: "danger", text } });
     }
-  }, [key, setNotice, message]);
-  useEffect(() => { fetchRows(); }, [fetchRows]);
-  return [data, fetchRows];
+  }, [key, message]);
+  useEffect(() => {
+    fetchRows();
+    return () => { latestRequest.current += 1; };
+  }, [fetchRows]);
+  const current = result?.key === key ? result : null;
+  return [current?.data, fetchRows, current?.error];
 }
 
 const Tabs = ({ view, navigate }) => {
@@ -58,7 +71,6 @@ function quote(quantity, base, tiers, giftBps) {
   const offer = list - roundHalfUp((list * (tier?.discount_bps ?? 0)) / 10000);
   return { tier, list, offer, gift: offer - roundHalfUp((offer * giftBps) / 10000) };
 }
-const toMinor = (text) => (/^\d+(\.\d{1,2})?$/.test(text.trim()) ? Math.round(Number(text) * 100) : NaN);
 const toBps = (text) => (/^\d+(\.\d{1,2})?$/.test(String(text).trim()) ? Math.round(Number(text) * 100) : NaN);
 
 const PricingView = ({ setNotice }) => {
@@ -79,13 +91,16 @@ const PricingView = ({ setNotice }) => {
   }, [setNotice]);
   useEffect(() => { fetchPricing(); }, [fetchPricing]);
   if (!form) return <Text>Loading…</Text>;
-  const base = toMinor(form.price), gift = toBps(form.gift);
+  const price = form.price.replace(/[٠-٩]/g, (digit) => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit))).replace(/٫/g, ".");
+  const base = toBps(price), gift = toBps(form.gift);
+  const baseValid = base >= 1 && base <= saved.maxBaseUnitPriceMinor;
   const tiers = form.tiers.map((t) => ({ minimum_quantity: Number(t.min), discount_bps: toBps(t.percent), is_active: t.active }));
-  const valid = Number.isFinite(base) && base > 0 && Number.isFinite(gift) && tiers.every((t) => Number.isInteger(t.minimum_quantity) && Number.isFinite(t.discount_bps));
+  const valid = baseValid && Number.isFinite(gift) && tiers.every((t) => Number.isInteger(t.minimum_quantity) && Number.isFinite(t.discount_bps));
   const setTier = (index, patch) => setForm({ ...form, tiers: form.tiers.map((t, i) => (i === index ? { ...t, ...patch } : t)) });
   const setBundle = (index, patch) => setForm({ ...form, bundles: form.bundles.map((b, i) => (i === index ? { ...b, ...patch } : b)) });
   const save = async (e) => {
     e.preventDefault();
+    if (!valid) return;
     const done = await send({ op: "pricing.save", expectedVersion: saved.version, baseUnitPriceMinor: base, giftDiscountBps: gift, tiers, bundles: form.bundles.map((b) => ({ quantity: b.quantity, is_active: b.active, display_order: Number(b.order) - 1 })) }, { success: "Prices saved." });
     if (done) fetchPricing();
   };
@@ -96,7 +111,13 @@ const PricingView = ({ setNotice }) => {
         <H3>Token price</H3>
         <Text mb="md">{saved.configured ? `Pricing version ${saved.version}, last saved ${when(saved.updatedAt)}. Every save creates a new version; orders keep the prices they were accepted at.` : "Prices have not been saved yet. These are suggested starting values; saving creates version 1."}</Text>
         <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-          <div style={{ width: 200 }}><Field label="Base price per token (EGP)"><input aria-label="Base price" inputMode="decimal" style={input} value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} /></Field></div>
+          <div style={{ width: 200 }}>
+            <Field label="Base price per token (EGP)">
+              <input aria-label="Base price" inputMode="decimal" aria-invalid={!baseValid} aria-describedby={baseValid ? undefined : "base-price-error"}
+                style={baseValid ? input : { ...input, borderColor: colors.red }} value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
+            </Field>
+            {!baseValid && <p id="base-price-error" style={{ color: colors.red, fontSize: 13, margin: "0 0 12px" }}>{messageFor("price_invalid")} For example, 123.45 or ١٢٣٫٤٥.</p>}
+          </div>
           <div style={{ width: 200 }}><Field label="Gift discount (%)" hint="Applies to gifted orders, instead of a promo code."><input aria-label="Gift discount" inputMode="decimal" style={input} value={form.gift} onChange={(e) => setForm({ ...form, gift: e.target.value })} /></Field></div>
         </div>
       </div>
@@ -131,7 +152,7 @@ const PricingView = ({ setNotice }) => {
       <div style={{ ...card, marginBottom: 20 }}>
         <H3>Price table</H3>
         <Text mb="md">What each quantity costs with the values above, before saving. A gift shows the gift price; a promo code replaces the gift discount.</Text>
-        {!valid ? <Text>Fix the highlighted values to see prices.</Text> : (
+        {!valid ? <Text>Enter a valid base price, discount and quantities to see prices.</Text> : (
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead><tr><th style={th}>Tokens</th><th style={th}>List price</th><th style={th}>Quantity discount</th><th style={th}>Price</th><th style={th}>Price as a gift</th></tr></thead>
             <tbody>
@@ -199,8 +220,17 @@ const PromotionsView = ({ setNotice }) => {
   const [editing, setEditing] = useState(null); // null, "new" or a row
   const [confirmDelete, setConfirmDelete] = useState(null);
   const { send, busy } = useSend(setNotice, PAGE_NAME);
-  const [data, fetchRows] = usePaged({ view: "promotions", status: status || undefined }, setNotice, "The promotions could not be loaded.");
+  const [data, fetchRows, error] = usePaged({ view: "promotions", status: status || undefined }, "The promotions could not be loaded.");
   const act = async (body, success) => { const done = await send(body, { success }); if (done) { setEditing(null); setConfirmDelete(null); fetchRows(); } return done; };
+  const expiredMessage = "This promotion has ended. Edit its end date before activating it.";
+  const cannotActivate = (row) => !row.isActive && toDate(row.endsAt).getTime() <= Date.now();
+  const togglePromotion = (row) => {
+    if (cannotActivate(row)) {
+      setNotice({ kind: "danger", text: expiredMessage });
+      return;
+    }
+    return act({ op: row.isActive ? "promo.deactivate" : "promo.activate", id: row.id }, row.isActive ? "Deactivated." : "Activated.");
+  };
   const fields = (f) => ({ code: f.code, discountBps: toBps(f.percent), bundle: Number(f.bundle), startsAt: iso(f.startsAt), endsAt: iso(f.endsAt), maximumRedemptions: f.max === "" ? null : Number(f.max), perBuyerLimit: Number(f.perBuyer) });
   return (
     <div style={card}>
@@ -211,7 +241,7 @@ const PromotionsView = ({ setNotice }) => {
         <button style={button("primary")} onClick={() => setEditing(editing === "new" ? null : "new")}>New promotion</button>
       </div>
       {editing === "new" && <div style={{ ...card, background: colors.cream, marginBottom: 16 }}><PromoForm initial={BLANK} busy={busy} onCancel={() => setEditing(null)} onSubmit={(f) => act({ op: "promo.create", kind: f.kind, ...fields(f), ...(f.kind === "automatic_free" ? { code: undefined, discountBps: undefined } : {}) }, "Promotion created.")} /></div>}
-      {!data ? <Text>Loading…</Text> : (
+      {error ? <Notice notice={error} /> : !data ? <Text>Loading…</Text> : (
         <>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead><tr><th style={th}>Code</th><th style={th}>Discount</th><th style={th}>Bundle</th><th style={th}>Runs</th><th style={th}>Used</th><th style={th}>Status</th><th style={th}></th></tr></thead>
@@ -219,19 +249,21 @@ const PromotionsView = ({ setNotice }) => {
               {data.rows.map((row) => {
                 const [label, kind] = STATUS[row.status];
                 const deletable = row.used === 0 && row.orders === 0;
+                const activationBlocked = cannotActivate(row);
                 return (
                   <React.Fragment key={row.id}>
                     <tr>
-                      <td style={td}>{row.trigger === "code" ? <strong>{row.code}</strong> : <em>Free campaign</em>}</td>
+                      <td style={{ ...td, overflowWrap: "anywhere" }}>{row.trigger === "code" ? <strong>{row.code}</strong> : <em>Free campaign</em>}</td>
                       <td style={td}>{percent(row.discountBps)}</td>
                       <td style={td}>{row.bundle} token{row.bundle > 1 ? "s" : ""}</td>
-                      <td style={td}>{when(row.startsAt)}<br />to {when(row.endsAt)}</td>
+                      <td style={{ ...td, whiteSpace: "nowrap" }}>{when(row.startsAt)}<br />to {when(row.endsAt)}</td>
                       <td style={td}>{row.used} / {row.maximumRedemptions ?? "no cap"}<br /><span style={{ color: colors.muted, fontSize: 12 }}>{row.perBuyerLimit} per buyer</span></td>
                       <td style={td}><Badge kind={kind}>{label}</Badge></td>
                       <td style={td}>
                         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                           <button style={button("secondary")} onClick={() => setEditing(editing?.id === row.id ? null : row)}>Edit</button>
-                          <button style={button("secondary", busy)} disabled={busy} onClick={() => act({ op: row.isActive ? "promo.deactivate" : "promo.activate", id: row.id }, row.isActive ? "Deactivated." : "Activated.")}>{row.isActive ? "Deactivate" : "Activate"}</button>
+                          <button style={{ ...button("secondary", busy || activationBlocked), whiteSpace: "nowrap" }} disabled={busy || activationBlocked}
+                            title={activationBlocked ? expiredMessage : undefined} onClick={() => togglePromotion(row)}>{row.isActive ? "Deactivate" : "Activate"}</button>
                           {deletable ? <button style={button("danger", busy)} disabled={busy} onClick={() => setConfirmDelete(confirmDelete === row.id ? null : row.id)}>Delete</button> : <span style={{ color: colors.muted, fontSize: 12, alignSelf: "center" }}>Used: deactivate instead</span>}
                         </div>
                       </td>
@@ -265,12 +297,12 @@ const STATE_LABELS = { pending: "Pending payment", paid: "Paid", not_required: "
 const CHANNEL_LABELS = { paymob: "Website", apple_app_store: "App Store", google_play: "Google Play" };
 const SETTLEMENT_LABELS = { payment: "Paid", zero_cost: "Zero-cost", native_store: "Store" };
 
-const OrdersView = ({ navigate, setNotice }) => {
+const OrdersView = ({ navigate }) => {
   const [filters, setFilters] = useState({ status: "", settlement: "", channel: "", promo: "", from: "", to: "", phone: "" });
   const [phoneDraft, setPhoneDraft] = useState("");
   const params = { view: "orders" };
-  for (const [key, value] of Object.entries(filters)) if (value) params[key] = value;
-  const [data, fetchRows] = usePaged(params, setNotice, "The orders could not be loaded.");
+  for (const [key, value] of Object.entries(filters)) if (value.trim()) params[key] = value.trim();
+  const [data, fetchRows, error] = usePaged(params, "The orders could not be loaded.");
   const set = (key) => (e) => setFilters({ ...filters, [key]: e.target.value });
   const filtered = Object.values(filters).some(Boolean);
   return (
@@ -281,33 +313,32 @@ const OrdersView = ({ navigate, setNotice }) => {
         <select aria-label="Payment state" style={{ ...input, width: 170 }} value={filters.status} onChange={set("status")}><option value="">Any state</option>{Object.entries(STATE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
         <select aria-label="Settlement" style={{ ...input, width: 160 }} value={filters.settlement} onChange={set("settlement")}><option value="">Any settlement</option><option value="payment">Paid</option><option value="zero_cost">Zero-cost</option><option value="native_store">Store</option><option value="none">Not settled</option></select>
         <select aria-label="Channel" style={{ ...input, width: 140 }} value={filters.channel} onChange={set("channel")}><option value="">Web and native</option><option value="web">Website</option><option value="native">Native app</option></select>
-        <input aria-label="Promotion id" placeholder="Promotion id" style={{ ...input, width: 150 }} value={filters.promo} onChange={set("promo")} />
+        <input aria-label="Promotion ID" placeholder="Promotion ID" style={{ ...input, width: 150 }} value={filters.promo} onChange={set("promo")} />
         <label>From <input aria-label="From date" type="date" style={{ ...input, width: 150 }} value={filters.from} onChange={set("from")} /></label>
         <label>To <input aria-label="To date" type="date" style={{ ...input, width: 150 }} value={filters.to} onChange={set("to")} /></label>
         {filtered && <button type="button" style={button("secondary")} onClick={() => { setPhoneDraft(""); setFilters({ status: "", settlement: "", channel: "", promo: "", from: "", to: "", phone: "" }); }}>Clear filters</button>}
       </form>
-      {!data ? <Text>Loading…</Text> : (
+      {error ? <Notice notice={error} /> : !data ? <Text>Loading…</Text> : !data.rows.length ? (
+        <Text>{data.anyOrder ? "No orders match these filters." : "There are no orders yet."}</Text>
+      ) : (
         <>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead><tr><th style={th}>Created</th><th style={th}>Buyer</th><th style={th}>Type</th><th style={th}>Tokens</th><th style={th}>Total</th><th style={th}>State</th><th style={th}>Channel</th><th style={th}>Promo</th></tr></thead>
             <tbody>
               {data.rows.map((row) => (
                 <tr key={row.id}>
-                  <td style={td}><Link navigate={navigate} to={`${PAGE}?view=order&id=${row.id}`}>{when(row.createdAt)}</Link></td>
+                  <td style={{ ...td, whiteSpace: "nowrap" }}><Link navigate={navigate} to={`${PAGE}?view=order&id=${row.id}`}>{when(row.createdAt)}</Link></td>
                   <td style={td}>{row.buyerPhone ?? "(deleted)"}</td>
                   <td style={{ ...td, textTransform: "capitalize" }}>{row.orderKind}</td>
                   <td style={td}>{row.tokenQuantity}</td>
                   <td style={td}>{row.totalMinor === null ? "Store price" : pounds(row.totalMinor)}</td>
                   <td style={td}>{STATE_LABELS[row.paymentState]}</td>
                   <td style={td}>{CHANNEL_LABELS[row.purchaseChannel] ?? row.purchaseChannel}</td>
-                  <td style={td}>{row.promoCode ?? (row.promoTrigger === "automatic_free" ? "Free campaign" : "")}</td>
+                  <td style={{ ...td, overflowWrap: "anywhere" }}>{row.promoCode ?? (row.promoTrigger === "automatic_free" ? "Free campaign" : "")}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-          {data.rows.length === 0 && (
-            <Text mt="md">{!data.anyOrder ? "There are no orders yet. Checkout is not live yet, so nothing can be bought until it is. Orders appear here once players can buy tokens." : "No orders match these filters."}</Text>
-          )}
           <LoadMore cursor={data.nextCursor} onClick={fetchRows} />
         </>
       )}
@@ -378,17 +409,17 @@ const OrderView = ({ id, navigate, setNotice }) => {
 
 // ---- payment reviews ---------------------------------------------------------------------------------
 
-const ReviewsView = ({ navigate, setNotice }) => {
+const ReviewsView = ({ navigate }) => {
   // The Home queue links here with &state=open.
   const [state, setState] = useState(new URLSearchParams(useLocation().search).get("state") === "resolved" ? "resolved" : "open");
-  const [data, fetchRows] = usePaged({ view: "reviews", state }, setNotice, "The payment reviews could not be loaded.");
+  const [data, fetchRows, error] = usePaged({ view: "reviews", state }, "The payment reviews could not be loaded.");
   return (
     <div style={card}>
       <Text mb="md">Cases the payment system could not settle by itself. Marking one reviewed records that you checked it and handled it outside this tool; it moves no money. Refunds are made in Paymob, the App Store or Google Play.</Text>
       <div style={{ marginBottom: 12 }}>
         <select aria-label="Case state" style={{ ...input, width: 180 }} value={state} onChange={(e) => setState(e.target.value)}><option value="open">Open (oldest first)</option><option value="resolved">Reviewed</option></select>
       </div>
-      {!data ? <Text>Loading…</Text> : (
+      {error ? <Notice notice={error} /> : !data ? <Text>Loading…</Text> : (
         <>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead><tr><th style={th}>Opened</th><th style={th}>Case</th><th style={th}>State</th><th style={th}>Reviewed</th></tr></thead>
@@ -467,9 +498,9 @@ const ShopPage = () => {
   const view = params.get("view") ?? "pricing";
   useEffect(() => setNotice(null), [location.search]);
   const body = view === "promotions" ? <PromotionsView setNotice={setNotice} />
-    : view === "orders" ? <OrdersView navigate={navigate} setNotice={setNotice} />
+    : view === "orders" ? <OrdersView navigate={navigate} />
     : view === "order" ? <OrderView key={params.get("id")} id={params.get("id")} navigate={navigate} setNotice={setNotice} />
-    : view === "reviews" ? <ReviewsView key={location.search} navigate={navigate} setNotice={setNotice} />
+    : view === "reviews" ? <ReviewsView key={location.search} navigate={navigate} />
     : view === "review" ? <ReviewView key={params.get("id")} id={params.get("id")} navigate={navigate} setNotice={setNotice} />
     : view === "products" ? <ProductsView setNotice={setNotice} />
     : <PricingView setNotice={setNotice} />;

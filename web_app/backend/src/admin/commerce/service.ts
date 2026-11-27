@@ -11,7 +11,7 @@ import { StaffError } from "../staff-service.js";
 export class CommerceError extends StaffError {}
 
 type Actor = { actorId: string; requestKey: string };
-const UUID = /^[0-9a-f-]{36}$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const PAGE_SIZE = 25;
 export const MAX_TIERS = 20;
 export const MAX_TOKEN_QUANTITY = 20;
@@ -169,9 +169,9 @@ export class CommerceService {
     const [row] = await this.db.select().from(shopSettings).where(eq(shopSettings.id, 1)).limit(1);
     if (!row) {
       // Nothing has been saved yet; the first save creates the row at version 1.
-      return { configured: false, version: "0", baseUnitPriceMinor: 10000, giftDiscountBps: 1000, tiers: [] as QuantityTier[], bundles: DEFAULT_BUNDLES, updatedAt: null };
+      return { configured: false, version: "0", baseUnitPriceMinor: 10000, maxBaseUnitPriceMinor: MAX_PRICE_MINOR, giftDiscountBps: 1000, tiers: [] as QuantityTier[], bundles: DEFAULT_BUNDLES, updatedAt: null };
     }
-    return { configured: true, version: String(row.pricingVersion), baseUnitPriceMinor: Number(row.baseUnitPriceMinor), giftDiscountBps: row.giftDiscountBps, tiers: normalizeTiers(row.quantityTiers), bundles: normalizeBundles(row.bundles), updatedAt: row.updatedAt };
+    return { configured: true, version: String(row.pricingVersion), baseUnitPriceMinor: Number(row.baseUnitPriceMinor), maxBaseUnitPriceMinor: MAX_PRICE_MINOR, giftDiscountBps: row.giftDiscountBps, tiers: normalizeTiers(row.quantityTiers), bundles: normalizeBundles(row.bundles), updatedAt: row.updatedAt };
   }
 
   /** One transaction: refuse a stale version, write the new settings, bump `pricing_version`, audit before/after. */
@@ -356,7 +356,7 @@ export class CommerceService {
       conditions.push(filter.channel === "web" ? eq(tokenOrders.purchaseChannel, "paymob") : sql`${tokenOrders.purchaseChannel} <> 'paymob'`);
     }
     if (filter.promo) {
-      if (!UUID.test(filter.promo)) throw new CommerceError("invalid_filter");
+      if (!UUID.test(filter.promo)) throw new CommerceError("invalid_promotion_id");
       conditions.push(eq(tokenOrders.appliedPromotionId, filter.promo));
     }
     const day = /^\d{4}-\d\d-\d\d$/;
