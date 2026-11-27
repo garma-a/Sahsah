@@ -106,6 +106,18 @@ The optional gameplay module exposes `/api/v1` REST and `/api/v1/realtime` nativ
 
 ### Run the game locally
 
+After the one-time `.env` setup below, one command starts everything (Docker must be running):
+
+```sh
+pnpm local        # database + API (:3001) + admin (:3002/admin) + website (:3000)
+pnpm local:admin  # database + admin only
+pnpm local:web    # database + API + website
+```
+
+`scripts/local.mjs` starts the Compose database, builds, applies migrations, then runs the processes in the foreground with prefixed logs; Ctrl+C stops them and the database keeps its data. When `.env` has no admin session secret or first account, it generates local-only values once (the password is `ADMIN_BOOTSTRAP_PASSWORD` in `.env`). The website reads `NEXT_PUBLIC_API_URL` from `../frontend/.env.local`.
+
+The same steps by hand:
+
 ```sh
 docker compose up -d            # PostgreSQL 18 on localhost:5433, with local-only roles
 cp .env.example .env            # then set the values below
