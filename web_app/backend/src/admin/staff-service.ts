@@ -105,9 +105,20 @@ export class StaffService {
   async bootstrap(emailInput: string | undefined, password: string | undefined) {
     return this.database.transaction(async (tx) => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(${BOOTSTRAP_LOCK[0]}, ${BOOTSTRAP_LOCK[1]})`);
-      const [existing] = await tx.select({ id: staffAccounts.id }).from(staffAccounts).where(eq(staffAccounts.role, "super_admin")).limit(1);
-      if (existing) return false;
+      const [superAdmin] = await tx.select({ id: staffAccounts.id }).from(staffAccounts).where(eq(staffAccounts.role, "super_admin")).limit(1);
+      if (superAdmin) return false;
       const email = normalizeEmail(emailInput);
+      // Without bootstrap settings it is an error only when no active staff account exists at all;
+      // staff created another way keep working. Inactive system rows (the content importer) cannot sign in.
+      if (!email && !password) {
+        const [active] = await tx.select({ id: staffAccounts.id }).from(staffAccounts).where(eq(staffAccounts.isActive, true)).limit(1);
+        if (active) return false;
+      }
+      // An address that already has an account is never taken over or promoted here.
+      if (email) {
+        const [taken] = await tx.select({ id: staffAccounts.id }).from(staffAccounts).where(eq(staffAccounts.normalizedEmail, email)).limit(1);
+        if (taken) return false;
+      }
       if (email.length > MAX_STAFF_EMAIL_LENGTH) {
         throw new Error(`ADMIN_BOOTSTRAP_EMAIL can be at most ${MAX_STAFF_EMAIL_LENGTH} characters.`);
       }
