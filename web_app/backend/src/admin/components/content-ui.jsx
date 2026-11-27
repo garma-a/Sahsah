@@ -22,7 +22,7 @@ export const MESSAGES = {
   slot_occupied: "This slot already has a question. Reload the pack.",
   question_changed: "This question was changed by someone else. Reload the pack and try again.",
   format_change_needs_replacement: "A correction cannot change the format. Replace the question instead.",
-  public_edit_confirmation_required: "Confirm that you are editing a public pack.",
+  public_edit_confirmation_required: "Confirm that you are editing a published pack.",
   pack_public: "A public pack must stay complete. Replace the question instead of retiring it.",
   pack_archived: "Restore the pack before publishing it.",
   pack_incomplete: "The pack is not ready. Fix the problems listed below.",
@@ -51,6 +51,7 @@ export const MESSAGES = {
   not_banned: "That account is not banned. Reload the page.",
   note_required: "Write the note.",
   note_too_long: "Notes can be at most 1000 characters.",
+  note_required_too_long: "The note can be at most 1,000 characters.",
   already_resolved: "That was already resolved. Reload the page.",
   invalid_target: "Choose who receives the credit.",
   no_numbers: "Paste at least one valid phone number.",
@@ -121,7 +122,10 @@ export const MESSAGES = {
   invalid_facebookUrl: "The Facebook address must start with https://.",
   invalid_instagramUrl: "The Instagram address must start with https://.",
   invalid_tiktokUrl: "The TikTok address must start with https://.",
+  format_name_required: "Enter the English name for staff.",
+  format_name_too_long: "The English name for staff can be at most 80 characters.",
   label_required: "Enter the Arabic label players see.",
+  label_too_long: "The Arabic label players see can be at most 80 characters.",
   invalid_base: "Choose what the question starts with.",
   invalid_stages: "A format has at most 3 hint stages, each a picture or an audio clip.",
   invalid_answer: "Choose what the answer shows.",
@@ -183,9 +187,9 @@ export const button = (kind = "primary", disabled = false) => ({
   color: kind === "primary" ? "#fff" : kind === "danger" ? colors.red : colors.forest,
 });
 
-export const Field = ({ label, hint, children }) => (
+export const Field = ({ label, hint, required, children }) => (
   <label style={{ display: "block", marginBottom: 12 }}>
-    <span style={{ display: "block", fontWeight: 600, marginBottom: 4 }}>{label}</span>
+    <span style={{ display: "block", fontWeight: 600, marginBottom: 4 }}>{label}{required && <span aria-hidden="true" style={{ color: colors.red }}> *</span>}</span>
     {children}
     {hint && <span style={{ display: "block", color: colors.muted, fontSize: 12, marginTop: 4 }}>{hint}</span>}
   </label>

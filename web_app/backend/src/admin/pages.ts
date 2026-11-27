@@ -10,7 +10,7 @@ import { dislikedQuestions, incompleteDrafts } from "./home/lists.js";
 import type { MessagesService } from "./messages/service.js";
 import type { PlayersService } from "./players/service.js";
 import type { PublicSiteService } from "./public-site/service.js";
-import { StaffError, type StaffService } from "./staff-service.js";
+import { MAX_STAFF_EMAIL_LENGTH, StaffError, type StaffService } from "./staff-service.js";
 
 const SINGLE_FILE_BYTES = 26 * 1024 * 1024;
 type Reply = { status: (code: number) => unknown };
@@ -76,7 +76,7 @@ export function buildPages(staff: StaffService, db: () => SahsahDatabase, conten
     try {
       // Checked against the database on every call; the sidebar entry is only a convenience.
       await staff.requireSuperAdmin(actorId);
-      if (req.method?.toUpperCase() !== "POST") return { staff: await staff.list(), me: actorId };
+      if (req.method?.toUpperCase() !== "POST") return { staff: await staff.list(), me: actorId, maxEmailLength: MAX_STAFF_EMAIL_LENGTH };
       const body = req.payload ?? {}, requestKey = uuid(body.requestKey);
       const base = { actorId: actorId!, requestKey };
       switch (body.op) {
@@ -106,7 +106,7 @@ export function buildPages(staff: StaffService, db: () => SahsahDatabase, conten
         const query = req.query ?? {};
         switch (text(query.view) || "home") {
           case "category":
-            return await content.category(query.id);
+            return await content.category(query.id, query.cursor);
           case "pack":
             return await content.pack(query.id);
           case "formats":

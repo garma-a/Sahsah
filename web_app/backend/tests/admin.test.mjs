@@ -44,9 +44,10 @@ async function setup(t, name) {
   return { owner, start };
 }
 
-async function login(base, email, password) {
+async function login(base, email, password, headers) {
   const response = await fetch(`${base}/admin/login`, {
     method: "POST",
+    headers,
     body: new URLSearchParams({ email, password }),
     redirect: "manual",
   });
@@ -68,7 +69,15 @@ test("staff sign in against the database and anonymous visitors are turned away"
   const anonymous = await fetch(`${base}/admin`, { redirect: "manual" });
   assert.equal(anonymous.status, 302);
   assert.equal(anonymous.headers.get("location"), "/admin/login");
-  assert.match(await (await fetch(`${base}/admin/login`)).text(), /Sahsah Admin/);
+  const loginPage = await (await fetch(`${base}/admin/login`)).text();
+  assert.match(loginPage, /Sahsah Admin/);
+  assert.match(loginPage, /"welcomeHeader":"Sahsah staff dashboard"/);
+  assert.match(loginPage, /"welcomeMessage":"Sign in with your staff account to manage Sahsah\."/);
+  const stylesheet = loginPage.match(/href="(\/admin\/sahsah\.css)"/)?.[1];
+  assert.ok(stylesheet, "the login template includes the branding stylesheet");
+  const styles = await fetch(`${base}${stylesheet}`);
+  assert.equal(styles.status, 200);
+  assert.match(styles.headers.get("content-type"), /^text\/css/);
   assert.notEqual((await fetch(`${base}/admin/api/pages/audit-log`, { redirect: "manual" })).status, 200);
 
   const wrong = await login(base, BOOTSTRAP.email, "not-the-password");
@@ -98,9 +107,23 @@ test("repeated wrong passwords lock the account out for a while", { timeout: 120
   assert.match(await locked.response.text(), /Sahsah Admin/);
 });
 
+test("the sign-in retry limit supplies a plain-language message", { timeout: 120000 }, async (t) => {
+  const { start } = await setup(t, "sahsah_admin_retry");
+  const { base } = await start({ ADMIN_LOGIN_ATTEMPTS_PER_MINUTE: "1", TRUSTED_PROXY_HOPS: "1" });
+  const headers = { "X-Forwarded-For": "192.0.2.10" };
+  const first = await login(base, BOOTSTRAP.email, "wrong-password-123", headers);
+  assert.doesNotMatch(await first.response.text(), /"errorMessage":"tooManyRequests"/);
+  const limited = await login(base, BOOTSTRAP.email, BOOTSTRAP.password, headers);
+  assert.equal(limited.cookie, undefined);
+  const page = await limited.response.text();
+  assert.match(page, /"errorMessage":"tooManyRequests"/);
+  assert.match(page, /"tooManyRequests":"Too many sign-in attempts\. Wait a minute before trying again\."/);
+});
+
 test("the first Super Admin is created from the environment on first boot only", { timeout: 120000 }, async (t) => {
   const { owner, start } = await setup(t, "sahsah_admin_bootstrap");
   await assert.rejects(start({ ADMIN_BOOTSTRAP_EMAIL: "", ADMIN_BOOTSTRAP_PASSWORD: "" }), /ADMIN_BOOTSTRAP_EMAIL/);
+  await assert.rejects(start({ ADMIN_BOOTSTRAP_EMAIL: `${"a".repeat(243)}@example.test` }), /ADMIN_BOOTSTRAP_EMAIL can be at most 254 characters/);
   const first = await start();
   await first.close();
   const before = await owner.query("SELECT role, normalized_email, password_hash FROM staff_accounts");
@@ -136,6 +159,12 @@ test("Super Admin manages staff with audit rows; Admin cannot reach staff manage
   const { owner, start } = await setup(t, "sahsah_admin_staff");
   const { base } = await start();
   const root = (await login(base, BOOTSTRAP.email, BOOTSTRAP.password)).cookie;
+
+  const staffPage = await (await call(base, root, "staff")).json();
+  assert.equal(staffPage.maxEmailLength, 254);
+  const tooLong = await call(base, root, "staff", { method: "POST", body: { op: "create", email: `${"a".repeat(243)}@example.test`, role: "admin" } });
+  assert.equal(tooLong.status, 400);
+  assert.deepEqual(await tooLong.json(), { error: "email_too_long" });
 
   const key = randomUUID();
   const created = await call(base, root, "staff", { method: "POST", body: { op: "create", email: "Helper@Example.test", role: "admin", requestKey: key } });
