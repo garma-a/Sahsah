@@ -125,11 +125,13 @@ test("the sign-in retry limit supplies a plain-language message", { timeout: 120
 
 test("the first Super Admin is created from the environment on first boot only", { timeout: 120000 }, async (t) => {
   const { owner, start } = await setup(t, "sahsah_admin_bootstrap");
+  // The content seed's inactive system Admin exists before the first boot and must not block it.
+  await owner.query("INSERT INTO staff_accounts(id,role,normalized_email,password_hash,is_active) VALUES($1,'admin','content-import@sahsah.invalid','disabled',false)", [randomUUID()]);
   await assert.rejects(start({ ADMIN_BOOTSTRAP_EMAIL: "", ADMIN_BOOTSTRAP_PASSWORD: "" }), /ADMIN_BOOTSTRAP_EMAIL/);
   await assert.rejects(start({ ADMIN_BOOTSTRAP_EMAIL: `${"a".repeat(243)}@example.test` }), /ADMIN_BOOTSTRAP_EMAIL can be at most 254 characters/);
   const first = await start();
   await first.close();
-  const before = await owner.query("SELECT role, normalized_email, password_hash FROM staff_accounts");
+  const before = await owner.query("SELECT role, normalized_email, password_hash FROM staff_accounts WHERE role='super_admin'");
   assert.equal(before.rows.length, 1);
   assert.equal(before.rows[0].role, "super_admin");
   assert.match(before.rows[0].password_hash, /^scrypt\$/);
@@ -137,7 +139,7 @@ test("the first Super Admin is created from the environment on first boot only",
 
   const second = await start({ ADMIN_BOOTSTRAP_EMAIL: "other@example.test", ADMIN_BOOTSTRAP_PASSWORD: "other-password-123" });
   assert.equal((await login(second.base, "other@example.test", "other-password-123")).cookie, undefined);
-  assert.equal((await owner.query("SELECT 1 FROM staff_accounts")).rowCount, 1);
+  assert.equal((await owner.query("SELECT 1 FROM staff_accounts WHERE role='super_admin'")).rowCount, 1);
   assert.equal((await owner.query("SELECT 1 FROM staff_audit_events WHERE action_code='staff.bootstrap'")).rowCount, 1);
 });
 

@@ -98,11 +98,14 @@ export class StaffService {
     return account;
   }
 
-  /** First boot only: when no staff account exists yet, create the Super Admin from the environment. */
+  /**
+   * First boot only: when no Super Admin exists yet, create one from the environment. System rows such as
+   * the content importer (an inactive Admin) do not count, so seeding content first cannot lock staff out.
+   */
   async bootstrap(emailInput: string | undefined, password: string | undefined) {
     return this.database.transaction(async (tx) => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(${BOOTSTRAP_LOCK[0]}, ${BOOTSTRAP_LOCK[1]})`);
-      const [existing] = await tx.select({ id: staffAccounts.id }).from(staffAccounts).limit(1);
+      const [existing] = await tx.select({ id: staffAccounts.id }).from(staffAccounts).where(eq(staffAccounts.role, "super_admin")).limit(1);
       if (existing) return false;
       const email = normalizeEmail(emailInput);
       if (email.length > MAX_STAFF_EMAIL_LENGTH) {

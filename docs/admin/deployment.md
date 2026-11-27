@@ -15,7 +15,7 @@ The staff dashboard is a second Railway service built from `web_app/backend` (AD
 | --- | --- |
 | `DATABASE_URL` | Runtime role connection string (required). |
 | `ADMIN_SESSION_SECRET` | 32+ characters; signs the session cookie (required). |
-| `ADMIN_BOOTSTRAP_EMAIL`, `ADMIN_BOOTSTRAP_PASSWORD` | Create the first Super Admin on first boot only (password 12+ characters). Remove them from the service after the first sign-in; they are ignored once any staff account exists. |
+| `ADMIN_BOOTSTRAP_EMAIL`, `ADMIN_BOOTSTRAP_PASSWORD` | Create the first Super Admin on first boot only (password 12+ characters). Remove them from the service after the first sign-in; they are ignored once a Super Admin exists (system accounts such as the content importer do not count). |
 | `TRUSTED_PROXY_HOPS` | `1` on Railway, so rate limits and cookies see the real client address. |
 | `NODE_ENV` | `production`: Secure cookies, requires `DATABASE_URL`. |
 | `ADMIN_DATABASE_POOL_MAX`, `ADMIN_LOGIN_ATTEMPTS_PER_MINUTE` | Optional tuning (defaults 3 and 10). |
