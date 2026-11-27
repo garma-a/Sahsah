@@ -243,7 +243,7 @@ test("bulk import: templates, dry run, safe ZIP handling, draft import, replay a
   assert.deepEqual(Buffer.from(await preview.arrayBuffer()), png1);
   const audioFile = ok.packs[1].rows[2].files[0];
   assert.equal((await fetch(base + audioFile.url)).headers.get("content-type"), "audio/mpeg");
-  assert.equal((await fetch(base + withFile.url.replace(/sig=[0-9a-f]/, "sig=0"))).status, 404, "a tampered link is refused");
+  assert.equal((await fetch(base + withFile.url.replace(/sig=([0-9a-f])/, (_, c) => `sig=${c === "0" ? "1" : "0"}`))).status, 404, "a tampered link is refused");
   assert.equal((await fetch(base + withFile.url.replace("a1.png", "a2.png"))).status, 404, "a link works for its own file only");
   assert.equal(await objects(), 0);
   assert.deepEqual(await counts(), before, "the report is still a dry run");

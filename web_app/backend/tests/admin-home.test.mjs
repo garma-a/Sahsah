@@ -57,7 +57,8 @@ async function seedGame(o, { host, startedAt, active = false, openRoom = false, 
     // Games and their rooms end only after the content is attached: the content is frozen then.
     if (!active) {
       await o.query("UPDATE games SET status='finished',ended_at=$2::timestamptz,end_reason='host_ended',content_purge_after=$2::timestamptz+interval '12 months' WHERE id=$1", [game, end]);
-      await o.query("UPDATE rooms SET closed_at=$2 WHERE id=$1", [room, end]);
+      // The API's maintenance sweep may already have closed this backdated room; closing is then done.
+      await o.query("UPDATE rooms SET closed_at=$2 WHERE id=$1 AND closed_at IS NULL", [room, end]);
     }
   }
   return { room, game };
