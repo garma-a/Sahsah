@@ -13,8 +13,7 @@ const QUEUES = [
   { key: "disliked", label: "Disliked questions", hint: "Questions with many thumbs-down votes", to: "/admin/pages/content?view=disliked" },
 ];
 
-// Three columns at desktop width, so six cards make two even rows.
-const grid = { display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))" };
+const grid = { display: "grid", gap: 12 };
 const number = (value) => value.toLocaleString("en-US");
 const money = (value) => `EGP ${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const weekday = (date) => new Date(`${date}T00:00:00Z`).toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" });
@@ -74,16 +73,23 @@ const Home = () => {
     return () => clearInterval(timer);
   }, []);
   const age = data ? data.ageSeconds + Math.max(0, Math.floor((now - receivedAt) / 1000)) : 0;
+  const ageLabel = age < 60 ? `${age} s` : `${Math.floor(age / 60)} min`;
   const k = data?.kpis;
   return (
     <Box variant="white">
+      <style>{`
+        .sahsah-home-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); }
+        @media (min-width: 1366px) {
+          .sahsah-home-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        }
+      `}</style>
       <Box flex style={{ justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
         <div>
           <H3 style={{ marginBottom: 0 }}>Home</H3>
           <Text color="grey60">Signed in as {email} ({role === "super_admin" ? "Super Admin" : "Admin"}).{data ? ` Figures for ${data.cairoDate} (Cairo time).` : ""}</Text>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          {data && <span style={{ color: colors.muted, fontSize: 13 }} aria-live="off">Updated {age} s ago</span>}
+          {data && <span style={{ color: colors.muted, fontSize: 13, whiteSpace: "nowrap" }} aria-live="off">Updated {ageLabel} ago</span>}
           <button style={button("secondary", loading)} disabled={loading} onClick={() => load(true)}>{loading ? "Refreshing…" : "Refresh now"}</button>
         </div>
       </Box>
@@ -92,7 +98,7 @@ const Home = () => {
       {data && (
         <>
           <H3 mt="xl">Needs attention</H3>
-          <div style={grid}>
+          <div className="sahsah-home-grid" style={grid}>
             {QUEUES.map((queue) => {
               const count = data.queues[queue.key];
               return (
@@ -107,7 +113,7 @@ const Home = () => {
           </div>
 
           <H3 mt="xl">Today</H3>
-          <div style={grid}>
+          <div className="sahsah-home-grid" style={grid}>
             <Kpi label="Games started today" value={number(k.gamesToday)} />
             <Kpi label="Sales today" value={money(k.salesTodayEgp)} hint={!k.anyOrder ? "Checkout not live: no orders yet" : `${k.paidOrdersToday} paid ${k.paidOrdersToday === 1 ? "order" : "orders"}`} />
             <Kpi label="New accounts today" value={number(k.newAccountsToday)} />
@@ -120,7 +126,7 @@ const Home = () => {
           <div style={{ ...card, display: "flex", gap: 32, flexWrap: "wrap" }}>
             <Bars title="Games started per day" color={colors.forest} rows={data.trend.map((d) => ({ date: d.date, value: d.games }))} />
             <Bars title="New accounts per day" color={colors.gold} rows={data.trend.map((d) => ({ date: d.date, value: d.accounts }))} />
-            <div style={{ flex: "1 1 280px" }}>
+            <div style={{ flex: "1 1 280px", minWidth: 0, overflowWrap: "anywhere" }}>
               <div style={{ fontWeight: 600, marginBottom: 8 }}>Top categories by games played</div>
               {data.topCategories.length === 0 ? <Text color="grey60">No games in the last 7 days.</Text> : (
                 <ol style={{ margin: 0, paddingLeft: 20 }}>

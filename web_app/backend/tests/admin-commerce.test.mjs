@@ -53,12 +53,14 @@ test("shop: pricing, promotions, orders, payment reviews and store products", { 
   let pricing = await admin.read("");
   assert.equal(pricing.configured, false);
   assert.equal(pricing.version, "0");
+  assert.equal(pricing.maxBaseUnitPriceMinor, 10_000_000);
   const save = (over = {}, key) => admin.post({ op: "pricing.save", expectedVersion: pricing.version, baseUnitPriceMinor: 10000, giftDiscountBps: 1000, tiers: [{ minimum_quantity: 2, discount_bps: 500, is_active: true }, { minimum_quantity: 5, discount_bps: 1500, is_active: true }], bundles: bundles(), ...over }, key);
   let saved = await save();
   assert.equal(saved.status, 200, JSON.stringify(saved.body));
   assert.equal(saved.body.version, "1");
   pricing = await admin.read("");
   assert.equal(pricing.configured, true);
+  assert.equal(pricing.maxBaseUnitPriceMinor, 10_000_000);
   assert.equal(pricing.tiers.length, 2);
   assert.equal(pricing.version, "1");
 
@@ -91,6 +93,7 @@ test("shop: pricing, promotions, orders, payment reviews and store products", { 
   await bad({ tiers: [tier(2, 10001)] }, "tier_discount_invalid");
   await bad({ tiers: Array.from({ length: 21 }, (_, i) => tier(i + 1)) }, "tiers_too_many");
   await bad({ baseUnitPriceMinor: 0 }, "price_invalid");
+  await bad({ baseUnitPriceMinor: pricing.maxBaseUnitPriceMinor + 1 }, "price_invalid");
   await bad({ giftDiscountBps: 10001 }, "gift_discount_invalid");
   await bad({ bundles: bundles([0, 0, 1]) }, "bundle_order_invalid");
   await bad({ bundles: bundles().slice(0, 2) }, "bundles_invalid");
@@ -187,6 +190,13 @@ test("shop: pricing, promotions, orders, payment reviews and store products", { 
   assert.equal(new Set([...orders.rows, ...rest.rows].map((r) => r.id)).size, 28, "no order repeats or is skipped across pages");
   assert.equal((await admin.read(`?view=orders&phone=${encodeURIComponent(await phoneOf(a1))}`)).rows.map((r) => r.id).join(), ids[1]);
   assert.equal((await admin.read(`?view=orders&promo=${promoId}`)).rows.length, 1);
+  assert.equal((await admin.read(`?view=orders&promo=${promoId.toUpperCase()}`)).rows.length, 1);
+  for (const invalid of ["not-an-id", "-".repeat(36)]) {
+    const rejected = await admin.read(`?view=orders&promo=${invalid}`);
+    assert.equal(rejected.status, 400);
+    assert.equal(rejected.error, "invalid_promotion_id");
+  }
+  assert.equal((await admin.read(`?view=order&id=${"-".repeat(36)}`)).status, 404);
   assert.equal((await admin.read("?view=orders&status=paid")).rows.length, 0);
   assert.equal((await admin.read("?view=orders&status=pending")).rows.length, 25);
   assert.equal((await admin.read("?view=orders&channel=native")).rows.length, 0);
