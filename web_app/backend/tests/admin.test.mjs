@@ -78,6 +78,9 @@ test("staff sign in against the database and anonymous visitors are turned away"
   const styles = await fetch(`${base}${stylesheet}`);
   assert.equal(styles.status, 200);
   assert.match(styles.headers.get("content-type"), /^text\/css/);
+  const css = await styles.text();
+  assert.match(css, /@media \(max-width: 1023px\)/, "screens under 1024 px wide get the notice");
+  assert.match(css, /This screen size is not supported\./);
   assert.notEqual((await fetch(`${base}/admin/api/pages/audit-log`, { redirect: "manual" })).status, 200);
 
   const wrong = await login(base, BOOTSTRAP.email, "not-the-password");
