@@ -18,6 +18,7 @@ export class StaffError extends Error {
 }
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export const MAX_STAFF_EMAIL_LENGTH = 254;
 const normalizeEmail = (value: unknown) => (typeof value === "string" ? value.trim().toLowerCase() : "");
 const BOOTSTRAP_LOCK = [1935763505, 3] as const;
 
@@ -104,6 +105,9 @@ export class StaffService {
       const [existing] = await tx.select({ id: staffAccounts.id }).from(staffAccounts).limit(1);
       if (existing) return false;
       const email = normalizeEmail(emailInput);
+      if (email.length > MAX_STAFF_EMAIL_LENGTH) {
+        throw new Error(`ADMIN_BOOTSTRAP_EMAIL can be at most ${MAX_STAFF_EMAIL_LENGTH} characters.`);
+      }
       if (!EMAIL.test(email) || !password || password.length < MINIMUM_PASSWORD_LENGTH) {
         throw new Error(`No staff account exists: set ADMIN_BOOTSTRAP_EMAIL and ADMIN_BOOTSTRAP_PASSWORD (${MINIMUM_PASSWORD_LENGTH}+ characters).`);
       }
@@ -136,6 +140,7 @@ export class StaffService {
 
   async create(input: { actorId: string; requestKey: string; email: unknown; role: unknown }) {
     const email = normalizeEmail(input.email);
+    if (email.length > MAX_STAFF_EMAIL_LENGTH) throw new StaffError("email_too_long");
     if (!EMAIL.test(email)) throw new StaffError("invalid_email");
     if (input.role !== "admin" && input.role !== "super_admin") throw new StaffError("invalid_role");
     const role: StaffRole = input.role;

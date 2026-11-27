@@ -5,6 +5,7 @@ import { Field, Notice, button, card, colors, get, input, useSend } from "./cont
 
 const PAGE = "/admin/pages/public-site";
 const PAGE_NAME = "public-site";
+const PROPAGATION = "Live announcement and site settings changes can take about a minute to reach visitors.";
 const TABS = [["announcements", "Announcements"], ["pages", "Pages"], ["settings", "Site settings"]];
 // Postgres text: "2026-11-20 10:00:00.123456+00".
 const toDate = (value) => new Date(value.replace(" ", "T").replace(/\+00$/, "Z"));
@@ -87,15 +88,15 @@ const Announcements = ({ setNotice }) => {
     <>
       <Tabs view="announcements" navigate={useNavigate()} analyticsUrl={data?.analyticsUrl} />
       <Text mb="md">An announcement is a dated message shown at the top of the website for everyone. The newest live one is shown; players can dismiss it.</Text>
-      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-        <select aria-label="Status" style={{ ...input, width: 170 }} value={status} onChange={(e) => setStatus(e.target.value)}>
-          <option value="">All statuses</option><option value="live">Live</option><option value="scheduled">Scheduled</option><option value="ended">Ended</option><option value="inactive">Inactive</option>
-        </select>
-        <button style={button("primary")} onClick={() => setEditing({ create: true })}>New announcement</button>
-      </div>
-      {editing?.create && <AnnouncementForm initial={emptyAnnouncement()} busy={busy} submitLabel="Create announcement" onCancel={() => setEditing(null)} onSave={(fields) => act({ op: "announcement.create", ...fields }, "Announcement created.")} />}
-      {editing?.row && <AnnouncementForm key={editing.row.id} initial={fromRow(editing.row)} busy={busy} submitLabel="Save changes" onCancel={() => setEditing(null)} onSave={(fields) => act({ op: "announcement.update", id: editing.row.id, ...fields }, "Announcement saved.")} />}
       <div style={card}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+          <select aria-label="Status" style={{ ...input, width: 170 }} value={status} onChange={(e) => setStatus(e.target.value)}>
+            <option value="">All statuses</option><option value="live">Live</option><option value="scheduled">Scheduled</option><option value="ended">Ended</option><option value="inactive">Inactive</option>
+          </select>
+          <button style={button("primary")} onClick={() => setEditing({ create: true })}>New announcement</button>
+        </div>
+        {editing?.create && <AnnouncementForm initial={emptyAnnouncement()} busy={busy} submitLabel="Create announcement" onCancel={() => setEditing(null)} onSave={(fields) => act({ op: "announcement.create", ...fields }, `Announcement created. ${PROPAGATION}`)} />}
+        {editing?.row && <AnnouncementForm key={editing.row.id} initial={fromRow(editing.row)} busy={busy} submitLabel="Save changes" onCancel={() => setEditing(null)} onSave={(fields) => act({ op: "announcement.update", id: editing.row.id, ...fields }, `Announcement saved. ${PROPAGATION}`)} />}
         {!data ? <Text>Loading…</Text> : (
           <>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -105,12 +106,12 @@ const Announcements = ({ setNotice }) => {
                   const [label, kind] = STATUS[row.status] ?? [row.status, ""];
                   return (
                     <tr key={row.id}>
-                      <td style={{ ...td, maxWidth: 360 }}><strong style={rtl}>{row.titleAr}</strong><div style={{ ...rtl, color: colors.muted }}>{row.bodyAr}</div>{row.linkUrl && <div style={{ fontSize: 12, color: colors.muted }}>Link: {row.linkLabel} → {row.linkUrl}</div>}</td>
-                      <td style={td}>{when(row.startsAt)}<br /><span style={{ color: colors.muted, fontSize: 12 }}>{row.endsAt ? `until ${when(row.endsAt)}` : "no end"}</span></td>
+                      <td style={{ ...td, maxWidth: 360, overflowWrap: "anywhere" }}><strong dir="auto">{row.titleAr}</strong><div dir="auto" style={{ color: colors.muted }}>{row.bodyAr}</div>{row.linkUrl && <div style={{ fontSize: 12, color: colors.muted }}>Link: <span dir="auto">{row.linkLabel}</span> → {row.linkUrl}</div>}</td>
+                      <td style={{ ...td, whiteSpace: "nowrap" }}>{when(row.startsAt)}<br /><span style={{ color: colors.muted, fontSize: 12 }}>{row.endsAt ? `until ${when(row.endsAt)}` : "no end"}</span></td>
                       <td style={td}><Badge kind={kind}>{label}</Badge></td>
                       <td style={{ ...td, whiteSpace: "nowrap" }}>
                         <button style={button("secondary", busy)} disabled={busy} onClick={() => setEditing({ row })}>Edit</button>{" "}
-                        <button style={button("secondary", busy)} disabled={busy} onClick={() => act({ op: row.isActive ? "announcement.deactivate" : "announcement.activate", id: row.id }, row.isActive ? "Announcement deactivated." : "Announcement activated.")}>{row.isActive ? "Deactivate" : "Activate"}</button>{" "}
+                        <button style={button("secondary", busy)} disabled={busy} onClick={() => act({ op: row.isActive ? "announcement.deactivate" : "announcement.activate", id: row.id }, `Announcement ${row.isActive ? "deactivated" : "activated"}. ${PROPAGATION}`)}>{row.isActive ? "Deactivate" : "Activate"}</button>{" "}
                         {row.deletable ? <button style={button("danger", busy)} disabled={busy} onClick={() => window.confirm("Delete this announcement? It was never shown.") && act({ op: "announcement.delete", id: row.id }, "Announcement deleted.")}>Delete</button> : <span title="It was shown, so it is kept. Deactivate it instead." style={{ color: colors.muted, fontSize: 12 }}>Kept (was shown)</span>}
                       </td>
                     </tr>
@@ -223,7 +224,7 @@ const Settings = ({ setNotice }) => {
   }, [setNotice]);
   useEffect(() => { reload(); }, [reload]);
   if (!data || !form) return <Text>Loading…</Text>;
-  const act = async (payload, success) => { const done = await send(payload, { success }); if (done) await reload(); };
+  const act = async (payload, success) => { const done = await send(payload, { success: `${success} ${PROPAGATION}` }); if (done) await reload(); };
   return (
     <>
       <Tabs view="settings" navigate={navigate} analyticsUrl={data.analyticsUrl} />
@@ -256,6 +257,7 @@ const PublicSitePage = () => {
   return (
     <Box variant="white">
       <H3>Public site</H3>
+      <Text mb="md" color="grey60">{PROPAGATION}</Text>
       <Notice notice={notice} />
       {view === "pages" ? <Pages setNotice={setNotice} /> : view === "settings" ? <Settings setNotice={setNotice} /> : <Announcements setNotice={setNotice} />}
     </Box>

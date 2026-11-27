@@ -50,7 +50,8 @@ function decodeCursor(value: unknown): [number, string] | undefined {
   if (value === undefined || value === "") return undefined;
   try {
     const parsed = JSON.parse(Buffer.from(String(value), "base64url").toString());
-    if (Array.isArray(parsed) && Number.isSafeInteger(parsed[0]) && parsed[0] >= 0 && UUID.test(parsed[1])) return [parsed[0], parsed[1]];
+    if (Array.isArray(parsed) && parsed.length === 2 && Number.isInteger(parsed[0]) && parsed[0] >= 0 && parsed[0] <= 2_147_483_647
+      && typeof parsed[1] === "string" && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(parsed[1])) return [parsed[0], parsed[1]];
   } catch {
     // falls through to the refusal
   }
@@ -208,17 +209,27 @@ export class ContentService {
     };
   }
 
-  async category(categoryId: unknown) {
+  async category(categoryId: unknown, cursorInput?: unknown) {
     const key = id(categoryId);
+    const cursor = decodeCursor(cursorInput);
     const [category] = await this.categoryRows(this.db, eq(categories.id, key), 1);
     if (!category) throw new ContentError("not_found", 404);
     const sections = await this.db.select().from(categorySections).orderBy(categorySections.displayOrder, categorySections.id).limit(500);
-    const packs = await this.db.select().from(questionPacks).where(eq(questionPacks.categoryId, key)).orderBy(questionPacks.packNumber).limit(100);
+    const rows = await this.db.select().from(questionPacks)
+      .where(and(
+        eq(questionPacks.categoryId, key),
+        cursor && sql`(${questionPacks.packNumber}, ${questionPacks.id}) > (${cursor[0]}, ${cursor[1]})`,
+      ))
+      .orderBy(questionPacks.packNumber, questionPacks.id)
+      .limit(PAGE_SIZE + 1);
+    const packs = rows.slice(0, PAGE_SIZE);
+    const last = packs.at(-1);
     const content = await loadPackContent(this.db, packs.map((p) => p.id));
     return {
       category,
       sections,
       mediaEnabled: !!this.media,
+      nextCursor: rows.length > PAGE_SIZE && last ? encodeCursor(last.packNumber, last.id) : null,
       packs: packs.map((p) => ({
         id: p.id,
         packNumber: p.packNumber,

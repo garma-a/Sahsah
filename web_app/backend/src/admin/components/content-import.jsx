@@ -5,6 +5,7 @@ import { FORMAT_LABELS, Field, button, card, colors, get, input, useSend } from 
 const PAGE = "/admin/pages/content";
 const th = { textAlign: "left", color: colors.muted, padding: "6px 8px", fontWeight: 600 };
 const td = { padding: "6px 8px", borderTop: `1px solid ${colors.line}`, verticalAlign: "top" };
+const fileCount = (count) => `${count} file${count === 1 ? "" : "s"}`;
 
 const download = (filename, text) => {
   const link = document.createElement("a");
@@ -137,7 +138,7 @@ const ImportView = ({ id, navigate, setNotice }) => {
       {result && (
         <div style={{ ...card, borderColor: "#134b2c", marginBottom: 20 }} role="status">
           <H3>{result.replayed ? "Already imported" : "Import finished"}</H3>
-          <Text mb="md">{result.packs.length} draft pack{result.packs.length === 1 ? "" : "s"} created{result.replayed ? " by an earlier attempt of this import" : ` with ${result.questions} questions and ${result.files} files`}. Nothing is published: open each draft to review it, then publish it.</Text>
+          <Text mb="md">{result.packs.length} draft pack{result.packs.length === 1 ? "" : "s"} created{result.replayed ? " by an earlier attempt of this import" : ` with ${result.questions} questions and ${fileCount(result.files)}`}. Nothing is published: open each draft to review it, then publish it.</Text>
           <ul>
             {result.packs.map((p) => <li key={p.id}><a href={`${PAGE}?view=pack&id=${p.id}`} onClick={(e) => { e.preventDefault(); navigate(`${PAGE}?view=pack&id=${p.id}`); }}>Pack {p.packNumber}</a> — {p.label}</li>)}
           </ul>
@@ -149,7 +150,7 @@ const ImportView = ({ id, navigate, setNotice }) => {
           <H3>3. Check report</H3>
           <div role="status" style={{ padding: "10px 14px", borderRadius: 6, marginBottom: 12, background: report.canImport ? "#e3f1e8" : "#fbe3e1", color: report.canImport ? "#134b2c" : "#8a1f18" }}>
             {report.canImport
-              ? `No problems found: ${report.summary.packs} pack${report.summary.packs === 1 ? "" : "s"}, ${report.summary.questions} questions, ${report.summary.files} files. Nothing has been saved yet.`
+              ? `No problems found: ${report.summary.packs} pack${report.summary.packs === 1 ? "" : "s"}, ${report.summary.questions} questions, ${fileCount(report.summary.files)}. Nothing has been saved yet.`
               : `${errorCount} problem${errorCount === 1 ? "" : "s"} found in ${report.summary.packs} pack${report.summary.packs === 1 ? "" : "s"} and ${report.summary.questions} rows. Fix them, then upload the ZIP again. Nothing was saved.`}
             {report.summary.ignored > 0 && <div style={{ fontSize: 12 }}>{report.summary.ignored} system file{report.summary.ignored === 1 ? " was" : "s were"} ignored (such as __MACOSX).</div>}
           </div>

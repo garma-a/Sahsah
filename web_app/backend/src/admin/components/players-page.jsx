@@ -7,16 +7,21 @@ const PAGE = "/admin/pages/players";
 const PAGE_NAME = "players";
 const load = (params) => get(params, PAGE_NAME);
 // Postgres text: "2026-11-20 10:00:00.123456+00".
-const when = (value) => (value ? new Date(value.replace(" ", "T").replace(/\+00$/, "Z")).toLocaleString() : "");
+const cairoDateTime = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "Africa/Cairo", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+});
+const when = (value) => (value ? cairoDateTime.format(new Date(value.replace(" ", "T").replace(/\+00$/, "Z"))) : "");
 const STATES = { active: "Active", deletion_pending: "Deletion pending", deleted: "Deleted" };
 const th = { textAlign: "left", color: colors.muted, padding: "6px 8px" };
 const td = { padding: "6px 8px", borderTop: `1px solid ${colors.line}`, verticalAlign: "top" };
+const singleLine = { ...td, whiteSpace: "nowrap" };
+const wrap = { ...td, overflowWrap: "anywhere" };
 const Badge = ({ kind, children }) => (
   <span style={{ display: "inline-block", padding: "1px 8px", borderRadius: 10, fontSize: 12, fontWeight: 700, marginRight: 4, background: kind === "red" ? "#fbe3e1" : kind === "gold" ? "#fbefcf" : "#e7e3d6", color: kind === "red" ? "#8a1f18" : kind === "gold" ? "#7a5200" : colors.muted }}>{children}</span>
 );
 
 const Link = ({ to, navigate, children }) => (
-  <a href={to} onClick={(e) => { e.preventDefault(); navigate(to); }}>{children}</a>
+  <a href={to} style={{ color: colors.forest, fontWeight: 600 }} onClick={(e) => { e.preventDefault(); navigate(to); }}>{children}</a>
 );
 
 const Tabs = ({ view, navigate }) => (
@@ -68,11 +73,11 @@ const ListView = ({ navigate, setNotice }) => {
             <tbody>
               {data.rows.map((row) => (
                 <tr key={row.id}>
-                  <td style={td}><Link navigate={navigate} to={`${PAGE}?view=account&id=${row.id}`}>{row.phone ?? "(deleted)"}</Link></td>
-                  <td style={td}>{row.displayName ?? ""}</td>
-                  <td style={td}>{STATES[row.state]}</td>
+                  <td style={singleLine}><Link navigate={navigate} to={`${PAGE}?view=account&id=${row.id}`}>{row.phone ?? "(deleted)"}</Link></td>
+                  <td style={wrap}><span dir="auto">{row.displayName ?? ""}</span></td>
+                  <td style={singleLine}>{STATES[row.state]}</td>
                   <td style={td}>{row.tokenBalance}</td>
-                  <td style={td}>{when(row.createdAt)}</td>
+                  <td style={singleLine}>{when(row.createdAt)}</td>
                   <td style={td}>{row.banned && <Badge kind="red">Banned</Badge>}{row.flagged && <Badge kind="gold">Flagged</Badge>}</td>
                 </tr>
               ))}
@@ -86,13 +91,13 @@ const ListView = ({ navigate, setNotice }) => {
   );
 };
 
-const ReasonForm = ({ label, placeholder, submit, busy, kind = "primary", children }) => {
+const ReasonForm = ({ label, action, submit, busy, kind = "primary", children }) => {
   const [text, setText] = useState("");
   return (
     <form onSubmit={async (e) => { e.preventDefault(); if (await submit(text)) setText(""); }} style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
       {children}
-      <div style={{ flex: "1 1 260px" }}><Field label={label}><input style={input} value={text} placeholder={placeholder} onChange={(e) => setText(e.target.value)} /></Field></div>
-      <div style={{ marginBottom: 12 }}><button style={button(kind, busy)} disabled={busy}>{kind === "danger" ? "Ban account" : "Save"}</button></div>
+      <div style={{ flex: "1 1 260px", minWidth: 0 }}><Field label={`${label} (required)`}><input style={input} required value={text} onChange={(e) => setText(e.target.value)} /></Field></div>
+      <div style={{ marginBottom: 12 }}><button style={{ ...button(kind, busy), whiteSpace: "nowrap" }} disabled={busy}>{action}</button></div>
     </form>
   );
 };
@@ -114,11 +119,17 @@ const AccountView = ({ id, navigate, setNotice }) => {
   const { account } = data;
   const act = async (body, success) => { const done = await send(body, { success }); if (done) fetchAccount(); return done; };
   const activeBan = data.bans.find((ban) => !ban.liftedAt);
+  const ban = (reason) => {
+    const player = account.displayName || account.phone || id;
+    const target = account.displayName && account.phone ? `${player} (${account.phone})` : player;
+    if (reason.trim() && !window.confirm(`Ban ${target}? They will be unable to sign in or host, join or start games.`)) return;
+    return act({ op: "ban", id, reason }, "Account banned.");
+  };
   return (
     <>
       <p><Link navigate={navigate} to={PAGE}>← All accounts</Link></p>
       <div style={{ ...card, marginBottom: 20 }}>
-        <H3>{account.displayName ?? "Deleted account"} {account.banned && <Badge kind="red">Banned</Badge>}{account.openFlags > 0 && <Badge kind="gold">Flagged</Badge>}</H3>
+        <H3 style={{ overflowWrap: "anywhere" }}><span dir="auto">{account.displayName ?? "Deleted account"}</span> {account.banned && <Badge kind="red">Banned</Badge>}{account.openFlags > 0 && <Badge kind="gold">Flagged</Badge>}</H3>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 12 }}>
           <div><Text color="grey60">Phone</Text><strong>{account.phone ?? "(removed)"}</strong></div>
           <div><Text color="grey60">State</Text><strong>{STATES[account.state]}</strong></div>
@@ -133,7 +144,7 @@ const AccountView = ({ id, navigate, setNotice }) => {
         <div style={{ ...card, marginBottom: 20 }}>
           <H3>Add complimentary credit</H3>
           <Text mb="md">Adds tokens to the bank. Credit is permanent and cannot be taken back here, so check the amount.</Text>
-          <ReasonForm label="Reason (kept in the audit log)" busy={busy} submit={(reason) => act({ op: "credit", id, quantity, reason }, `Added ${quantity} token${quantity === "1" ? "" : "s"}.`).then((done) => { if (done) setQuantity(""); return done; })}>
+          <ReasonForm label="Audit log reason" action="Add credit" busy={busy} submit={(reason) => act({ op: "credit", id, quantity, reason }, `Added ${quantity} token${quantity === "1" ? "" : "s"}.`).then((done) => { if (done) setQuantity(""); return done; })}>
             <div style={{ width: 120 }}><Field label="Tokens (1–1000)"><input type="number" min="1" max="1000" style={input} value={quantity} onChange={(e) => setQuantity(e.target.value)} /></Field></div>
           </ReasonForm>
         </div>
@@ -144,10 +155,10 @@ const AccountView = ({ id, navigate, setNotice }) => {
         {activeBan ? (
           <>
             <Text mb="md">Banned by {activeBan.bannedBy} on {when(activeBan.bannedAt)}: {activeBan.reason}. The account cannot sign in or host, join or start games. A game it is already in can finish, and its token bank is kept.</Text>
-            <ReasonForm label="Reason for lifting the ban" busy={busy} submit={(reason) => act({ op: "unban", id, reason }, "Ban lifted.")} />
+            <ReasonForm label="Reason for lifting the ban" action="Lift ban" busy={busy} submit={(reason) => act({ op: "unban", id, reason }, "Ban lifted.")} />
           </>
         ) : account.state === "deleted" ? <Text>This account was deleted.</Text> : (
-          <ReasonForm label="Reason (kept in the audit log)" kind="danger" busy={busy} submit={(reason) => act({ op: "ban", id, reason }, "Account banned.")} />
+          <ReasonForm label="Audit log reason" action="Ban account" kind="danger" busy={busy} submit={ban} />
         )}
         {data.bans.filter((ban) => ban.liftedAt).map((ban) => (
           <Text key={ban.id} fontSize="xs" color="grey60">Earlier ban {when(ban.bannedAt)} by {ban.bannedBy}: {ban.reason}. Lifted {when(ban.liftedAt)} by {ban.liftedBy}: {ban.liftReason}.</Text>
@@ -160,11 +171,11 @@ const AccountView = ({ id, navigate, setNotice }) => {
         {data.flags.length === 0 && <Text mb="md">No flags.</Text>}
         {data.flags.map((flag) => (
           <div key={flag.id} style={{ display: "flex", gap: 12, padding: "6px 0", borderTop: `1px solid ${colors.line}`, alignItems: "center" }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ textDecoration: flag.resolvedAt ? "line-through" : "none" }}>{flag.note}</div>
+            <div style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>
+              <div dir="auto" style={{ textDecoration: flag.resolvedAt ? "line-through" : "none" }}>{flag.note}</div>
               <Text fontSize="xs" color="grey60">{flag.createdBy}, {when(flag.createdAt)}{flag.resolvedAt ? ` · resolved ${when(flag.resolvedAt)} by ${flag.resolvedBy}` : ""}</Text>
             </div>
-            {!flag.resolvedAt && <button style={button("secondary", busy)} disabled={busy} onClick={() => act({ op: "flag.resolve", id: flag.id }, "Flag resolved.")}>Resolve</button>}
+            {!flag.resolvedAt && <button style={{ ...button("secondary", busy), flexShrink: 0, whiteSpace: "nowrap" }} disabled={busy} onClick={() => act({ op: "flag.resolve", id: flag.id }, "Flag resolved.")}>Resolve</button>}
           </div>
         ))}
         <FlagForm busy={busy} submit={(note) => act({ op: "flag.add", id, note }, "Flag added.")} />
@@ -177,8 +188,8 @@ const AccountView = ({ id, navigate, setNotice }) => {
           <tbody>
             {data.ledger.map((entry) => (
               <tr key={entry.id}>
-                <td style={td}>{when(entry.createdAt)}</td>
-                <td style={td}>{entry.label}</td>
+                <td style={singleLine}>{when(entry.createdAt)}</td>
+                <td style={wrap}>{entry.label}</td>
                 <td style={{ ...td, fontWeight: 700, color: entry.amount < 0 ? colors.red : colors.forest }}>{entry.amount > 0 ? `+${entry.amount}` : entry.amount}</td>
               </tr>
             ))}
@@ -287,11 +298,11 @@ const BulkView = ({ navigate, setNotice }) => {
           <tbody>
             {(grants ?? []).map((g) => (
               <tr key={g.id}>
-                <td style={td}>{when(g.createdAt)}</td><td style={td}>{g.staffEmail}</td>
+                <td style={singleLine}>{when(g.createdAt)}</td><td style={wrap}>{g.staffEmail}</td>
                 <td style={td}>{g.targetKind === "all_active" ? "Every active account" : "Pasted list"}</td>
                 <td style={td}>{g.quantity}</td>
                 <td style={td}>{g.grantedCount} / {g.targetCount}{g.completedAt ? "" : " (unfinished)"}</td>
-                <td style={td}>{g.reason}</td>
+                <td style={wrap}><span dir="auto">{g.reason}</span></td>
                 <td style={td}>{!g.completedAt && <button style={button("secondary", busy)} disabled={busy} onClick={() => resume(g.id)}>Continue</button>}</td>
               </tr>
             ))}
@@ -323,11 +334,11 @@ const DeletionsView = ({ navigate, setNotice }) => {
             <tbody>
               {data.rows.map((row) => (
                 <tr key={row.id}>
-                  <td style={td}>{when(row.requestedAt)}</td>
-                  <td style={td}><Link navigate={navigate} to={`${PAGE}?view=account&id=${row.accountId}`}>{row.phone ?? row.displayName ?? row.accountId}</Link></td>
+                  <td style={singleLine}>{when(row.requestedAt)}</td>
+                  <td style={wrap}><Link navigate={navigate} to={`${PAGE}?view=account&id=${row.accountId}`}><span dir="auto">{row.phone ?? row.displayName ?? row.accountId}</span></Link></td>
                   <td style={{ ...td, textTransform: "capitalize" }}>{row.state}</td>
                   <td style={td}>{row.tokenBalance}</td>
-                  <td style={td}>{row.fundingClearedAt ? when(row.fundingClearedAt) : "Not yet"}</td>
+                  <td style={singleLine}>{row.fundingClearedAt ? when(row.fundingClearedAt) : "Not yet"}</td>
                   <td style={td}>{row.confirmedBank ?? ""}</td>
                 </tr>
               ))}
@@ -351,6 +362,7 @@ const PlayersPage = () => {
   return (
     <Box variant="white">
       <H3>Players</H3>
+      <Text mb="md" color="grey60">Dates and times are shown in Cairo time.</Text>
       <Tabs view={view} navigate={navigate} />
       <Notice notice={notice} />
       {view === "account" ? <AccountView key={params.get("id")} id={params.get("id")} navigate={navigate} setNotice={setNotice} /> : view === "bulk" ? <BulkView navigate={navigate} setNotice={setNotice} /> : view === "deletions" ? <DeletionsView navigate={navigate} setNotice={setNotice} /> : <ListView key={location.search} navigate={navigate} setNotice={setNotice} />}

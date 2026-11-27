@@ -30,8 +30,8 @@ const FormatForm = ({ initial, onSubmit, onCancel, busy, label }) => {
   return (
     <form onSubmit={(e) => { e.preventDefault(); onSubmit(form); }} aria-label="Format form" style={{ ...card, borderColor: colors.gold, marginBottom: 16 }}>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <Field label="Name (English, for staff)"><input style={input} value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} /></Field>
-        <Field label="Label players see (Arabic)"><input style={input} dir="rtl" value={form.labelAr} onChange={(e) => setForm({ ...form, labelAr: e.target.value })} /></Field>
+        <Field label="Name (English, for staff)" required><input style={input} required value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} /></Field>
+        <Field label="Label players see (Arabic)" required><input style={input} dir="rtl" required value={form.labelAr} onChange={(e) => setForm({ ...form, labelAr: e.target.value })} /></Field>
         <Field label="Starts with">
           <select style={input} value={form.baseKind} onChange={(e) => setForm({ ...form, baseKind: e.target.value })}>
             {Object.entries(BASES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
@@ -100,7 +100,7 @@ const FormatsView = ({ setNotice }) => {
       <div style={{ ...card, marginBottom: 16 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <H3>Staff-defined formats</H3>
-          <button style={button("primary")} onClick={() => setEditing(editing ? null : "new")}>{editing ? "Close" : "New format"}</button>
+          {!editing && <button style={button("primary")} onClick={() => setEditing("new")}>New format</button>}
         </div>
         <Text mb="md">A format is built only from text, pictures, audio and finished files you upload. The game sequence (board, hint stages with falling points, 60 second timer, reveal, award) never changes. Editing a format affects games started later; running games keep their own copy. Archiving hides it from new questions, and questions that already use it stay valid.</Text>
         {editing && <FormatForm key={editing === "new" ? "new" : editing.id} initial={editing === "new" ? blank : { nameEn: editing.nameEn, labelAr: editing.labelAr, baseKind: editing.baseKind, stageKinds: editing.stageKinds, answerKind: editing.answerKind, showPrompt: editing.showPrompt }} onSubmit={save} onCancel={() => setEditing(null)} busy={busy} label={editing === "new" ? "Create format" : "Save format"} />}

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Box, Button, H3, MessageBox, Table, TableBody, TableCell, TableHead, TableRow, Text } from "@adminjs/design-system";
+import { Box, Button, H3, MessageBox, Text } from "@adminjs/design-system";
 import { ApiClient } from "adminjs";
+import { colors } from "./content-ui";
 
 const api = new ApiClient();
 const MESSAGES = {
@@ -15,10 +16,14 @@ const MESSAGES = {
   not_found: "That staff account no longer exists.",
 };
 const ROLES = { admin: "Admin", super_admin: "Super Admin" };
+const heading = { color: colors.muted, textAlign: "left", padding: "6px 8px" };
+const cell = { borderTop: `1px solid ${colors.line}`, padding: "6px 8px" };
+const shortCell = { ...cell, whiteSpace: "nowrap" };
 
 const StaffPage = () => {
   const [staff, setStaff] = useState([]);
   const [me, setMe] = useState(null);
+  const [maxEmailLength, setMaxEmailLength] = useState(null);
   const [notice, setNotice] = useState(null);
   const [form, setForm] = useState({ email: "", role: "admin" });
   const [busy, setBusy] = useState(false);
@@ -31,6 +36,7 @@ const StaffPage = () => {
       const { data } = await api.getPage({ pageName: "staff" });
       setStaff(data.staff);
       setMe(data.me);
+      setMaxEmailLength(data.maxEmailLength);
     } catch (error) {
       if (error?.response?.status === 403) setForbidden(true);
       setNotice({ kind: "danger", text: MESSAGES[error?.response?.data?.error] ?? "Staff could not be loaded." });
@@ -53,7 +59,10 @@ const StaffPage = () => {
       const code = error?.response?.data?.error;
       // A refusal is final for this intent; a network failure keeps the key for the retry.
       if (code) delete keys.current[intent];
-      setNotice({ kind: "danger", text: MESSAGES[code] ?? "That did not work. Check the list before trying again." });
+      const text = code === "email_too_long"
+        ? `Email addresses can be at most ${maxEmailLength} characters.`
+        : MESSAGES[code] ?? "That did not work. Check the list before trying again.";
+      setNotice({ kind: "danger", text });
       return null;
     } finally {
       setBusy(false);
@@ -63,8 +72,23 @@ const StaffPage = () => {
   const report = (data, lead) => {
     if (data?.replayed) setNotice({ kind: "info", text: "That change was already applied." });
     else if (data?.temporaryPassword) {
-      setNotice({ kind: "success", text: `${lead} Temporary password for ${data.email} (shown once, share it privately): ${data.temporaryPassword}` });
+      setNotice({
+        kind: "success",
+        text: `${lead} Temporary password for ${data.email} (shown once, share it privately):`,
+        password: data.temporaryPassword,
+      });
     }
+  };
+
+  const copyPassword = async () => {
+    let copyStatus;
+    try {
+      await navigator.clipboard.writeText(notice.password);
+      copyStatus = "Copied";
+    } catch {
+      copyStatus = "Could not copy. Select the password to copy it manually.";
+    }
+    setNotice((current) => current === notice ? { ...current, copyStatus } : current);
   };
 
   const create = async (event) => {
@@ -87,51 +111,67 @@ const StaffPage = () => {
     <Box variant="white">
       <H3>Staff</H3>
       <Text mb="lg">Only Super Admins see this page. Deactivating an account signs that person out immediately.</Text>
-      {notice && <MessageBox mb="lg" variant={notice.kind} message={notice.text} onCloseClick={() => setNotice(null)} />}
+      {notice && (
+        <MessageBox mb="lg" variant={notice.kind} message={notice.text} style={{ overflowWrap: "anywhere" }} onCloseClick={() => setNotice(null)}>
+          {notice.password && (
+            <span style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+              <code style={{ minWidth: 0 }}>{notice.password}</code>
+              <Button type="button" size="sm" variant="outlined" onClick={copyPassword}>Copy password</Button>
+              <span role="status">{notice.copyStatus}</span>
+            </span>
+          )}
+        </MessageBox>
+      )}
       <form onSubmit={create}>
         <Box flex flexDirection="row" style={{ gap: 12, alignItems: "center" }} mb="xl">
-          <input style={{ ...field, minWidth: 260 }} type="email" required placeholder="Email address" aria-label="Email address" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
+          <input style={{ ...field, minWidth: 260 }} type="email" required maxLength={maxEmailLength ?? undefined} placeholder="Email address" aria-label="Email address" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
           <select style={field} aria-label="Role" value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })}>
             <option value="admin">Admin</option>
             <option value="super_admin">Super Admin</option>
           </select>
-          <Button type="submit" variant="contained" disabled={busy}>Add staff account</Button>
+          <Button type="submit" variant="contained" disabled={busy || maxEmailLength === null}>Add staff account</Button>
         </Box>
       </form>
-      <Table>
-        <TableHead>
-          <TableRow>
-            <TableCell>Email</TableCell>
-            <TableCell>Role</TableCell>
-            <TableCell>Status</TableCell>
-            <TableCell>Actions</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
+      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <thead>
+          <tr>
+            <th style={heading}>Email</th>
+            <th style={{ ...heading, width: "1%" }}>Role</th>
+            <th style={{ ...heading, width: "1%" }}>Status</th>
+            <th style={{ ...heading, width: "1%" }}>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
           {staff.map((member) => (
-            <TableRow key={member.id}>
-              <TableCell>{member.email}{member.id === me ? " (you)" : ""}</TableCell>
-              <TableCell>{ROLES[member.role]}</TableCell>
-              <TableCell>{member.isActive ? "Active" : "Deactivated"}</TableCell>
-              <TableCell>
-                <Box flex style={{ gap: 8, flexWrap: "wrap" }}>
-                  <Button size="sm" variant="outlined" disabled={busy} onClick={async () => report(await send(`reset:${member.id}`, { op: "reset-password", id: member.id }), "Password reset.")}>Reset password</Button>
+            <tr key={member.id}>
+              <td style={{ ...cell, overflowWrap: "anywhere" }}>{member.email}{member.id === me ? " (you)" : ""}</td>
+              <td style={shortCell}>{ROLES[member.role]}</td>
+              <td style={shortCell}>{member.isActive ? "Active" : "Deactivated"}</td>
+              <td style={shortCell}>
+                <div style={{ display: "inline-flex", gap: 8 }}>
+                  <Button size="sm" variant="outlined" disabled={busy} onClick={async () => {
+                    if (!window.confirm(`Reset the password for ${member.email}? Their current password will stop working and a temporary password will be issued.`)) return;
+                    report(await send(`reset:${member.id}`, { op: "reset-password", id: member.id }), "Password reset.");
+                  }}>Reset password</Button>
                   {member.id !== me && (
                     <Button size="sm" variant="outlined" disabled={busy} onClick={() => send(`role:${member.id}:${member.role}`, { op: "role", id: member.id, role: member.role === "admin" ? "super_admin" : "admin" })}>
                       Make {member.role === "admin" ? "Super Admin" : "Admin"}
                     </Button>
                   )}
                   {member.id !== me && (
-                    <Button size="sm" variant={member.isActive ? "danger" : "contained"} disabled={busy} onClick={() => send(`active:${member.id}:${member.isActive}`, { op: member.isActive ? "deactivate" : "reactivate", id: member.id })}>
+                    <Button size="sm" variant={member.isActive ? "danger" : "contained"} disabled={busy} onClick={() => {
+                      if (member.isActive && !window.confirm(`Deactivate ${member.email}? They will be signed out immediately and will need to be reactivated before signing in again.`)) return;
+                      send(`active:${member.id}:${member.isActive}`, { op: member.isActive ? "deactivate" : "reactivate", id: member.id });
+                    }}>
                       {member.isActive ? "Deactivate" : "Reactivate"}
                     </Button>
                   )}
-                </Box>
-              </TableCell>
-            </TableRow>
+                </div>
+              </td>
+            </tr>
           ))}
-        </TableBody>
-      </Table>
+        </tbody>
+      </table>
     </Box>
   );
 };

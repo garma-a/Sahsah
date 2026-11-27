@@ -24,6 +24,7 @@ import { ZIP_LIMITS } from "./content/zip.js";
 import { StaffError, StaffService } from "./staff-service.js";
 
 export const ROOT_PATH = "/admin";
+const STYLES_PATH = "/sahsah.css";
 // The largest multipart upload: a bulk-import ZIP. Every other upload checks its own smaller limit before reading.
 const UPLOAD_LIMIT_BYTES = ZIP_LIMITS.zipBytes;
 
@@ -93,13 +94,35 @@ export async function createAdminApplication(env: NodeJS.ProcessEnv = process.en
       dashboard: { component: components.Home, handler: dashboardHandler(staff, stats) },
       pages: buildPages(staff, () => database.db, content, imports, players, commerce, messages, publicSite, components),
       branding: { companyName: "Sahsah Admin", logo: false, withMadeWithLove: false, theme },
-      locale: { language: "en", availableLanguages: ["en"], translations: { en: { messages: { loginWelcome: "Sign in to Sahsah Admin" } } } },
+      assets: { styles: [`${ROOT_PATH}${STYLES_PATH}`] },
+      locale: {
+        language: "en",
+        availableLanguages: ["en"],
+        translations: {
+          en: {
+            messages: { tooManyRequests: "Too many sign-in attempts. Wait a minute before trying again." },
+            components: {
+              Login: {
+                welcomeHeader: "Sahsah staff dashboard",
+                welcomeMessage: "Sign in with your staff account to manage Sahsah.",
+              },
+            },
+          },
+        },
+      },
     });
     await admin.initialize();
     if (env.NODE_ENV === "development") await admin.watch();
 
     // Serve only AdminJS's declared assets; pnpm keeps the package behind a hidden directory.
     const router = express.Router();
+    router.get(STYLES_PATH, (_request, response) => {
+      // AdminJS renders its stock illustrations in an inner Box on the login welcome panel.
+      response.type("text/css").send(`
+        .login__Wrapper > section > section > section { display: none; }
+        [data-css="app-content"] > section:last-child { flex-grow: 1; }
+      `);
+    });
     for (const asset of AdminJSRouter.assets) {
       router.get(asset.path, (_request, response, next) => {
         response.sendFile(path.resolve(asset.src), { dotfiles: "allow" }, (error) => {

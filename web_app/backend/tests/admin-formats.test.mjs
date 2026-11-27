@@ -69,6 +69,9 @@ test("staff-defined formats: CRUD and audit, constraints, publish validation, a 
   assert.equal((await c.post({ op: "format.create", ...spec, nameEn: "Bad", baseKind: "video" })).body.error, "invalid_base");
   assert.equal((await c.post({ op: "format.create", ...spec, nameEn: "Empty", baseKind: "text", stageKinds: [], answerKind: "none" })).body.error, "format_empty");
   assert.equal((await c.post({ op: "format.create", ...spec, nameEn: "No label", labelAr: " " })).body.error, "label_required");
+  assert.equal((await c.post({ op: "format.create", ...spec, nameEn: " " })).body.error, "format_name_required");
+  assert.equal((await c.post({ op: "format.create", ...spec, nameEn: "a".repeat(81) })).body.error, "format_name_too_long");
+  assert.equal((await c.post({ op: "format.create", ...spec, labelAr: "س".repeat(81) })).body.error, "label_too_long");
   const key = randomUUID();
   assert.equal((await c.post({ op: "format.create", ...spec, nameEn: "Voice ladder", baseKind: "audio", stageKinds: ["audio"], answerKind: "audio", labelAr: "صوت" }, key)).status, 200);
   assert.deepEqual((await c.post({ op: "format.create", ...spec, nameEn: "Voice ladder", baseKind: "audio", stageKinds: ["audio"], answerKind: "audio", labelAr: "صوت" }, key)).body, { replayed: true });
