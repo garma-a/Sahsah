@@ -25,6 +25,8 @@ import { StaffError, StaffService } from "./staff-service.js";
 
 export const ROOT_PATH = "/admin";
 const STYLES_PATH = "/sahsah.css";
+// Narrower screens (phones, portrait tablets) see a "not supported" notice instead of the dashboard.
+const MIN_SCREEN_WIDTH = 1024;
 // The largest multipart upload: a bulk-import ZIP. Every other upload checks its own smaller limit before reading.
 const UPLOAD_LIMIT_BYTES = ZIP_LIMITS.zipBytes;
 
@@ -121,6 +123,16 @@ export async function createAdminApplication(env: NodeJS.ProcessEnv = process.en
       response.type("text/css").send(`
         .login__Wrapper > section > section > section { display: none; }
         [data-css="app-content"] > section:last-child { flex-grow: 1; }
+        /* The dashboard is built for desktop screens only; narrower screens get a notice instead of a broken layout. */
+        @media (max-width: ${MIN_SCREEN_WIDTH - 1}px) {
+          body > * { display: none !important; }
+          body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; background: #f4efe3; }
+          body::before {
+            content: "Sahsah Admin\\A\\AThis screen size is not supported.\\AOpen the admin dashboard on a desktop or laptop screen at least ${MIN_SCREEN_WIDTH} pixels wide.";
+            white-space: pre-line; max-width: 380px; text-align: center; color: #0d2e1d;
+            font: 400 18px/1.5 Roboto, system-ui, sans-serif;
+          }
+        }
       `);
     });
     for (const asset of AdminJSRouter.assets) {
