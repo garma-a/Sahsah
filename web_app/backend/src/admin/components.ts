@@ -11,6 +11,7 @@ export const components = {
   StaffPage: componentLoader.add("StaffPage", path.join(directory, "staff-page")),
   ContentPage: componentLoader.add("ContentPage", path.join(directory, "content-page")),
   PlayersPage: componentLoader.add("PlayersPage", path.join(directory, "players-page")),
+  MessagesPage: componentLoader.add("MessagesPage", path.join(directory, "messages-page")),
   ShopPage: componentLoader.add("ShopPage", path.join(directory, "shop-page")),
   AuditLog: componentLoader.add("AuditLog", path.join(directory, "audit-log")),
 };

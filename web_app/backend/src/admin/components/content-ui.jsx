@@ -77,6 +77,18 @@ export const MESSAGES = {
   promo_used: "This promotion was used or is on an order, so it cannot be deleted. Deactivate it instead.",
   campaign_closed: "This campaign has already closed for good and cannot be reopened. Create a new one.",
   invalid_request: "That request was not valid.",
+  email_not_configured: "Email sending is not set up on this service, so nothing can be sent from here. Use your own email app instead.",
+  reply_not_allowed: "Experience feedback cannot be replied to. You can close it.",
+  no_email: "This message has no usable email address, so it cannot be answered by email.",
+  body_required: "Write the reply.",
+  body_too_long: "A reply can be at most 5000 characters.",
+  already_closed: "That message is already closed. Reload the page.",
+  already_open: "That message is already open. Reload the page.",
+  provider_denied: "The email service refused the request. Check the Resend API key and that the sender domain is verified. The reply is saved as failed; nothing was sent.",
+  provider_rejected: "The email service rejected this email (for example because the address is not valid). The reply is saved as failed; nothing was sent.",
+  provider_busy: "The email service is limiting requests. The reply is saved as failed; wait a moment and try again.",
+  provider_unavailable: "The email service could not be reached. The reply is saved as failed; nothing was sent. Try again.",
+  provider_timeout: "The email service did not answer in time, so the email may or may not have been delivered. The reply is saved as failed; check the Resend log before sending it again.",
   too_many_numbers: "A pasted list can have at most 5000 numbers.",
 };
 export const messageFor = (code) => MESSAGES[code] ?? "That did not work. Check the page before trying again.";

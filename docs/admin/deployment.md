@@ -35,6 +35,26 @@ Staff upload category covers and question files through the dashboard, which val
 
 Rules the dashboard enforces on upload: the file type is read from its bytes (PNG, JPEG or WebP pictures; MP3 audio), pictures are 32 to 8192 pixels per side and at most 10 MB, audio is at most 25 MB and 10 minutes, and a category cover is a portrait 4:5 picture 400 to 2400 pixels wide and at most 5 MB. Sahsah does not resize, recode or otherwise process files: staff upload the finished file. Every upload gets a new random object key (`content/<id>.<ext>` private, `covers/<id>.<ext>` public) and never replaces an existing object. Only the key and the measured metadata go in `media_assets`. A file whose save fails or is abandoned stays in the bucket unreferenced; cleaning up unreferenced objects is a later maintenance task.
 
+## Support replies (email)
+
+Messages sent from the contact form appear under Messages. Staff reply from the dashboard; the email goes out through Resend's HTTPS API (Railway Hobby blocks SMTP, so there is no SMTP setting). Each reply is stored against the message with its outcome (`sending`, `sent`, `failed` or `external`) and an audit event; the player's answer arrives in the support mailbox, not in the dashboard.
+
+| Variable | Purpose |
+| --- | --- |
+| `RESEND_API_KEY` | Resend API key with "Sending access". Empty: email sending is off. |
+| `SUPPORT_FROM_EMAIL` | Sender, for example `Sahsah Support <support@your-domain>`. Required when the key is set; the service refuses to start without it. |
+| `SUPPORT_REPLY_TO` | Optional address players' answers go to; defaults to the sender. |
+
+Without `RESEND_API_KEY` the message page says plainly that email sending is not configured, offers "Reply in your email app" (a `mailto:` with the address, subject and the original quoted) and "Mark replied", which records the answer with status `external`. Nothing is sent from the service in that mode.
+
+Setting up Resend (free tier, 100 emails a day and 3,000 a month at the time of writing):
+
+1. Create a Resend account, then Domains, Add domain: enter the domain that will send the mail (a subdomain such as `mail.your-domain` keeps it apart from your normal mailbox).
+2. In Cloudflare DNS for that domain, add the records Resend shows (SPF and DKIM `TXT`/`MX` records; set them to "DNS only", not proxied), then press Verify in Resend. Verification usually takes minutes.
+3. Create an API key (Sending access, limited to that domain), put it in `RESEND_API_KEY` with `SUPPORT_FROM_EMAIL` on the admin service, and redeploy.
+
+If a send fails the reply is kept as failed with a plain reason (key or domain refused, address rejected, service unreachable, timed out) and staff can send it again. A request repeated with the same request key never sends twice: the provider also receives an `Idempotency-Key` derived from it. A timeout is reported as "may or may not have been delivered"; check the Resend log before sending that reply again. Email addresses and message text are never written to service logs.
+
 ## Content
 
 Content (sections, categories, packs, questions) is under Content for every staff role. Publishing a pack checks the same rules the game start checks, so a published pack always starts. Editing a published pack asks for confirmation, is validated as a whole and saves atomically; each save raises the pack's revision so a lobby that already picked it asks the host to confirm again. Games that are already running keep the copy they started with.
