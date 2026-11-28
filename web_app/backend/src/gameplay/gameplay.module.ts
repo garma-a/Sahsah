@@ -16,6 +16,7 @@ import { MediaService } from "./media/media.js";
 import { GameplayRealtime } from "./realtime/gateway.js";
 import { GameplayHttpInterceptor } from "./platform/http.js";
 import { GameplayMaintenance } from "./maintenance/maintenance.js";
+import { SiteService } from "./site/site.js";
 import { PreviewController } from "./preview/controller.js";
 
 @Module({
@@ -34,6 +35,7 @@ import { PreviewController } from "./preview/controller.js";
     ProjectionService,
     RoomLifecycle,
     MediaService,
+    SiteService,
     GameplayRealtime,
     GameplayHttpInterceptor,
     GameplayMaintenance,

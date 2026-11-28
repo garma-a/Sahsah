@@ -1,6 +1,9 @@
 import { LANGUAGE, request, type Auth } from "./client";
 import type {
+  AnnouncementList,
   Category,
+  ContactReceipt,
+  ContactRequest,
   CharadesCard,
   ControlStatus,
   CurrentRoom,
@@ -16,6 +19,7 @@ import type {
   Receipt,
   Selection,
   Snapshot,
+  SiteSettings,
   TeamNumber,
 } from "./types";
 
@@ -170,4 +174,17 @@ export function takeControl(
   input: { expectedControllerGeneration: string; proposedControlSecret: string },
 ): Promise<Receipt> {
   return request(`/rooms/${roomId}/control`, { method: "POST", auth, operationId, body: input });
+}
+
+export function listAnnouncements(signal?: AbortSignal): Promise<AnnouncementList> {
+  return request("/announcements", { query: { language: LANGUAGE }, signal });
+}
+
+export function getSiteSettings(signal?: AbortSignal): Promise<SiteSettings> {
+  return request("/site", { signal });
+}
+
+/** `auth` links the message to the signed-in account; an anonymous visitor sends none. */
+export function sendContact(auth: Auth, operationId: string, body: ContactRequest): Promise<ContactReceipt> {
+  return request("/contact", { method: "POST", auth, operationId, body });
 }

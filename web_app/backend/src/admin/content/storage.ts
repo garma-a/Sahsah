@@ -73,3 +73,17 @@ export function createAdminMedia(env: Environment): AdminMedia | undefined {
     publicUrl: (key) => `${base}/${key}`,
   };
 }
+
+/**
+ * Writes one new object; a previous attempt of the same upload having written it already counts as done.
+ * Any other failure throws, for the caller to turn into its own refusal.
+ */
+export async function putOnce(media: AdminMedia, scope: Scope, key: string, body: Buffer, contentType: string) {
+  try {
+    await media.put(scope, key, body, contentType);
+  } catch (error) {
+    const e = error as { code?: string; name?: string; $metadata?: { httpStatusCode?: number } };
+    if (e.code === "EEXIST" || e.name === "PreconditionFailed" || e.$metadata?.httpStatusCode === 412) return;
+    throw error;
+  }
+}

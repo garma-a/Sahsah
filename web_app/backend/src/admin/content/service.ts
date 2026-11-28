@@ -9,7 +9,7 @@ import { applyOnce, recordAudit, requestKeySeen } from "../audit.js";
 import { StaffError } from "../staff-service.js";
 import { inspectMedia, MediaRefusal } from "./inspect.js";
 import { loadPackContent, packIssues, questionStats, retiredQuestions, type PackIssue } from "./packs.js";
-import type { AdminMedia } from "./storage.js";
+import { putOnce, type AdminMedia } from "./storage.js";
 
 /** A refusal with a stable code; `issues` lists what stops a pack from being published. */
 export class ContentError extends StaffError {
@@ -38,7 +38,7 @@ const id = (value: unknown, code = "not_found") => {
 };
 
 /** The same request key always maps to the same asset id, so a retried upload finds its file. */
-const assetIdFor = (requestKey: string) => {
+export const assetIdFor = (requestKey: string) => {
   const h = createHash("sha256").update(`media:${requestKey}`).digest("hex");
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-8${h.slice(17, 20)}-${h.slice(20, 32)}`;
 };
@@ -363,11 +363,8 @@ export class ContentService {
 
   private async store(scope: "private" | "public", key: string, body: Buffer, contentType: string) {
     try {
-      await this.media!.put(scope, key, body, contentType);
-    } catch (error) {
-      // A previous attempt of this same upload already wrote this object.
-      const e = error as { code?: string; name?: string; $metadata?: { httpStatusCode?: number } };
-      if (e.code === "EEXIST" || e.name === "PreconditionFailed" || e.$metadata?.httpStatusCode === 412) return;
+      await putOnce(this.media!, scope, key, body, contentType);
+    } catch {
       throw new ContentError("storage_unavailable", 502);
     }
   }

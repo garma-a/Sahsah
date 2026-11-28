@@ -171,4 +171,14 @@ export interface WireTypes {
   CharadesHostAnswer: ({ "format": ("CHARADES"); "text": (string); "image"?: (WireTypes["ImageRef"]) });
   HostCharadesAnswerView: ({ "phase": ("answer"); "audience": ("host"); "roomId": (WireTypes["Id"]); "gameId": (WireTypes["Id"]); "boardPosition": (number); "questionPosition": (number); "basePoints": (200 | 400 | 600); "suggestedPoints": (number); "teams": (WireTypes["Teams"]); "timer": (WireTypes["Timer"]); "idleExpiresAt": (WireTypes["Time"]); "question": (WireTypes["CharadesQuestion"]); "answer": (WireTypes["CharadesHostAnswer"]); "controls": (WireTypes["Controls"]); "feedback": (WireTypes["Feedback"]) });
   CharadesCard: ({ "url": (string); "expiresAt": (WireTypes["Time"]); "contentType": (string); "width"?: (number); "height"?: (number) });
+  Announcement: ({ "id": (WireTypes["Id"]); "title": (string); "body": (string); "linkLabel"?: (string); "linkUrl"?: (string); "startsAt": (string); "endsAt"?: (string) });
+  AnnouncementList: ({ "items": (((WireTypes["Announcement"]))[]) });
+  FaqItem: ({ "question": (string); "answer": (string) });
+  PublicPage: ({ "slug": ("about" | "privacy" | "terms" | "faq"); "title": (string); "body"?: (string); "items"?: (((WireTypes["FaqItem"]))[]); "updatedAt": (string) });
+  SiteSettings: ({ "logoUrl"?: (string); "logoWidth"?: (number); "logoHeight"?: (number); "supportPhone"?: (string); "whatsapp"?: (string); "supportEmail"?: (string); "facebookUrl"?: (string); "instagramUrl"?: (string); "tiktokUrl"?: (string) });
+  ContactSupport: ({ "kind": ("support"); "reason": ("technical" | "purchase" | "account"); "email": (string); "message": (string); "name"?: (string); "website"?: (string) });
+  ContactBusiness: ({ "kind": ("business"); "businessKind": ("business" | "influencer"); "email": (string); "handle"?: (string); "message": (string); "name"?: (string); "website"?: (string) });
+  ContactExperience: ({ "kind": ("experience"); "rating"?: (number); "message"?: (string); "email"?: (string); "name"?: (string); "website"?: (string) }) & (((({ "rating": unknown })) | (({ "message": unknown }))));
+  ContactRequest: ((((WireTypes["ContactSupport"])) | ((WireTypes["ContactBusiness"])) | ((WireTypes["ContactExperience"]))));
+  ContactReceipt: ({ "id": (WireTypes["Id"]); "receivedAt": (string) });
 }

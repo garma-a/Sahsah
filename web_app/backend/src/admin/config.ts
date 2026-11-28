@@ -13,6 +13,8 @@ export type AdminConfig = {
   loginAttemptsPerMinute: number;
   /** Accounts credited per transaction in a bulk grant. */
   bulkGrantChunkSize: number;
+  /** Link to the Cloudflare Web Analytics dashboard, shown on the Public site page. */
+  cloudflareAnalyticsUrl?: string;
 };
 
 export function readAdminConfig(env: Environment): AdminConfig {
@@ -27,6 +29,8 @@ export function readAdminConfig(env: Environment): AdminConfig {
   if (!/^\d+$/.test(attempts) || Number(attempts) < 1 || Number(attempts) > 1000) throw new Error("ADMIN_LOGIN_ATTEMPTS_PER_MINUTE must be 1 to 1000.");
   const chunk = env.ADMIN_BULK_GRANT_CHUNK_SIZE ?? "200";
   if (!/^\d+$/.test(chunk) || Number(chunk) < 1 || Number(chunk) > 500) throw new Error("ADMIN_BULK_GRANT_CHUNK_SIZE must be 1 to 500.");
+  const analytics = env.CLOUDFLARE_ANALYTICS_URL?.trim();
+  if (analytics && !/^https:\/\/[^\s]+$/.test(analytics)) throw new Error("CLOUDFLARE_ANALYTICS_URL must be an https address.");
   return {
     database: { ...database, application_name: "sahsah-admin" },
     sessionSecret,
@@ -36,5 +40,6 @@ export function readAdminConfig(env: Environment): AdminConfig {
     trustedProxyHops: Number(hops),
     loginAttemptsPerMinute: Number(attempts),
     bulkGrantChunkSize: Number(chunk),
+    cloudflareAnalyticsUrl: analytics || undefined,
   };
 }
