@@ -183,5 +183,11 @@ export function makeSchemas(factory: <T>(name: string) => ZodType<T>) {
     ContactExperience: factory<WireTypes["ContactExperience"]>("ContactExperience"),
     ContactRequest: factory<WireTypes["ContactRequest"]>("ContactRequest"),
     ContactReceipt: factory<WireTypes["ContactReceipt"]>("ContactReceipt"),
+    ComposedViewerAnswer: factory<WireTypes["ComposedViewerAnswer"]>("ComposedViewerAnswer"),
+    ComposedHostAnswer: factory<WireTypes["ComposedHostAnswer"]>("ComposedHostAnswer"),
+    ViewerComposedAnswerView: factory<WireTypes["ViewerComposedAnswerView"]>("ViewerComposedAnswerView"),
+    ComposedViewerQuestion: factory<WireTypes["ComposedViewerQuestion"]>("ComposedViewerQuestion"),
+    HostComposedAnswerView: factory<WireTypes["HostComposedAnswerView"]>("HostComposedAnswerView"),
+    ComposedHostQuestion: factory<WireTypes["ComposedHostQuestion"]>("ComposedHostQuestion"),
   };
 }

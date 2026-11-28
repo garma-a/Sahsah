@@ -3275,14 +3275,14 @@
             "type": "string",
             "enum": [
               "question_audio",
-              "answer_audio"
+              "answer_audio",
+              "hint_audio"
             ]
           },
           "variantNumber": {
             "type": "integer",
-            "enum": [
-              0
-            ]
+            "minimum": 0,
+            "maximum": 3
           }
         },
         "required": [
@@ -3975,6 +3975,9 @@
           },
           {
             "$ref": "#/components/schemas/CharadesQuestion"
+          },
+          {
+            "$ref": "#/components/schemas/ComposedHostQuestion"
           }
         ],
         "discriminator": {
@@ -3991,7 +3994,8 @@
             "AUDIO_REVERSE": "#/components/schemas/AudioReverseHostQuestion",
             "AUDIO_VOICE": "#/components/schemas/AudioVoiceHostQuestion",
             "IMAGE_CLUES": "#/components/schemas/ImageCluesQuestion",
-            "CHARADES": "#/components/schemas/CharadesQuestion"
+            "CHARADES": "#/components/schemas/CharadesQuestion",
+            "COMPOSED": "#/components/schemas/ComposedHostQuestion"
           }
         }
       },
@@ -4032,6 +4036,9 @@
           },
           {
             "$ref": "#/components/schemas/CharadesQuestion"
+          },
+          {
+            "$ref": "#/components/schemas/ComposedViewerQuestion"
           }
         ],
         "discriminator": {
@@ -4048,7 +4055,8 @@
             "AUDIO_REVERSE": "#/components/schemas/AudioReverseViewerQuestion",
             "AUDIO_VOICE": "#/components/schemas/AudioVoiceViewerQuestion",
             "IMAGE_CLUES": "#/components/schemas/ImageCluesQuestion",
-            "CHARADES": "#/components/schemas/CharadesQuestion"
+            "CHARADES": "#/components/schemas/CharadesQuestion",
+            "COMPOSED": "#/components/schemas/ComposedViewerQuestion"
           }
         }
       },
@@ -4868,6 +4876,9 @@
           },
           {
             "$ref": "#/components/schemas/HostCharadesAnswerView"
+          },
+          {
+            "$ref": "#/components/schemas/HostComposedAnswerView"
           }
         ]
       },
@@ -4981,6 +4992,9 @@
           },
           {
             "$ref": "#/components/schemas/ViewerCharadesAnswerView"
+          },
+          {
+            "$ref": "#/components/schemas/ViewerComposedAnswerView"
           }
         ]
       },
@@ -9805,6 +9819,363 @@
         "required": [
           "id",
           "receivedAt"
+        ]
+      },
+      "ComposedViewerAnswer": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": [
+              "COMPOSED"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "image": {
+            "$ref": "#/components/schemas/ImageRef"
+          }
+        },
+        "required": [
+          "format",
+          "text"
+        ]
+      },
+      "ComposedHostAnswer": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": [
+              "COMPOSED"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "image": {
+            "$ref": "#/components/schemas/ImageRef"
+          },
+          "audio": {
+            "$ref": "#/components/schemas/AudioRef"
+          },
+          "durationMs": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1800000
+          }
+        },
+        "required": [
+          "format",
+          "text"
+        ]
+      },
+      "ViewerComposedAnswerView": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "phase": {
+            "type": "string",
+            "enum": [
+              "answer"
+            ]
+          },
+          "audience": {
+            "type": "string",
+            "enum": [
+              "viewer"
+            ]
+          },
+          "roomId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "gameId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "boardPosition": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 6
+          },
+          "questionPosition": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 6
+          },
+          "basePoints": {
+            "type": "integer",
+            "enum": [
+              200,
+              400,
+              600
+            ]
+          },
+          "suggestedPoints": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 600
+          },
+          "teams": {
+            "$ref": "#/components/schemas/Teams"
+          },
+          "timer": {
+            "$ref": "#/components/schemas/Timer"
+          },
+          "idleExpiresAt": {
+            "$ref": "#/components/schemas/Time"
+          },
+          "question": {
+            "$ref": "#/components/schemas/ComposedViewerQuestion"
+          },
+          "answer": {
+            "$ref": "#/components/schemas/ComposedViewerAnswer"
+          }
+        },
+        "required": [
+          "phase",
+          "audience",
+          "roomId",
+          "gameId",
+          "boardPosition",
+          "questionPosition",
+          "basePoints",
+          "suggestedPoints",
+          "teams",
+          "timer",
+          "idleExpiresAt",
+          "question",
+          "answer"
+        ]
+      },
+      "ComposedViewerQuestion": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": [
+              "COMPOSED"
+            ]
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "baseKind": {
+            "type": "string",
+            "enum": [
+              "text",
+              "image",
+              "audio"
+            ]
+          },
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "stageIndex": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3
+          },
+          "stageSuggestions": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 600
+            },
+            "minItems": 2,
+            "maxItems": 4
+          },
+          "mediaKind": {
+            "type": "string",
+            "enum": [
+              "none",
+              "image",
+              "audio"
+            ]
+          },
+          "image": {
+            "$ref": "#/components/schemas/ImageRef"
+          },
+          "durationMs": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1800000
+          }
+        },
+        "required": [
+          "format",
+          "label",
+          "baseKind",
+          "stageIndex",
+          "mediaKind"
+        ]
+      },
+      "HostComposedAnswerView": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "phase": {
+            "type": "string",
+            "enum": [
+              "answer"
+            ]
+          },
+          "audience": {
+            "type": "string",
+            "enum": [
+              "host"
+            ]
+          },
+          "roomId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "gameId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "boardPosition": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 6
+          },
+          "questionPosition": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 6
+          },
+          "basePoints": {
+            "type": "integer",
+            "enum": [
+              200,
+              400,
+              600
+            ]
+          },
+          "suggestedPoints": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 600
+          },
+          "teams": {
+            "$ref": "#/components/schemas/Teams"
+          },
+          "timer": {
+            "$ref": "#/components/schemas/Timer"
+          },
+          "idleExpiresAt": {
+            "$ref": "#/components/schemas/Time"
+          },
+          "question": {
+            "$ref": "#/components/schemas/ComposedHostQuestion"
+          },
+          "answer": {
+            "$ref": "#/components/schemas/ComposedHostAnswer"
+          },
+          "controls": {
+            "$ref": "#/components/schemas/Controls"
+          },
+          "feedback": {
+            "$ref": "#/components/schemas/Feedback"
+          }
+        },
+        "required": [
+          "phase",
+          "audience",
+          "roomId",
+          "gameId",
+          "boardPosition",
+          "questionPosition",
+          "basePoints",
+          "suggestedPoints",
+          "teams",
+          "timer",
+          "idleExpiresAt",
+          "question",
+          "answer",
+          "controls",
+          "feedback"
+        ]
+      },
+      "ComposedHostQuestion": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": [
+              "COMPOSED"
+            ]
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "baseKind": {
+            "type": "string",
+            "enum": [
+              "text",
+              "image",
+              "audio"
+            ]
+          },
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "stageIndex": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3
+          },
+          "stageSuggestions": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 600
+            },
+            "minItems": 2,
+            "maxItems": 4
+          },
+          "mediaKind": {
+            "type": "string",
+            "enum": [
+              "none",
+              "image",
+              "audio"
+            ]
+          },
+          "image": {
+            "$ref": "#/components/schemas/ImageRef"
+          },
+          "durationMs": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1800000
+          },
+          "audio": {
+            "$ref": "#/components/schemas/AudioRef"
+          }
+        },
+        "required": [
+          "format",
+          "label",
+          "baseKind",
+          "stageIndex",
+          "mediaKind"
         ]
       }
     },

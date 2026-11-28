@@ -128,6 +128,48 @@ export const questionPacks = t.pgTable(
   ],
 );
 
+/** Staff-defined question kinds (ADR 0022): a base, up to three hint stages, an optional answer media and the display label. */
+export const questionFormats = t.pgTable(
+  "question_formats",
+  {
+    id: t.uuid("id").primaryKey().notNull(),
+    code: t.text("code").notNull(),
+    nameEn: t.text("name_en").notNull(),
+    labelAr: t.text("label_ar").notNull(),
+    baseKind: t.text("base_kind").notNull(),
+    // One "image" or "audio" per hint stage, in order; the list length is the number of hint stages.
+    stageKinds: t.jsonb("stage_kinds").$type<string[]>().default(sql`'[]'::jsonb`).notNull(),
+    answerKind: t.text("answer_kind").default("none").notNull(),
+    showPrompt: t.boolean("show_prompt").default(true).notNull(),
+    createdByStaffId: t.uuid("created_by_staff_id").notNull(),
+    createdAt: t.timestamp("created_at", { withTimezone: true, mode: "string" }).default(sql`now()`).notNull(),
+    updatedAt: t.timestamp("updated_at", { withTimezone: true, mode: "string" }).default(sql`now()`).notNull(),
+    archivedAt: t.timestamp("archived_at", { withTimezone: true, mode: "string" }),
+  },
+  (table): t.PgTableExtraConfigValue[] => [
+    t.uniqueIndex("question_formats_code").on(table.code),
+    // The question editor offers active formats by name.
+    t.index("question_formats_active").on(table.nameEn, table.id).where(sql`archived_at IS NULL`),
+    t
+      .foreignKey({
+        name: "question_formats_creator",
+        columns: [table.createdByStaffId],
+        foreignColumns: [staffAccounts.id],
+      })
+      .onDelete("no action")
+      .onUpdate("no action"),
+    t.check("question_formats_code_shape", sql`code ~ '^[a-z][a-z0-9_]{1,39}$'`),
+    t.check("question_formats_name_bounds", sql`length(btrim(name_en)) BETWEEN 1 AND 80 AND length(btrim(label_ar)) BETWEEN 1 AND 80`),
+    t.check("question_formats_base_kind", sql`base_kind IN ('text', 'image', 'audio')`),
+    t.check("question_formats_answer_kind", sql`answer_kind IN ('none', 'image', 'audio')`),
+    t.check(
+      "question_formats_stage_kinds",
+      sql`jsonb_typeof(stage_kinds) = 'array' AND jsonb_array_length(stage_kinds) <= 3 AND NOT jsonb_path_exists(stage_kinds, '$[*] ? (@ != "image" && @ != "audio")')`,
+    ),
+    t.check("question_formats_update_order", sql`updated_at >= created_at`),
+  ],
+);
+
 export const questions = t.pgTable(
   "questions",
   {
@@ -139,6 +181,8 @@ export const questions = t.pgTable(
     answerAr: t.text("answer_ar").notNull(),
     answerFranco: t.text("answer_franco"),
     format: questionFormat("format").notNull(),
+    // Set exactly when format is COMPOSED; the definition is copied into each game at start (ADR 0002, 0022).
+    composedFormatId: t.uuid("composed_format_id"),
     formatConfig: t
       .jsonb("format_config")
       .$type<JsonObject>()
@@ -164,6 +208,17 @@ export const questions = t.pgTable(
       })
       .onDelete("no action")
       .onUpdate("no action"),
+    t.index("questions_composed_format").on(table.composedFormatId, table.id).where(sql`composed_format_id IS NOT NULL`),
+    t
+      .foreignKey({
+        name: "questions_composed_format",
+        columns: [table.composedFormatId],
+        foreignColumns: [questionFormats.id],
+      })
+      .onDelete("no action")
+      .onUpdate("no action"),
+    // The enum literal is compared as text: a value added in the same migration cannot be used yet.
+    t.check("questions_composed_format_pair", sql`(format::text = 'COMPOSED') = (composed_format_id IS NOT NULL)`),
     t.check(
       "questions_format_config_object",
       sql`jsonb_typeof(format_config) = 'object'`,
@@ -316,7 +371,7 @@ export const questionMedia = t.pgTable(
       .onUpdate("no action"),
     t.check(
       "question_media_variant_shape",
-      sql`(media_role = 'hint_image' AND variant_number BETWEEN 0 AND 3 AND suggested_points IS NOT NULL AND suggested_points BETWEEN 1 AND 600) OR (media_role <> 'hint_image' AND variant_number = 0 AND suggested_points IS NULL)`,
+      sql`(media_role::text IN ('hint_image', 'hint_audio') AND variant_number BETWEEN 0 AND 3 AND suggested_points IS NOT NULL AND suggested_points BETWEEN 1 AND 600) OR (media_role::text NOT IN ('hint_image', 'hint_audio') AND variant_number = 0 AND suggested_points IS NULL)`,
     ),
   ],
 );

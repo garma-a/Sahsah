@@ -46,8 +46,16 @@ function viewerSnapshot(snapshot: Snapshot): Snapshot {
     result.question = question;
   }
   if ("answer" in view) {
-    const { forwardAudio: _forward, ...answer } = {
+    // Composed answers carry a host-only clip and its length; viewers never get either.
+    const {
+      forwardAudio: _forward,
+      audio: _clip,
+      durationMs: _length,
+      ...answer
+    } = {
       forwardAudio: undefined,
+      audio: undefined,
+      durationMs: undefined,
       ...view.answer,
     };
     result.answer = answer;
@@ -764,6 +772,9 @@ export class GameplayRealtime
       "answer" in view && "forwardAudio" in view.answer
         ? view.answer.forwardAudio
         : undefined,
+      "answer" in view && "audio" in view.answer
+        ? view.answer.audio
+        : undefined,
     ].filter(Boolean);
     requireState(
       permitted.some((r) => canonical(r) === canonical(data.media)),
@@ -787,7 +798,7 @@ export class GameplayRealtime
             Number(media.questionPosition),
           ),
           eq(s.gameQuestionMedia.mediaRole, media.role),
-          eq(s.gameQuestionMedia.variantNumber, 0),
+          eq(s.gameQuestionMedia.variantNumber, Number(media.variantNumber)),
         ),
       );
     const duration = metadata[0]?.duration;
