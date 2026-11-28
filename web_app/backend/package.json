@@ -26,6 +26,9 @@
     "start": "node dist/main.js",
     "start:admin": "node dist/admin/main.js",
     "dev:admin": "nest build && NODE_ENV=development node --env-file-if-exists=.env dist/admin/main.js",
+    "local": "node scripts/local.mjs all",
+    "local:admin": "node scripts/local.mjs admin",
+    "local:web": "node scripts/local.mjs web",
     "build:admin": "nest build && NODE_ENV=production node dist/admin/bundle.js",
     "check": "tsc --noEmit",
     "types:contracts": "node scripts/generate-contract-types.mjs",
@@ -68,6 +71,7 @@
     "rxjs": "7.8.2",
     "tslib": "2.8.1",
     "ws": "8.22.1",
+    "yauzl": "3.2.0",
     "zod": "4.6.7"
   },
   "devDependencies": {
@@ -79,6 +83,7 @@
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
     "@types/ws": "8.18.2",
+    "@types/yauzl": "3.4.0",
     "drizzle-kit": "0.31.11",
     "sharp": "0.34.5",
     "typescript": "5.9.3"

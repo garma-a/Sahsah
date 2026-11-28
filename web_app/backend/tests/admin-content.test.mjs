@@ -60,6 +60,34 @@ function client(base, cookie) {
 
 const standard = (n) => ({ format: "STANDARD", promptAr: `سؤال ${n}`, answerAr: `جواب ${n}` });
 
+test("category detail can page past 100 packs in pack number order", { timeout: 120000 }, async (t) => {
+  const pg = await cluster(t);
+  const owner = await pg.database("sahsah_admin_pack_pages");
+  const base = await startAdmin(t, pg.url("sahsah_app", "sahsah_admin_pack_pages"));
+  const c = client(base, await login(base));
+  const { body: section } = await c.post({ op: "section.create", nameAr: "قسم" });
+  const { body: category } = await c.post({ op: "category.create", sectionId: section.id, nameAr: "فئة" });
+  await owner.query(
+    "INSERT INTO question_packs(id, category_id, pack_number) SELECT gen_random_uuid(), $1, number FROM generate_series(103, 1, -1) AS number",
+    [category.id],
+  );
+  const url = `?view=category&id=${category.id}`;
+  const numbers = [];
+  let page = await c.read(url);
+  assert.ok(page.nextCursor, "the first page has a continuation");
+  while (true) {
+    numbers.push(...page.packs.map((pack) => pack.packNumber));
+    if (!page.nextCursor) break;
+    assert.ok(numbers.length < 103, "a continuation must advance");
+    page = await c.read(`${url}&cursor=${encodeURIComponent(page.nextCursor)}`);
+  }
+  assert.deepEqual(numbers, Array.from({ length: 103 }, (_, index) => index + 1));
+  assert.deepEqual(await c.read(`${url}&cursor=garbage`), { error: "invalid_cursor" });
+  for (const cursor of [[1, "-".repeat(36)], [2_147_483_648, randomUUID()]]) {
+    assert.deepEqual(await c.read(`${url}&cursor=${Buffer.from(JSON.stringify(cursor)).toString("base64url")}`), { error: "invalid_cursor" });
+  }
+});
+
 test("staff build a pack of mixed formats; publish validates; edit and replace differ; every change is audited", { timeout: 240000 }, async (t) => {
   const cleanup = [], dir = await mkdtemp(path.join(tmpdir(), "sahsah-admin-media-"));
   const pg = await cluster({ after: (fn) => cleanup.push(fn) });
@@ -280,11 +308,20 @@ test("a content change never touches games already running; archiving hides cont
 
   // Archived content leaves the public catalog; restoring brings it back.
   const publicCategories = async () => (await (await fetch(`${f.base}/categories?limit=50`)).json()).items;
+  const publicPacks = async () => {
+    const response = await fetch(`${f.base}/categories/${categoryId}/packs`);
+    assert.equal(response.status, 200);
+    return (await response.json()).items.map((pack) => pack.id);
+  };
   assert.ok((await publicCategories()).some((x) => x.id === categoryId));
+  assert.deepEqual(await publicPacks(), [packId]);
   assert.equal((await c.post({ op: "pack.archive", id: packId })).status, 200);
   assert.equal((await publicCategories()).find((x) => x.id === categoryId).publishedPackCount, 0);
   assert.equal((await c.post({ op: "pack.unarchive", id: packId })).status, 200);
   assert.equal((await publicCategories()).find((x) => x.id === categoryId).publishedPackCount, 1);
   assert.equal((await c.post({ op: "category.archive", id: categoryId })).status, 200);
   assert.equal((await publicCategories()).some((x) => x.id === categoryId), false);
+  assert.deepEqual(await publicPacks(), []);
+  assert.equal((await c.post({ op: "category.unarchive", id: categoryId })).status, 200);
+  assert.deepEqual(await publicPacks(), [packId]);
 });

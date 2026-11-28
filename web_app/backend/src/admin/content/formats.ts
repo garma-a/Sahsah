@@ -9,6 +9,7 @@ import { StaffError } from "../staff-service.js";
 
 class FormatError extends StaffError {}
 const UUID = /^[0-9a-f-]{36}$/;
+const MAX_FORMAT_NAME_LENGTH = 80;
 
 /** The twelve built-in kinds, described for staff. Their behaviour is code, so they are read-only. */
 const BUILT_IN: Record<string, string> = {
@@ -39,8 +40,10 @@ type Input = { nameEn: unknown; labelAr: unknown; baseKind: unknown; stageKinds:
 function parse(input: Input) {
   const name = typeof input.nameEn === "string" ? input.nameEn.trim() : "";
   const label = typeof input.labelAr === "string" ? input.labelAr.trim() : "";
-  if (!name || name.length > 80) throw new FormatError("name_required");
-  if (!label || label.length > 80) throw new FormatError("label_required");
+  if (!name) throw new FormatError("format_name_required");
+  if (name.length > MAX_FORMAT_NAME_LENGTH) throw new FormatError("format_name_too_long");
+  if (!label) throw new FormatError("label_required");
+  if (label.length > MAX_FORMAT_NAME_LENGTH) throw new FormatError("label_too_long");
   if (input.baseKind !== "text" && input.baseKind !== "image" && input.baseKind !== "audio") throw new FormatError("invalid_base");
   if (!Array.isArray(input.stageKinds) || input.stageKinds.length > MAX_HINT_STAGES || !input.stageKinds.every((k) => k === "image" || k === "audio")) throw new FormatError("invalid_stages");
   if (input.answerKind !== "none" && input.answerKind !== "image" && input.answerKind !== "audio") throw new FormatError("invalid_answer");

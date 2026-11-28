@@ -9,7 +9,7 @@ import type { ComposedDefinition } from "../../gameplay/games/rules/composed-for
 import { FormatService } from "./formats.js";
 import { applyOnce, recordAudit, requestKeySeen } from "../audit.js";
 import { StaffError } from "../staff-service.js";
-import { inspectMedia, MediaRefusal } from "./inspect.js";
+import { inspectMedia, MediaRefusal, type Inspected } from "./inspect.js";
 import { loadPackContent, packIssues, questionStats, retiredQuestions, type PackIssue } from "./packs.js";
 import { putOnce, type AdminMedia } from "./storage.js";
 
@@ -50,7 +50,8 @@ function decodeCursor(value: unknown): [number, string] | undefined {
   if (value === undefined || value === "") return undefined;
   try {
     const parsed = JSON.parse(Buffer.from(String(value), "base64url").toString());
-    if (Array.isArray(parsed) && Number.isSafeInteger(parsed[0]) && parsed[0] >= 0 && UUID.test(parsed[1])) return [parsed[0], parsed[1]];
+    if (Array.isArray(parsed) && parsed.length === 2 && Number.isInteger(parsed[0]) && parsed[0] >= 0 && parsed[0] <= 2_147_483_647
+      && typeof parsed[1] === "string" && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(parsed[1])) return [parsed[0], parsed[1]];
   } catch {
     // falls through to the refusal
   }
@@ -58,7 +59,7 @@ function decodeCursor(value: unknown): [number, string] | undefined {
 }
 
 /** Only these settings exist per format; anything else the browser sends is dropped. */
-function cleanConfig(format: string, input: unknown): JsonObject {
+export function cleanConfig(format: string, input: unknown): JsonObject {
   const raw = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
   const out: JsonObject = {};
   const put = (key: string, max: number) => {
@@ -81,6 +82,24 @@ function cleanConfig(format: string, input: unknown): JsonObject {
   }
   return out;
 }
+
+/** The row for a question file that was just stored; it stays pending until a question uses it. */
+export const pendingAsset = (media: AdminMedia, o: { assetId: string; key: string; found: Inspected; body: Buffer; staffId: string }) => ({
+  id: o.assetId,
+  mediaKind: o.found.kind,
+  state: "pending" as const,
+  accessScope: "private" as const,
+  storageProvider: media.provider,
+  storageNamespace: media.namespace("private"),
+  storageKey: o.key,
+  contentType: o.found.contentType,
+  byteSize: BigInt(o.body.length),
+  widthPx: o.found.widthPx ?? null,
+  heightPx: o.found.heightPx ?? null,
+  durationMs: o.found.durationMs ?? null,
+  sha256: createHash("sha256").update(o.body).digest(),
+  uploadedByStaffId: o.staffId,
+});
 
 type MediaItem = { key: string; assetId: string; points?: number };
 type FormatRow = typeof questionFormats.$inferSelect;
@@ -190,17 +209,27 @@ export class ContentService {
     };
   }
 
-  async category(categoryId: unknown) {
+  async category(categoryId: unknown, cursorInput?: unknown) {
     const key = id(categoryId);
+    const cursor = decodeCursor(cursorInput);
     const [category] = await this.categoryRows(this.db, eq(categories.id, key), 1);
     if (!category) throw new ContentError("not_found", 404);
     const sections = await this.db.select().from(categorySections).orderBy(categorySections.displayOrder, categorySections.id).limit(500);
-    const packs = await this.db.select().from(questionPacks).where(eq(questionPacks.categoryId, key)).orderBy(questionPacks.packNumber).limit(100);
+    const rows = await this.db.select().from(questionPacks)
+      .where(and(
+        eq(questionPacks.categoryId, key),
+        cursor && sql`(${questionPacks.packNumber}, ${questionPacks.id}) > (${cursor[0]}, ${cursor[1]})`,
+      ))
+      .orderBy(questionPacks.packNumber, questionPacks.id)
+      .limit(PAGE_SIZE + 1);
+    const packs = rows.slice(0, PAGE_SIZE);
+    const last = packs.at(-1);
     const content = await loadPackContent(this.db, packs.map((p) => p.id));
     return {
       category,
       sections,
       mediaEnabled: !!this.media,
+      nextCursor: rows.length > PAGE_SIZE && last ? encodeCursor(last.packNumber, last.id) : null,
       packs: packs.map((p) => ({
         id: p.id,
         packNumber: p.packNumber,
@@ -422,22 +451,7 @@ export class ContentService {
       await recordAudit(tx, { staffId: input.actorId, action: "content.media.upload", targetKind: "media_asset", targetKey: assetId, requestKey: input.requestKey, details: { kind: found.kind, contentType: found.contentType, byteSize: body.length } });
       const [asset] = await tx
         .insert(mediaAssets)
-        .values({
-          id: assetId,
-          mediaKind: found.kind,
-          state: "pending",
-          accessScope: "private",
-          storageProvider: this.media!.provider,
-          storageNamespace: this.media!.namespace("private"),
-          storageKey: key,
-          contentType: found.contentType,
-          byteSize: BigInt(body.length),
-          widthPx: found.widthPx ?? null,
-          heightPx: found.heightPx ?? null,
-          durationMs: found.durationMs ?? null,
-          sha256: createHash("sha256").update(body).digest(),
-          uploadedByStaffId: input.actorId,
-        })
+        .values(pendingAsset(this.media!, { assetId, key, found, body, staffId: input.actorId }))
         .returning();
       return { asset: asset! };
     });
@@ -623,7 +637,8 @@ export class ContentService {
   }
 
   /** Writes the question's files; a pending upload becomes ready here, with its lineage when it is a derived slot. */
-  private async attachMedia(tx: SahsahDatabase, questionId: string, format: keyof typeof FORMAT_SLOTS, items: MediaItem[], config: JsonObject, specs: SlotSpec[]) {
+  /** Also used by the bulk import, so imported questions follow exactly the editor's lineage rules. */
+  async attachMedia(tx: SahsahDatabase, questionId: string, format: keyof typeof FORMAT_SLOTS, items: MediaItem[], config: JsonObject, specs: SlotSpec[]) {
     const ids = [...new Set(items.map((i) => i.assetId))];
     const assets = ids.length ? await tx.select().from(mediaAssets).where(inArray(mediaAssets.id, ids)).for("update") : [];
     const pins: { role: (typeof specs)[number]["role"]; variant: number; assetId: string; points: number | null }[] = [];

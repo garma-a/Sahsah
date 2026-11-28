@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router";
 import { Field, Notice, button, card, colors, get, input, useSend } from "./content-ui";
 import PackView from "./content-pack";
 import FormatsView from "./content-formats";
+import ImportView from "./content-import";
 
 const PAGE = "/admin/pages/content";
 const Arrows = ({ onMove, first, last, busy }) => (
@@ -48,7 +49,7 @@ const SectionsPanel = ({ sections, reload, setNotice }) => {
             </form>
           ) : (
             <>
-              <span style={{ flex: 1 }}><strong dir="rtl">{section.nameAr}</strong>{section.nameFranco ? <span style={{ color: colors.muted }}> · {section.nameFranco}</span> : null}</span>
+              <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}><strong dir="rtl">{section.nameAr}</strong>{section.nameFranco ? <span style={{ color: colors.muted }}> · {section.nameFranco}</span> : null}</span>
               <button type="button" style={button("secondary")} onClick={() => setEditing({ ...section })}>Rename</button>
             </>
           )}
@@ -69,12 +70,12 @@ const CategoryForm = ({ sections, initial, onSubmit, busy, submitLabel }) => {
   return (
     <form onSubmit={(e) => { e.preventDefault(); onSubmit(form); }}>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <Field label="Arabic name"><input style={input} dir="rtl" value={form.nameAr} onChange={set("nameAr")} /></Field>
+        <Field label="Arabic name" required><input style={input} dir="rtl" required value={form.nameAr} onChange={set("nameAr")} /></Field>
         <Field label="Franco name (optional)"><input style={input} value={form.nameFranco ?? ""} onChange={set("nameFranco")} /></Field>
         <Field label="Arabic description (optional)"><textarea style={input} dir="rtl" rows={2} value={form.descriptionAr ?? ""} onChange={set("descriptionAr")} /></Field>
         <Field label="Franco description (optional)"><textarea style={input} rows={2} value={form.descriptionFranco ?? ""} onChange={set("descriptionFranco")} /></Field>
-        <Field label="Section">
-          <select style={input} value={form.sectionId ?? ""} onChange={set("sectionId")}>
+        <Field label="Section" required>
+          <select style={input} required value={form.sectionId ?? ""} onChange={set("sectionId")}>
             <option value="">Choose a section</option>
             {sections.map((s) => <option key={s.id} value={s.id}>{s.nameAr}</option>)}
           </select>
@@ -130,16 +131,21 @@ const HomeView = ({ navigate, setNotice }) => {
             <option value="all">All</option>
           </select>
         </div>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead><tr style={{ textAlign: "left", color: colors.muted }}><th>Cover</th><th>Category</th><th>Section</th><th>Packs (published / draft)</th><th>Status</th><th>Order</th></tr></thead>
+        <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
+          <thead>
+            <tr style={{ textAlign: "left", color: colors.muted }}>
+              <th style={{ width: 60 }}>Cover</th><th>Category</th><th style={{ width: "21%" }}>Section</th>
+              <th style={{ width: 170 }}>Packs (published / draft)</th><th style={{ width: 84 }}>Status</th><th style={{ width: 165 }}>Order</th>
+            </tr>
+          </thead>
           <tbody>
             {data.categories.map((c, index) => (
               <tr key={c.id} style={{ borderTop: `1px solid ${colors.line}` }}>
                 <td style={{ padding: 6 }}>{c.coverUrl ? <img src={c.coverUrl} alt="" width={40} height={50} style={{ objectFit: "cover", borderRadius: 4 }} /> : <span style={{ color: colors.muted }}>none</span>}</td>
-                <td><a href={`${PAGE}?view=category&id=${c.id}`} onClick={(e) => { e.preventDefault(); navigate(`${PAGE}?view=category&id=${c.id}`); }}><strong dir="rtl">{c.nameAr}</strong></a>{c.nameFranco ? <span style={{ color: colors.muted }}> · {c.nameFranco}</span> : null}</td>
-                <td dir="rtl">{c.sectionName ?? "—"}</td>
-                <td>{c.packs.published} / {c.packs.drafts}{c.packs.archived ? ` (+${c.packs.archived} archived)` : ""}</td>
-                <td>{c.archived ? "Archived" : "Active"}</td>
+                <td style={{ overflowWrap: "anywhere", paddingRight: 12 }}><a href={`${PAGE}?view=category&id=${c.id}`} onClick={(e) => { e.preventDefault(); navigate(`${PAGE}?view=category&id=${c.id}`); }}><strong dir="rtl">{c.nameAr}</strong></a>{c.nameFranco ? <span style={{ color: colors.muted }}> · {c.nameFranco}</span> : null}</td>
+                <td style={{ overflowWrap: "anywhere", paddingRight: 12 }}><span dir="rtl">{c.sectionName ?? "—"}</span></td>
+                <td style={{ whiteSpace: "nowrap" }}>{c.packs.published} / {c.packs.drafts}{c.packs.archived ? ` (+${c.packs.archived} archived)` : ""}</td>
+                <td style={{ whiteSpace: "nowrap" }}>{c.archived ? "Archived" : "Active"}</td>
                 <td>{filters.section && filters.section !== "none" && filters.status === "active" ? <Arrows busy={busy} first={index === 0} last={index === data.categories.length - 1 && !data.nextCursor} onMove={(d) => move(c.id, d)} /> : <span style={{ color: colors.muted, fontSize: 12 }}>filter by one section to reorder</span>}</td>
               </tr>
             ))}
@@ -154,9 +160,22 @@ const HomeView = ({ navigate, setNotice }) => {
 
 const CategoryView = ({ id, navigate, setNotice }) => {
   const [data, setData] = useState(null);
-  const { send, busy } = useSend(setNotice);
-  const load = useCallback(async () => {
-    try { setData(await get({ view: "category", id })); } catch { setNotice({ kind: "danger", text: "That category could not be loaded." }); }
+  const [loadingMore, setLoadingMore] = useState(false);
+  const { send, busy: saving } = useSend(setNotice);
+  const busy = saving || loadingMore;
+  const load = useCallback(async (cursor) => {
+    if (cursor) {
+      setLoadingMore(true);
+      setNotice(null);
+    }
+    try {
+      const next = await get({ view: "category", id, cursor });
+      setData((previous) => cursor && previous ? { ...next, packs: [...previous.packs, ...next.packs] } : next);
+    } catch {
+      setNotice({ kind: "danger", text: cursor ? "More packs could not be loaded." : "That category could not be loaded." });
+    } finally {
+      if (cursor) setLoadingMore(false);
+    }
   }, [id, setNotice]);
   useEffect(() => { load(); }, [load]);
   if (!data) return <Text>Loading…</Text>;
@@ -172,8 +191,11 @@ const CategoryView = ({ id, navigate, setNotice }) => {
       <p><a href={PAGE} onClick={(e) => { e.preventDefault(); navigate(PAGE); }}>← All categories</a></p>
       <div style={{ ...card, marginBottom: 20 }}>
         <Box flex style={{ justifyContent: "space-between" }}>
-          <H3><span dir="rtl">{category.nameAr}</span> {category.archived && <span style={{ color: colors.red }}>(archived)</span>}</H3>
-          <button style={button(category.archived ? "primary" : "danger", busy)} disabled={busy} onClick={() => act({ op: category.archived ? "category.unarchive" : "category.archive", id }, category.archived ? "Category restored." : "Category archived: it is hidden from new games.")}>
+          <H3 style={{ minWidth: 0, overflowWrap: "anywhere" }}><span dir="rtl">{category.nameAr}</span> {category.archived && <span style={{ color: colors.red }}>(archived)</span>}</H3>
+          <button style={{ ...button(category.archived ? "primary" : "danger", busy), whiteSpace: "nowrap" }} disabled={busy} onClick={() => {
+            if (!category.archived && !window.confirm(`Archive “${category.nameAr}”? The category and its packs will be hidden from new games.`)) return;
+            act({ op: category.archived ? "category.unarchive" : "category.archive", id }, category.archived ? "Category restored." : "Category archived: it is hidden from new games.");
+          }}>
             {category.archived ? "Restore category" : "Archive category"}
           </button>
         </Box>
@@ -192,7 +214,10 @@ const CategoryView = ({ id, navigate, setNotice }) => {
       <div style={card}>
         <Box flex style={{ justifyContent: "space-between" }}>
           <H3>Packs</H3>
-          <button style={button("primary", busy)} disabled={busy} onClick={async () => { const done = await send({ op: "pack.create", categoryId: id }); if (done?.id) navigate(`${PAGE}?view=pack&id=${done.id}`); }}>New draft pack</button>
+          <span style={{ display: "inline-flex", gap: 8 }}>
+            <button style={button("secondary", busy || category.archived)} disabled={busy || category.archived} onClick={() => navigate(`${PAGE}?view=import&id=${id}`)}>Import packs</button>
+            <button style={button("primary", busy)} disabled={busy} onClick={async () => { const done = await send({ op: "pack.create", categoryId: id }); if (done?.id) navigate(`${PAGE}?view=pack&id=${done.id}`); }}>New draft pack</button>
+          </span>
         </Box>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead><tr style={{ textAlign: "left", color: colors.muted }}><th>Pack</th><th>Status</th><th>Questions</th><th>Problems</th></tr></thead>
@@ -208,6 +233,7 @@ const CategoryView = ({ id, navigate, setNotice }) => {
           </tbody>
         </table>
         {data.packs.length === 0 && <Text mt="md">No packs yet. Create a draft pack and fill its six slots.</Text>}
+        {data.nextCursor && <Box mt="md"><button style={button("secondary", busy)} disabled={busy} onClick={() => load(data.nextCursor)}>{loadingMore ? "Loading…" : "Load more"}</button></Box>}
       </div>
     </>
   );
@@ -308,7 +334,7 @@ const ContentPage = () => {
       )}
       {(view === "drafts" || view === "disliked") && <p><a href={PAGE} onClick={(e) => { e.preventDefault(); navigate(PAGE); }}>← All categories</a></p>}
       <Notice notice={notice} />
-      {view === "category" ? <CategoryView key={params.get("id")} id={params.get("id")} navigate={navigate} setNotice={setNotice} /> : view === "pack" ? <PackView key={params.get("id")} id={params.get("id")} navigate={navigate} setNotice={setNotice} /> : view === "formats" ? <FormatsView setNotice={setNotice} /> : view === "drafts" ? <DraftsView navigate={navigate} setNotice={setNotice} /> : view === "disliked" ? <DislikedView navigate={navigate} setNotice={setNotice} /> : <HomeView navigate={navigate} setNotice={setNotice} />}
+      {view === "category" ? <CategoryView key={params.get("id")} id={params.get("id")} navigate={navigate} setNotice={setNotice} /> : view === "pack" ? <PackView key={params.get("id")} id={params.get("id")} navigate={navigate} setNotice={setNotice} /> : view === "import" ? <ImportView key={params.get("id")} id={params.get("id")} navigate={navigate} setNotice={setNotice} /> : view === "formats" ? <FormatsView setNotice={setNotice} /> : view === "drafts" ? <DraftsView navigate={navigate} setNotice={setNotice} /> : view === "disliked" ? <DislikedView navigate={navigate} setNotice={setNotice} /> : <HomeView navigate={navigate} setNotice={setNotice} />}
     </Box>
   );
 };

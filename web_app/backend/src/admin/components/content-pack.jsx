@@ -70,7 +70,7 @@ const Preview = ({ question, slotPoints, composed }) => {
           <option value="franco">Franco-Arabic</option>
         </select>
       </Box>
-      <div data-testid="preview" style={{ maxWidth: 420, margin: "0 auto", background: colors.forest, color: "#fff", borderRadius: 16, padding: 20, minHeight: 240 }} dir={lang === "franco" ? "ltr" : "rtl"}>
+      <div data-testid="preview" style={{ maxWidth: 420, margin: "0 auto", background: colors.forest, color: "#fff", borderRadius: 16, padding: 20, minHeight: 240, overflowWrap: "anywhere" }} dir={lang === "franco" ? "ltr" : "rtl"}>
         <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 8 }} dir="ltr">
           {stage.points ? `Suggested points: ${stage.points}` : `Tile value: ${slotPoints}`}
         </div>
@@ -111,7 +111,7 @@ const toForm = (slot, defaultFormat = "STANDARD") => {
   };
 };
 
-const SlotEditor = ({ data, slot, published, onDone, setNotice }) => {
+const SlotEditor = ({ data, slot, published, isPublic, onDone, setNotice }) => {
   const q = slot.question;
   const [mode, setMode] = useState(q ? "edit" : "create");
   const [form, setForm] = useState(() => toForm(slot));
@@ -173,7 +173,9 @@ const SlotEditor = ({ data, slot, published, onDone, setNotice }) => {
       )}
       {mode === "edit" && <Notice notice={{ kind: "ok", text: "Editing keeps this as the same question: players who have already seen it still count as having seen it. Use it for typos and small fixes, and you cannot change the format." }} />}
       {mode === "replace" && <Notice notice={{ kind: "danger", text: "Replacing retires the current question and puts a brand new one in this slot. Players who saw the old one will see the new one as unseen, and a pack they completed is shown as Updated. Upload the new files below." }} />}
-      {published && <Notice notice={{ kind: "danger", text: "This pack is published: players can start games with it right now. Your change goes live as soon as you save, and the whole pack must stay valid." }} />}
+      {published && <Notice notice={{ kind: "danger", text: isPublic
+        ? "Players can start games with this pack. Your change goes live as soon as you save, and the whole pack must stay valid."
+        : "This pack is hidden from new games. Edits to published packs must keep all six slots valid." }} />}
       <Field label="Format">
         <select aria-label="Format" style={input} value={form.format === "COMPOSED" ? `composed:${form.composedFormatId}` : form.format} disabled={mode === "edit"} onChange={(e) => { const v = e.target.value; setForm({ ...form, format: v.startsWith("composed:") ? "COMPOSED" : v, composedFormatId: v.startsWith("composed:") ? v.slice(9) : null, media: {}, config: {} }); }}>
           {FORMATS.map((f) => <option key={f} value={f}>{FORMAT_LABELS[f]}</option>)}
@@ -181,9 +183,9 @@ const SlotEditor = ({ data, slot, published, onDone, setNotice }) => {
         </select>
       </Field>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <Field label="Question (Arabic)"><textarea style={input} dir="rtl" rows={3} value={form.promptAr} onChange={set("promptAr")} /></Field>
+        <Field label="Question (Arabic)" required><textarea style={input} dir="rtl" rows={3} required value={form.promptAr} onChange={set("promptAr")} /></Field>
         <Field label="Question (Franco, optional)"><textarea style={input} rows={3} value={form.promptFranco} onChange={set("promptFranco")} /></Field>
-        <Field label="Answer (Arabic)"><textarea style={input} dir="rtl" rows={2} value={form.answerAr} onChange={set("answerAr")} /></Field>
+        <Field label="Answer (Arabic)" required><textarea style={input} dir="rtl" rows={2} required value={form.answerAr} onChange={set("answerAr")} /></Field>
         <Field label="Answer (Franco, optional)"><textarea style={input} rows={2} value={form.answerFranco} onChange={set("answerFranco")} /></Field>
       </div>
       {form.format === "IMAGE_MEMORY" && (
@@ -238,7 +240,7 @@ const SlotEditor = ({ data, slot, published, onDone, setNotice }) => {
       {["IMAGE_BLUR", "IMAGE_ZOOM"].includes(form.format) && <Text fontSize="sm" color="grey60" mt="sm">Points must start at {slot.points} and keep falling (default {stageDefaults?.join(" → ")}). Uploading a new original means uploading the hint stages again.</Text>}
       {composed && composed.stageKinds.length > 0 && <Text fontSize="sm" color="grey60" mt="sm">Hint stage points must be below {slot.points} and keep falling from one stage to the next.</Text>}
       {form.format === "IMAGE_CLUES" && <Text fontSize="sm" color="grey60" mt="sm">Each clue lowers the suggested points below {slot.points}. Add clue cards in order, without gaps.</Text>}
-      {published && <label style={{ display: "block", margin: "12px 0" }}><input type="checkbox" checked={confirm} onChange={(e) => setConfirm(e.target.checked)} /> I understand this pack is public and this change goes live immediately.</label>}
+      {published && <label style={{ display: "block", margin: "12px 0" }}><input type="checkbox" checked={confirm} onChange={(e) => setConfirm(e.target.checked)} /> {isPublic ? "I understand this change goes live immediately." : "I confirm this edit to a published pack."}</label>}
       <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
         <button style={button("primary", busy)} disabled={busy}>{mode === "replace" ? "Replace question" : mode === "edit" ? "Save correction" : "Add question"}</button>
         <button type="button" style={button("secondary")} onClick={onDone}>Cancel</button>
@@ -263,6 +265,7 @@ const PackView = ({ id, navigate, setNotice }) => {
   const { pack, category } = data;
   const state = pack.archived ? "archived" : pack.publicationState;
   const published = pack.publicationState === "published";
+  const isPublic = published && !pack.archived && !category.archived;
   const act = async (op, success) => {
     if (await send({ op, id }, { success })) load();
   };
@@ -274,11 +277,20 @@ const PackView = ({ id, navigate, setNotice }) => {
         <Box flex style={{ justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
           <H3>Pack {pack.packNumber} · <span data-testid="pack-state">{STATES[state]}</span></H3>
           <div style={{ display: "flex", gap: 8 }}>
-            {!published && !pack.archived && <button style={button("primary", busy)} disabled={busy} onClick={() => act("pack.publish", "Pack published: hosts can now start games with it.")}>Publish</button>}
-            <button style={button(pack.archived ? "primary" : "danger", busy)} disabled={busy} onClick={() => act(pack.archived ? "pack.unarchive" : "pack.archive", pack.archived ? "Pack restored." : "Pack archived: it is hidden from new games.")}>{pack.archived ? "Restore pack" : "Archive pack"}</button>
+            {!published && !pack.archived && <button style={button("primary", busy)} disabled={busy} onClick={() => act("pack.publish", category.archived ? "Pack published. Restore the category to make it available for new games." : "Pack published: hosts can now start games with it.")}>Publish</button>}
+            <button style={button(pack.archived ? "primary" : "danger", busy)} disabled={busy} onClick={() => {
+              if (!pack.archived && !window.confirm(`Archive Pack ${pack.packNumber} in “${category.nameAr}”? It will be hidden from new games.`)) return;
+              act(pack.archived ? "pack.unarchive" : "pack.archive", pack.archived ? "Pack restored." : "Pack archived: it is hidden from new games.");
+            }}>{pack.archived ? "Restore pack" : "Archive pack"}</button>
           </div>
         </Box>
-        <Text>{published ? "This pack is public: edits go live immediately and the whole pack must stay valid." : "A draft can stay incomplete. Publishing checks all six slots, the file types and the point bands."}</Text>
+        <Text>{pack.archived
+          ? "This pack is archived and hidden from new games."
+          : category.archived
+            ? "This category is archived. Its packs are hidden from new games."
+            : published
+              ? "This pack is public: edits go live immediately and the whole pack must stay valid."
+              : "A draft can stay incomplete. Publishing checks all six slots, the file types and the point bands."}</Text>
         {data.issues.length > 0 && (
           <div style={{ marginTop: 12 }}>
             <Notice notice={{ kind: "danger", text: `${data.issues.length} thing${data.issues.length === 1 ? "" : "s"} to fix before this pack is playable:`, issues: data.issues }} />
@@ -291,7 +303,7 @@ const PackView = ({ id, navigate, setNotice }) => {
           const q = slot.question;
           const slotIssues = issuesFor(slot.slot);
           return (
-            <div key={slot.slot} style={{ ...card, borderColor: slotIssues.length ? colors.red : colors.line }} data-testid={`slot-${slot.slot}`}>
+            <div key={slot.slot} style={{ ...card, minWidth: 0, overflowWrap: "anywhere", borderColor: slotIssues.length ? colors.red : colors.line }} data-testid={`slot-${slot.slot}`}>
               <strong>Slot {slot.slot} · {slot.points} pts</strong>
               {q ? (
                 <>
@@ -306,15 +318,15 @@ const PackView = ({ id, navigate, setNotice }) => {
                 <p style={{ color: colors.muted }}>Empty slot</p>
               )}
               {slotIssues.map((i) => <div key={i.code} style={{ color: colors.red, fontSize: 12 }}>{i.message}</div>)}
-              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                <button style={button("secondary")} onClick={() => { setOpen(open === slot.slot ? null : slot.slot); setPreviewing(null); }}>{q ? "Edit or replace" : "Add question"}</button>
-                {q && <button style={button("secondary")} onClick={() => { setPreviewing(previewing === slot.slot ? null : slot.slot); setOpen(null); }}>Preview as player</button>}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8, whiteSpace: "nowrap" }}>
+                <button style={{ ...button("secondary"), whiteSpace: "inherit" }} onClick={() => { setOpen(open === slot.slot ? null : slot.slot); setPreviewing(null); }}>{q ? "Edit or replace" : "Add question"}</button>
+                {q && <button style={{ ...button("secondary"), whiteSpace: "inherit" }} onClick={() => { setPreviewing(previewing === slot.slot ? null : slot.slot); setOpen(null); }}>Preview as player</button>}
               </div>
             </div>
           );
         })}
       </div>
-      {open && <SlotEditor key={`${open}-${data.slots[open - 1].question?.id}`} data={data} slot={data.slots[open - 1]} published={published} setNotice={setNotice} onDone={() => { setOpen(null); load(); }} />}
+      {open && <SlotEditor key={`${open}-${data.slots[open - 1].question?.id}`} data={data} slot={data.slots[open - 1]} published={published} isPublic={isPublic} setNotice={setNotice} onDone={() => { setOpen(null); load(); }} />}
       {previewing && (
         <div style={{ marginTop: 12 }}>
           <Box flex style={{ justifyContent: "space-between" }}>
@@ -325,7 +337,7 @@ const PackView = ({ id, navigate, setNotice }) => {
         </div>
       )}
       {data.retired.length > 0 && (
-        <details style={{ marginTop: 16 }}>
+        <details style={{ marginTop: 16, overflowWrap: "anywhere" }}>
           <summary>Retired questions ({data.retired.length})</summary>
           <ul>{data.retired.map((r) => <li key={r.id}>Slot {r.slot} · {FORMAT_LABELS[r.format]} · <span dir="rtl">{r.promptAr}</span></li>)}</ul>
         </details>

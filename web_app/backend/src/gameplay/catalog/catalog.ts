@@ -261,11 +261,13 @@ export class CatalogService {
             },
           ];
         const rows = await db
-          .select()
+          .select({ pack: s.questionPacks })
           .from(s.questionPacks)
+          .innerJoin(s.categories, eq(s.categories.id, s.questionPacks.categoryId))
           .where(
             and(
               eq(s.questionPacks.categoryId, categoryId),
+              isNull(s.categories.archivedAt),
               eq(s.questionPacks.publicationState, "published"),
               isNull(s.questionPacks.archivedAt),
               or(
@@ -279,19 +281,20 @@ export class CatalogService {
           )
           .orderBy(s.questionPacks.packNumber, s.questionPacks.id)
           .limit(50);
-        const eligibility = await this.eligibilities(db, rows, members);
+        const packs = rows.map(({ pack }) => pack);
+        const eligibility = await this.eligibilities(db, packs, members);
         const own = actor?.account?.accountId;
         const history =
           own && rows.length
             ? await completionHistory(
                 db,
                 own,
-                rows.map((p) => p.id),
+                packs.map((p) => p.id),
               )
             : [];
         const items: Contract<"Pack">[] = [];
-        let scanned: (typeof rows)[number] | undefined;
-        for (const pack of rows) {
+        let scanned: (typeof packs)[number] | undefined;
+        for (const pack of packs) {
           scanned = pack;
           const e = eligibility.get(pack.id)!;
           if (e.questions.length !== 6) continue;
@@ -324,7 +327,7 @@ export class CatalogService {
         }
         return {
           items,
-          ...(scanned && (rows.length === 50 || scanned.id !== rows.at(-1)?.id)
+          ...(scanned && (packs.length === 50 || scanned.id !== packs.at(-1)?.id)
             ? { nextCursor: next(scanned.packNumber, scanned.id) }
             : {}),
         };

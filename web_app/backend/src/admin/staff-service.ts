@@ -18,6 +18,7 @@ export class StaffError extends Error {
 }
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export const MAX_STAFF_EMAIL_LENGTH = 254;
 const normalizeEmail = (value: unknown) => (typeof value === "string" ? value.trim().toLowerCase() : "");
 const BOOTSTRAP_LOCK = [1935763505, 3] as const;
 
@@ -97,13 +98,30 @@ export class StaffService {
     return account;
   }
 
-  /** First boot only: when no staff account exists yet, create the Super Admin from the environment. */
+  /**
+   * First boot only: when no Super Admin exists yet, create one from the environment. System rows such as
+   * the content importer (an inactive Admin) do not count, so seeding content first cannot lock staff out.
+   */
   async bootstrap(emailInput: string | undefined, password: string | undefined) {
     return this.database.transaction(async (tx) => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(${BOOTSTRAP_LOCK[0]}, ${BOOTSTRAP_LOCK[1]})`);
-      const [existing] = await tx.select({ id: staffAccounts.id }).from(staffAccounts).limit(1);
-      if (existing) return false;
+      const [superAdmin] = await tx.select({ id: staffAccounts.id }).from(staffAccounts).where(eq(staffAccounts.role, "super_admin")).limit(1);
+      if (superAdmin) return false;
       const email = normalizeEmail(emailInput);
+      // Without bootstrap settings it is an error only when no active staff account exists at all;
+      // staff created another way keep working. Inactive system rows (the content importer) cannot sign in.
+      if (!email && !password) {
+        const [active] = await tx.select({ id: staffAccounts.id }).from(staffAccounts).where(eq(staffAccounts.isActive, true)).limit(1);
+        if (active) return false;
+      }
+      // An address that already has an account is never taken over or promoted here.
+      if (email) {
+        const [taken] = await tx.select({ id: staffAccounts.id }).from(staffAccounts).where(eq(staffAccounts.normalizedEmail, email)).limit(1);
+        if (taken) return false;
+      }
+      if (email.length > MAX_STAFF_EMAIL_LENGTH) {
+        throw new Error(`ADMIN_BOOTSTRAP_EMAIL can be at most ${MAX_STAFF_EMAIL_LENGTH} characters.`);
+      }
       if (!EMAIL.test(email) || !password || password.length < MINIMUM_PASSWORD_LENGTH) {
         throw new Error(`No staff account exists: set ADMIN_BOOTSTRAP_EMAIL and ADMIN_BOOTSTRAP_PASSWORD (${MINIMUM_PASSWORD_LENGTH}+ characters).`);
       }
@@ -136,6 +154,7 @@ export class StaffService {
 
   async create(input: { actorId: string; requestKey: string; email: unknown; role: unknown }) {
     const email = normalizeEmail(input.email);
+    if (email.length > MAX_STAFF_EMAIL_LENGTH) throw new StaffError("email_too_long");
     if (!EMAIL.test(email)) throw new StaffError("invalid_email");
     if (input.role !== "admin" && input.role !== "super_admin") throw new StaffError("invalid_role");
     const role: StaffRole = input.role;

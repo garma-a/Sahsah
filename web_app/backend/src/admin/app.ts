@@ -19,10 +19,16 @@ import { MessagesService } from "./messages/service.js";
 import { PublicSiteService } from "./public-site/service.js";
 import { PlayersService } from "./players/service.js";
 import { createAdminMedia } from "./content/storage.js";
+import { ImportService } from "./content/import-service.js";
+import { ZIP_LIMITS } from "./content/zip.js";
 import { StaffError, StaffService } from "./staff-service.js";
 
 export const ROOT_PATH = "/admin";
-const UPLOAD_LIMIT_BYTES = 26 * 1024 * 1024;
+const STYLES_PATH = "/sahsah.css";
+// Narrower screens (phones, portrait tablets) see a "not supported" notice instead of the dashboard.
+const MIN_SCREEN_WIDTH = 1024;
+// The largest multipart upload: a bulk-import ZIP. Every other upload checks its own smaller limit before reading.
+const UPLOAD_LIMIT_BYTES = ZIP_LIMITS.zipBytes;
 
 // Sahsah colours: forest green chrome, gold accent, red for errors, cream surfaces.
 const theme = {
@@ -53,6 +59,7 @@ export async function createAdminApplication(env: NodeJS.ProcessEnv = process.en
     const staff = new StaffService(database);
     const media = createAdminMedia(env);
     const content = new ContentService(database, media);
+    const imports = new ImportService(database, content, media, { secret: config.sessionSecret, dir: env.ADMIN_IMPORT_DIR, ttlMs: env.ADMIN_IMPORT_TTL_MS ? Number(env.ADMIN_IMPORT_TTL_MS) : undefined, previewPath: `${ROOT_PATH}/import-preview` });
     const players = new PlayersService(database, config.bulkGrantChunkSize);
     const commerce = new CommerceService(database);
     const messages = new MessagesService(database, createMailer(env));
@@ -73,6 +80,8 @@ export async function createAdminApplication(env: NodeJS.ProcessEnv = process.en
     });
     // Development storage only: the local media directory, private files behind a short signature.
     if (media?.serve) app.use("/dev-media", media.serve);
+    // Staged import files behind a signed, expiring link made for the dry-run report.
+    app.get(`${ROOT_PATH}/import-preview/:id`, imports.preview);
     app.get("/", (_req, res) => res.redirect(302, ROOT_PATH));
     // Page responses can carry a one-time temporary password.
     app.use(`${ROOT_PATH}/api`, (_req, res, next) => {
@@ -85,15 +94,47 @@ export async function createAdminApplication(env: NodeJS.ProcessEnv = process.en
       resources: [],
       componentLoader,
       dashboard: { component: components.Home, handler: dashboardHandler(staff, stats) },
-      pages: buildPages(staff, () => database.db, content, players, commerce, messages, publicSite, components),
+      pages: buildPages(staff, () => database.db, content, imports, players, commerce, messages, publicSite, components),
       branding: { companyName: "Sahsah Admin", logo: false, withMadeWithLove: false, theme },
-      locale: { language: "en", availableLanguages: ["en"], translations: { en: { messages: { loginWelcome: "Sign in to Sahsah Admin" } } } },
+      assets: { styles: [`${ROOT_PATH}${STYLES_PATH}`] },
+      locale: {
+        language: "en",
+        availableLanguages: ["en"],
+        translations: {
+          en: {
+            messages: { tooManyRequests: "Too many sign-in attempts. Wait a minute before trying again." },
+            components: {
+              Login: {
+                welcomeHeader: "Sahsah staff dashboard",
+                welcomeMessage: "Sign in with your staff account to manage Sahsah.",
+              },
+            },
+          },
+        },
+      },
     });
     await admin.initialize();
     if (env.NODE_ENV === "development") await admin.watch();
 
     // Serve only AdminJS's declared assets; pnpm keeps the package behind a hidden directory.
     const router = express.Router();
+    router.get(STYLES_PATH, (_request, response) => {
+      // AdminJS renders its stock illustrations in an inner Box on the login welcome panel.
+      response.type("text/css").send(`
+        .login__Wrapper > section > section > section { display: none; }
+        [data-css="app-content"] > section:last-child { flex-grow: 1; }
+        /* The dashboard is built for desktop screens only; narrower screens get a notice instead of a broken layout. */
+        @media (max-width: ${MIN_SCREEN_WIDTH - 1}px) {
+          body > * { display: none !important; }
+          body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; background: #f4efe3; }
+          body::before {
+            content: "Sahsah Admin\\A\\AThis screen size is not supported.\\AOpen the admin dashboard on a desktop or laptop screen at least ${MIN_SCREEN_WIDTH} pixels wide.";
+            white-space: pre-line; max-width: 380px; text-align: center; color: #0d2e1d;
+            font: 400 18px/1.5 Roboto, system-ui, sans-serif;
+          }
+        }
+      `);
+    });
     for (const asset of AdminJSRouter.assets) {
       router.get(asset.path, (_request, response, next) => {
         response.sendFile(path.resolve(asset.src), { dotfiles: "allow" }, (error) => {
