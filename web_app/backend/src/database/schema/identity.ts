@@ -23,6 +23,9 @@ export const accounts = t.pgTable("accounts", {
   tokenBalance: t.integer("token_balance").default(0).notNull(),
   tokenBalanceUpdatedAt: t.timestamp("token_balance_updated_at", { withTimezone: true, mode: "string" }).default(sql`now()`).notNull(),
 }, (table): t.PgTableExtraConfigValue[] => [
+  t.index("accounts_recent").on(table.createdAt, table.id),
+  // Suffix search on the phone number: reverse the number and match a prefix of the reversed text.
+  t.index("accounts_phone_suffix").using("btree", sql`reverse(${table.phoneE164}) text_pattern_ops`),
   t.uniqueIndex("accounts_firebase_identity").on(table.firebaseProjectId, table.firebaseUid),
   t.index("accounts_active_game_release").on(table.activeGameId, table.id).where(sql`active_game_id IS NOT NULL`),
   t.foreignKey({

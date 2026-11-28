@@ -11,6 +11,8 @@ export type AdminConfig = {
   trustedProxyHops: number;
   /** Sign-in attempts per address per minute, before the per-email lockout. */
   loginAttemptsPerMinute: number;
+  /** Accounts credited per transaction in a bulk grant. */
+  bulkGrantChunkSize: number;
 };
 
 export function readAdminConfig(env: Environment): AdminConfig {
@@ -23,6 +25,8 @@ export function readAdminConfig(env: Environment): AdminConfig {
   if (!/^[0-3]$/.test(hops)) throw new Error("TRUSTED_PROXY_HOPS must be 0 to 3.");
   const attempts = env.ADMIN_LOGIN_ATTEMPTS_PER_MINUTE ?? "10";
   if (!/^\d+$/.test(attempts) || Number(attempts) < 1 || Number(attempts) > 1000) throw new Error("ADMIN_LOGIN_ATTEMPTS_PER_MINUTE must be 1 to 1000.");
+  const chunk = env.ADMIN_BULK_GRANT_CHUNK_SIZE ?? "200";
+  if (!/^\d+$/.test(chunk) || Number(chunk) < 1 || Number(chunk) > 500) throw new Error("ADMIN_BULK_GRANT_CHUNK_SIZE must be 1 to 500.");
   return {
     database: { ...database, application_name: "sahsah-admin" },
     sessionSecret,
@@ -31,5 +35,6 @@ export function readAdminConfig(env: Environment): AdminConfig {
     production: env.NODE_ENV === "production",
     trustedProxyHops: Number(hops),
     loginAttemptsPerMinute: Number(attempts),
+    bulkGrantChunkSize: Number(chunk),
   };
 }

@@ -177,12 +177,12 @@ test("PostgreSQL 18 migrations, runtime permissions and transactions", { timeout
       (SELECT count(*)::int FROM pg_indexes WHERE schemaname='public') AS indexes,
       (SELECT count(*)::int FROM pg_index i JOIN pg_class c ON c.oid=i.indrelid
         WHERE c.relnamespace='public'::regnamespace AND indpred IS NOT NULL) AS partial_indexes`);
-    assert.deepEqual(counts, { tables: 42, enums: 37, foreign_keys: 95, checks: 315, indexes: 163, partial_indexes: 21 });
+    assert.deepEqual(counts, { tables: 45, enums: 37, foreign_keys: 107, checks: 326, indexes: 179, partial_indexes: 23 });
     const tables = Object.values(schema).filter((entry) => is(entry, PgTable)).map(getTableConfig);
-    assert.equal(tables.length, 42);
-    assert.equal(tables.flatMap((table) => table.columns).length, 540);
-    assert.equal(tables.flatMap((table) => table.foreignKeys).length, 95);
-    assert.equal(tables.flatMap((table) => table.checks).length, 315);
+    assert.equal(tables.length, 45);
+    assert.equal(tables.flatMap((table) => table.columns).length, 572);
+    assert.equal(tables.flatMap((table) => table.foreignKeys).length, 107);
+    assert.equal(tables.flatMap((table) => table.checks).length, 326);
     assert.equal((await owner.query("SELECT count(*)::int AS count FROM pg_constraint WHERE connamespace='public'::regnamespace AND contype='f' AND condeferrable AND NOT condeferred")).rows[0].count, 95);
     assert.equal((await owner.query("SELECT count(*)::int AS count FROM pg_proc WHERE pronamespace='sahsah_internal'::regnamespace AND prosecdef AND proconfig @> ARRAY['search_path=pg_catalog, public, pg_temp']")).rows[0].count, 37);
     assert.equal((await owner.query("SELECT count(*)::int AS count FROM shop_settings")).rows[0].count, 0);

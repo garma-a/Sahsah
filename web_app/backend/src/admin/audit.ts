@@ -5,6 +5,8 @@ import { staffAccounts, staffAuditEvents } from "../database/schema/index.js";
 import type { JsonObject } from "../database/schema/types.js";
 
 export type AuditEntry = {
+  /** Set when other rows in the same transaction must point at this event. */
+  id?: string;
   staffId: string;
   action: string;
   targetKind: string;
@@ -20,8 +22,9 @@ export type AuditEntry = {
  * roll back together. Never put passwords or other secrets in `details`.
  */
 export async function recordAudit(tx: SahsahDatabase, entry: AuditEntry) {
+  const id = entry.id ?? randomUUID();
   await tx.insert(staffAuditEvents).values({
-    id: randomUUID(),
+    id,
     staffAccountId: entry.staffId,
     actionCode: entry.action,
     targetKind: entry.targetKind,
@@ -30,6 +33,7 @@ export async function recordAudit(tx: SahsahDatabase, entry: AuditEntry) {
     reason: entry.reason ?? null,
     details: entry.details ?? null,
   });
+  return id;
 }
 
 export const AUDIT_PAGE_SIZE = 25;

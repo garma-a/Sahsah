@@ -4,6 +4,7 @@ import { readFile, rm } from "node:fs/promises";
 import type { SahsahDatabase } from "../database/connection.js";
 import { auditActions, AuditFilterError, listAudit } from "./audit.js";
 import { ContentError, type ContentService } from "./content/service.js";
+import type { PlayersService } from "./players/service.js";
 import { StaffError, type StaffService } from "./staff-service.js";
 
 /**
@@ -11,7 +12,6 @@ import { StaffError, type StaffService } from "./staff-service.js";
  * then the page says so rather than pretending to work.
  */
 export const SECTIONS = [
-  { name: "players", title: "Players", planned: "Accounts, token banks and complimentary credit" },
   { name: "shop", title: "Shop", planned: "Prices, promo codes and orders" },
   { name: "messages", title: "Messages", planned: "Contact messages and replies" },
   { name: "public-site", title: "Public site", planned: "Announcements, public pages and site settings" },
@@ -63,7 +63,7 @@ function refuse(response: Reply, error: unknown) {
   throw error;
 }
 
-export function buildPages(staff: StaffService, db: () => SahsahDatabase, content: ContentService, components: { Placeholder: string; AuditLog: string; StaffPage: string; ContentPage: string }) {
+export function buildPages(staff: StaffService, db: () => SahsahDatabase, content: ContentService, players: PlayersService, components: { Placeholder: string; AuditLog: string; StaffPage: string; ContentPage: string; PlayersPage: string }) {
   const placeholder = (section: (typeof SECTIONS)[number]) => ({
     component: components.Placeholder,
     icon: "Circle",
@@ -154,6 +154,51 @@ export function buildPages(staff: StaffService, db: () => SahsahDatabase, conten
     }
   };
 
+  const playersPage: PageHandler = async (request, response, context) => {
+    const req = request as unknown as PageRequest, actorId = (context as Context).currentAdmin?.id;
+    try {
+      // Admins and Super Admins both manage players (ADR 0008); the account is re-read on every call.
+      await staff.requireStaff(actorId);
+      if (req.method?.toUpperCase() !== "POST") {
+        const query = req.query ?? {};
+        switch (text(query.view) || "list") {
+          case "account":
+            return await players.account(query.id, text(query.cursor));
+          case "bulk":
+            return { grants: await players.recentGrants() };
+          case "deletions":
+            return await players.deletionRequests(text(query.cursor));
+          default:
+            return await players.list({ q: text(query.q), state: text(query.state), banned: text(query.banned), flagged: text(query.flagged), cursor: text(query.cursor) });
+        }
+      }
+      const body = req.payload ?? {}, requestKey = uuid(body.requestKey);
+      const base = { actorId: actorId!, requestKey };
+      switch (body.op) {
+        case "credit":
+          return await players.credit({ ...base, accountId: body.id, quantity: body.quantity, reason: body.reason });
+        case "ban":
+          return await players.ban({ ...base, accountId: body.id, reason: body.reason });
+        case "unban":
+          return await players.unban({ ...base, accountId: body.id, reason: body.reason });
+        case "flag.add":
+          return await players.addFlag({ ...base, accountId: body.id, note: body.note });
+        case "flag.resolve":
+          return await players.resolveFlag({ ...base, flagId: body.id });
+        case "bulk.preview":
+          return await players.preview({ target: body.target, phones: body.phones });
+        case "bulk.grant":
+          return await players.bulkGrant({ ...base, target: body.target, phones: body.phones, quantity: body.quantity, reason: body.reason });
+        case "bulk.resume":
+          return await players.resumeGrant(body.id);
+        default:
+          throw new StaffError("unknown_operation");
+      }
+    } catch (error) {
+      return refuse(response as unknown as Reply, error);
+    }
+  };
+
   const auditPage: PageHandler = async (request, response) => {
     const query = (request as unknown as PageRequest).query ?? {};
     try {
@@ -171,6 +216,7 @@ export function buildPages(staff: StaffService, db: () => SahsahDatabase, conten
   return {
     ...Object.fromEntries(SECTIONS.map((section) => [section.name, placeholder(section)])),
     content: { component: components.ContentPage, icon: "Folder", handler: contentPage },
+    players: { component: components.PlayersPage, icon: "User", handler: playersPage },
     "audit-log": { component: components.AuditLog, icon: "List", handler: auditPage },
     staff: { component: components.StaffPage, icon: "Users", handler: staffPage },
   };

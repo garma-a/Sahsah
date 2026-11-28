@@ -739,6 +739,8 @@ BEGIN
     IF audit.reason IS NULL OR length(btrim(audit.reason))=0 OR
        NOT ((NEW.entry_kind='credit' AND audit.action_code='token_grant'
               AND audit.target_kind='account' AND audit.target_key=NEW.account_id::text)
+         OR (NEW.entry_kind='credit' AND audit.action_code='token_bulk_grant'
+              AND audit.target_kind='bulk_grant')
          OR (NEW.entry_kind='game_restoration' AND audit.action_code='game_token_restoration'
               AND audit.target_kind='game' AND audit.target_key=NEW.game_id::text)) THEN
       RAISE EXCEPTION 'token action requires matching authorized staff audit and reason'
