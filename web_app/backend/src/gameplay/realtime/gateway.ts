@@ -565,7 +565,12 @@ export class GameplayRealtime
         const recipients = [...this.members.values()].filter(
           (c) => c.roomId === roomId && this.current(c),
         );
-        if (!recipients.length) break;
+        if (!recipients.length) {
+          // Nobody to send to is a finished publish. Leaving the generation unmarked made the pump
+          // requeue the room forever (a promise-only loop that starved the event loop).
+          stream.published = generation;
+          break;
+        }
         log.debug("realtime.publish", { count: recipients.length });
         const groups = new Map<
           string,
