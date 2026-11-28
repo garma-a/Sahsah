@@ -18,6 +18,8 @@ export class DatabaseConnection {
   private leaseBackendId?: number;
   private leaseLost = false;
   private transactions = new Set<Promise<void>>();
+  /** Called after every successful COMMIT; the admin service uses it to drop its cached dashboard figures. */
+  onCommit?: () => void;
 
   constructor(
     config: DatabaseConfig | undefined,
@@ -166,6 +168,11 @@ export class DatabaseConnection {
         throw new Error(
           "Transaction was rolled back; no changes were accepted.",
         );
+      try {
+        this.onCommit?.();
+      } catch {
+        // A listener must never turn a committed change into a failure.
+      }
       return result;
     } catch (error) {
       try {

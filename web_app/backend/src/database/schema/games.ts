@@ -41,6 +41,8 @@ export const games = t.pgTable("games", {
   t.uniqueIndex("games_room_sequence").on(table.roomId, table.sequenceNumber),
   t.uniqueIndex("games_host_identity").on(table.id, table.hostAccountId),
   t.uniqueIndex("games_one_active_per_room").on(table.roomId).where(sql`status = 'active'`),
+  // Dashboard: games started today / in the last seven days.
+  t.index("games_started_at").on(table.startedAt),
   t.index("games_due_expiry").on(table.idleExpiresAt, table.id).where(sql`status = 'active'`),
   t.index("games_due_content_purge").on(table.contentPurgeAfter, table.id).where(sql`content_purged_at IS NULL AND content_purge_after IS NOT NULL`),
   t.foreignKey({
@@ -152,6 +154,8 @@ export const gameQuestions = t.pgTable("game_questions", {
   t.uniqueIndex("game_questions_distinct_question").on(table.gameId, table.sourceQuestionId),
   t.uniqueIndex("game_questions_resolution_command").on(table.gameId, table.resolutionCommandId),
   t.index("game_questions_source_history").on(table.sourceQuestionId, table.gameId),
+  // Dashboard: per-question vote totals from the index alone.
+  t.index("game_questions_feedback_by_question").on(table.sourceQuestionId, table.feedbackVote).where(sql`feedback_vote IS NOT NULL`),
   t.index("game_questions_feedback_recent").on(table.feedbackVote, table.feedbackUpdatedAt, table.gameId).where(sql`feedback_vote IS NOT NULL`),
   t.foreignKey({
     name: "game_questions_pack",

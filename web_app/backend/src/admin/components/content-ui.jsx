@@ -10,7 +10,6 @@ export const MESSAGES = {
   description_too_long: "Descriptions can be at most 500 characters.",
   section_required: "Choose a section.",
   prompt_required: "Enter the Arabic question text.",
-  answer_required: "Enter the Arabic answer.",
   prompt_required_too_long: "Question text can be at most 4000 characters.",
   answer_required_too_long: "Answer text can be at most 4000 characters.",
   invalid_config: "A format setting is not valid (a colour must look like #aabbcc).",

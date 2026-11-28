@@ -212,6 +212,83 @@ const CategoryView = ({ id, navigate, setNotice }) => {
   );
 };
 
+const th = { textAlign: "left", color: colors.muted, padding: "6px 8px" };
+const td = { padding: "6px 8px", borderTop: `1px solid ${colors.line}`, verticalAlign: "top" };
+const go = (navigate, to) => (e) => { e.preventDefault(); navigate(to); };
+
+/** Lists behind the Home "needs attention" counts; paged by cursor like the other lists. */
+const useQueue = (view, setNotice) => {
+  const [data, setData] = useState(null);
+  const load = useCallback(async (cursor) => {
+    try {
+      const next = await get({ view, cursor });
+      setData((previous) => (cursor && previous ? { ...next, rows: [...previous.rows, ...next.rows] } : next));
+    } catch {
+      setData({ rows: [], nextCursor: null });
+      setNotice({ kind: "danger", text: "The list could not be loaded." });
+    }
+  }, [view, setNotice]);
+  useEffect(() => { load(); }, [load]);
+  return [data, load];
+};
+
+const DraftsView = ({ navigate, setNotice }) => {
+  const [data, load] = useQueue("drafts", setNotice);
+  return (
+    <div style={card}>
+      <H3>Unfinished drafts</H3>
+      <Text mb="md">Draft packs of active categories with fewer than six current questions, oldest first.</Text>
+      {!data ? <Text>Loading…</Text> : (
+        <>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead><tr><th style={th}>Category</th><th style={th}>Pack</th><th style={th}>Questions</th><th style={th}>Created</th></tr></thead>
+            <tbody>
+              {data.rows.map((row) => (
+                <tr key={row.id}>
+                  <td style={td} dir="rtl"><a href={`${PAGE}?view=category&id=${row.categoryId}`} onClick={go(navigate, `${PAGE}?view=category&id=${row.categoryId}`)}>{row.categoryNameAr}</a></td>
+                  <td style={td}><a href={`${PAGE}?view=pack&id=${row.id}`} onClick={go(navigate, `${PAGE}?view=pack&id=${row.id}`)}>Pack {row.packNumber}</a></td>
+                  <td style={td}>{row.filled} / 6</td>
+                  <td style={td}>{new Date(row.createdAt.replace(" ", "T").replace(/\+00$/, "Z")).toLocaleDateString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {data.rows.length === 0 && <Text mt="md">No unfinished drafts.</Text>}
+          {data.nextCursor && <Box mt="md"><button style={button("secondary")} onClick={() => load(data.nextCursor)}>Load more</button></Box>}
+        </>
+      )}
+    </div>
+  );
+};
+
+const DislikedView = ({ navigate, setNotice }) => {
+  const [data, load] = useQueue("disliked", setNotice);
+  return (
+    <div style={card}>
+      <H3>Disliked questions</H3>
+      <Text mb="md">Current questions with at least 20 votes of which at least 40% are thumbs-down. Open the pack to correct or replace the question.</Text>
+      {!data ? <Text>Loading…</Text> : (
+        <>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead><tr><th style={th}>Question</th><th style={th}>Pack</th><th style={th}>Thumbs-down</th></tr></thead>
+            <tbody>
+              {data.rows.map((row) => (
+                <tr key={row.id}>
+                  <td style={{ ...td, maxWidth: 420 }} dir="rtl">{row.promptAr}</td>
+                  <td style={td}><span dir="rtl">{row.categoryNameAr}</span> · <a href={`${PAGE}?view=pack&id=${row.packId}`} onClick={go(navigate, `${PAGE}?view=pack&id=${row.packId}`)}>Pack {row.packNumber}, slot {row.slot}</a></td>
+                  <td style={td}>{row.dislikes} of {row.votes} ({Math.round((row.dislikes / row.votes) * 100)}%)</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {data.rows.length === 0 && <Text mt="md">No question has a high thumbs-down share.</Text>}
+          {data.nextCursor && <Box mt="md"><button style={button("secondary")} onClick={() => load(data.nextCursor)}>Load more</button></Box>}
+        </>
+      )}
+    </div>
+  );
+};
+
 const ContentPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -222,8 +299,9 @@ const ContentPage = () => {
   return (
     <Box variant="white">
       <H3>Content</H3>
+      {(view === "drafts" || view === "disliked") && <p><a href={PAGE} onClick={(e) => { e.preventDefault(); navigate(PAGE); }}>← All categories</a></p>}
       <Notice notice={notice} />
-      {view === "category" ? <CategoryView key={params.get("id")} id={params.get("id")} navigate={navigate} setNotice={setNotice} /> : view === "pack" ? <PackView key={params.get("id")} id={params.get("id")} navigate={navigate} setNotice={setNotice} /> : <HomeView navigate={navigate} setNotice={setNotice} />}
+      {view === "category" ? <CategoryView key={params.get("id")} id={params.get("id")} navigate={navigate} setNotice={setNotice} /> : view === "pack" ? <PackView key={params.get("id")} id={params.get("id")} navigate={navigate} setNotice={setNotice} /> : view === "drafts" ? <DraftsView navigate={navigate} setNotice={setNotice} /> : view === "disliked" ? <DislikedView navigate={navigate} setNotice={setNotice} /> : <HomeView navigate={navigate} setNotice={setNotice} />}
     </Box>
   );
 };

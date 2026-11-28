@@ -85,6 +85,13 @@
       "when": 1795180886098,
       "tag": "0011_admin_public_site",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1795182099927,
+      "tag": "0012_admin_home_indexes",
+      "breakpoints": true
     }
   ]
 }
