@@ -102,6 +102,8 @@ export const promotions = t.pgTable("promotions", {
 }, (table): t.PgTableExtraConfigValue[] => [
   t.uniqueIndex("promotions_fingerprint_key_identity").on(table.id, table.phoneFingerprintKeyVersion),
   t.uniqueIndex("promotions_trigger_identity").on(table.id, table.trigger),
+  // Staff list, newest campaign first.
+  t.index("promotions_staff_list").on(table.startsAt, table.id),
   t.check("promotions_positive_fingerprint_key", sql`phone_fingerprint_key_version > 0`),
   t.check("promotions_trigger_shape", sql`(trigger = 'code' AND code IS NOT NULL AND length(btrim(code)) > 0) OR (trigger = 'automatic_free' AND code IS NULL AND discount_bps = 10000)`),
   t.check("promotions_discount", sql`discount_bps BETWEEN 1 AND 10000`),
@@ -159,6 +161,9 @@ export const tokenOrders = t.pgTable("token_orders", {
   t.index("token_orders_gift_claim_lookup").on(table.recipientPhoneE164, table.id),
   t.index("token_orders_beneficiary_history").on(table.beneficiaryAccountId, table.createdAt, table.id),
   t.uniqueIndex("token_orders_buyer_identity").on(table.id, table.buyerAccountId),
+  // Staff order list, newest first, and its per-promotion filter / "is this promotion referenced" check.
+  t.index("token_orders_staff_list").on(table.createdAt, table.id),
+  t.index("token_orders_promotion_list").on(table.appliedPromotionId, table.createdAt, table.id).where(sql`applied_promotion_id IS NOT NULL`),
   t.foreignKey({
     name: "token_orders_buyer",
     columns: [table.buyerAccountId],
