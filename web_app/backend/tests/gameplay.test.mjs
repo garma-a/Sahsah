@@ -6,7 +6,6 @@ import { cluster } from "./database/cluster.mjs";
 import { WebSocket } from "ws";
 
 process.env.NODE_ENV = "test";
-process.env.ADMIN_ENABLED = "false";
 const secret = () => randomBytes(32).toString("base64url");
 
 test(

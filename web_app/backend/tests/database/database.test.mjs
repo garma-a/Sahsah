@@ -177,7 +177,7 @@ test("PostgreSQL 18 migrations, runtime permissions and transactions", { timeout
       (SELECT count(*)::int FROM pg_indexes WHERE schemaname='public') AS indexes,
       (SELECT count(*)::int FROM pg_index i JOIN pg_class c ON c.oid=i.indrelid
         WHERE c.relnamespace='public'::regnamespace AND indpred IS NOT NULL) AS partial_indexes`);
-    assert.deepEqual(counts, { tables: 42, enums: 37, foreign_keys: 95, checks: 315, indexes: 158, partial_indexes: 21 });
+    assert.deepEqual(counts, { tables: 42, enums: 37, foreign_keys: 95, checks: 315, indexes: 160, partial_indexes: 21 });
     const tables = Object.values(schema).filter((entry) => is(entry, PgTable)).map(getTableConfig);
     assert.equal(tables.length, 42);
     assert.equal(tables.flatMap((table) => table.columns).length, 540);
