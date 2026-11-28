@@ -51,6 +51,9 @@ export const categories = t.pgTable(
   (table): t.PgTableExtraConfigValue[] => [
     t.check("categories_display_order_bounds", sql`display_order >= 0`),
     t.index("categories_section").on(table.sectionId, table.id),
+    // Admin category list and the public catalog both page by (display_order, id).
+    t.index("categories_display_order").on(table.displayOrder, table.id),
+    t.index("categories_section_display_order").on(table.sectionId, table.displayOrder, table.id),
     t
       .foreignKey({
         name: "categories_section",
@@ -146,6 +149,8 @@ export const questions = t.pgTable(
       .uniqueIndex("questions_one_current_per_pack_slot")
       .on(table.packId, table.slotNumber)
       .where(sql`retired_at IS NULL`),
+    // Retired questions of a pack (replacement history), which the current-slot index leaves out.
+    t.index("questions_pack_history").on(table.packId, table.slotNumber, table.id),
     t
       .foreignKey({
         name: "questions_pack",

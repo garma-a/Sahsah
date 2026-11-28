@@ -1,7 +1,9 @@
 import type { PageHandler } from "adminjs";
 import { randomUUID } from "node:crypto";
+import { readFile, rm } from "node:fs/promises";
 import type { SahsahDatabase } from "../database/connection.js";
 import { auditActions, AuditFilterError, listAudit } from "./audit.js";
+import { ContentError, type ContentService } from "./content/service.js";
 import { StaffError, type StaffService } from "./staff-service.js";
 
 /**
@@ -9,7 +11,6 @@ import { StaffError, type StaffService } from "./staff-service.js";
  * then the page says so rather than pretending to work.
  */
 export const SECTIONS = [
-  { name: "content", title: "Content", planned: "Categories, packs and questions" },
   { name: "players", title: "Players", planned: "Accounts, token banks and complimentary credit" },
   { name: "shop", title: "Shop", planned: "Prices, promo codes and orders" },
   { name: "messages", title: "Messages", planned: "Contact messages and replies" },
@@ -17,10 +18,11 @@ export const SECTIONS = [
 ] as const;
 
 type Reply = { status: (code: number) => unknown };
+type UploadedFile = { path: string; size: number };
 type PageRequest = {
   method?: string;
   query?: Record<string, unknown>;
-  payload?: Record<string, unknown>;
+  payload?: Record<string, unknown> & { file?: UploadedFile };
   session?: { id?: string };
   sessionID?: string;
 };
@@ -32,10 +34,27 @@ const uuid = (value: unknown) => {
   return /^[0-9a-f-]{36}$/.test(candidate) ? candidate : randomUUID();
 };
 
+const categoryFields = (body: Record<string, unknown>) => ({
+  nameAr: body.nameAr,
+  nameFranco: body.nameFranco,
+  descriptionAr: body.descriptionAr,
+  descriptionFranco: body.descriptionFranco,
+  sectionId: body.sectionId,
+});
+
+/** The multipart middleware wrote the file to a temporary path; read it once and remove it. */
+async function readUpload(file: UploadedFile) {
+  try {
+    return await readFile(file.path);
+  } finally {
+    await rm(file.path, { force: true });
+  }
+}
+
 function refuse(response: Reply, error: unknown) {
   if (error instanceof StaffError) {
     response.status(error.status);
-    return { error: error.code };
+    return { error: error.code, ...(error instanceof ContentError && error.issues ? { issues: error.issues } : {}) };
   }
   if (error instanceof AuditFilterError) {
     response.status(400);
@@ -44,7 +63,7 @@ function refuse(response: Reply, error: unknown) {
   throw error;
 }
 
-export function buildPages(staff: StaffService, db: () => SahsahDatabase, components: { Placeholder: string; AuditLog: string; StaffPage: string }) {
+export function buildPages(staff: StaffService, db: () => SahsahDatabase, content: ContentService, components: { Placeholder: string; AuditLog: string; StaffPage: string; ContentPage: string }) {
   const placeholder = (section: (typeof SECTIONS)[number]) => ({
     component: components.Placeholder,
     icon: "Circle",
@@ -77,6 +96,64 @@ export function buildPages(staff: StaffService, db: () => SahsahDatabase, compon
     }
   };
 
+  const contentPage: PageHandler = async (request, response, context) => {
+    const req = request as unknown as PageRequest, actorId = (context as Context).currentAdmin?.id;
+    try {
+      // Admins and Super Admins both manage content; the account is re-read on every call.
+      await staff.requireStaff(actorId);
+      if (req.method?.toUpperCase() !== "POST") {
+        const query = req.query ?? {};
+        switch (text(query.view) || "home") {
+          case "category":
+            return await content.category(query.id);
+          case "pack":
+            return await content.pack(query.id);
+          default:
+            return await content.home({ section: text(query.section), status: text(query.status), cursor: text(query.cursor) });
+        }
+      }
+      const body = req.payload ?? {}, requestKey = uuid(body.requestKey);
+      const base = { actorId: actorId!, requestKey };
+      const bytes = async () => (body.file ? await readUpload(body.file) : undefined);
+      switch (body.op) {
+        case "section.create":
+          return await content.createSection({ ...base, nameAr: body.nameAr, nameFranco: body.nameFranco });
+        case "section.rename":
+          return await content.renameSection({ ...base, sectionId: body.id, nameAr: body.nameAr, nameFranco: body.nameFranco });
+        case "section.move":
+          return await content.moveSection({ ...base, sectionId: body.id, direction: body.direction });
+        case "category.create":
+          return await content.createCategory({ ...base, ...categoryFields(body) });
+        case "category.update":
+          return await content.updateCategory({ ...base, categoryId: body.id, ...categoryFields(body) });
+        case "category.move":
+          return await content.moveCategory({ ...base, categoryId: body.id, direction: body.direction });
+        case "category.archive":
+        case "category.unarchive":
+          return await content.setCategoryArchived({ ...base, categoryId: body.id, archived: body.op === "category.archive" });
+        case "category.cover":
+          return await content.uploadCover({ ...base, categoryId: body.id, body: await bytes() });
+        case "pack.create":
+          return await content.createPack({ ...base, categoryId: body.categoryId });
+        case "pack.publish":
+          return await content.publishPack({ ...base, packId: body.id });
+        case "pack.archive":
+        case "pack.unarchive":
+          return await content.setPackArchived({ ...base, packId: body.id, archived: body.op === "pack.archive" });
+        case "question.save":
+          return await content.saveQuestion({ ...base, packId: body.packId, slot: body.slot, mode: body.mode, questionId: body.questionId, format: body.format, promptAr: body.promptAr, promptFranco: body.promptFranco, answerAr: body.answerAr, answerFranco: body.answerFranco, config: body.config, media: body.media, confirmPublicEdit: body.confirmPublicEdit });
+        case "question.retire":
+          return await content.retireQuestion({ ...base, packId: body.packId, slot: body.slot, questionId: body.questionId });
+        case "media.upload":
+          return await content.uploadQuestionMedia({ ...base, purpose: body.purpose, body: await bytes() });
+        default:
+          throw new StaffError("unknown_operation");
+      }
+    } catch (error) {
+      return refuse(response as unknown as Reply, error);
+    }
+  };
+
   const auditPage: PageHandler = async (request, response) => {
     const query = (request as unknown as PageRequest).query ?? {};
     try {
@@ -93,6 +170,7 @@ export function buildPages(staff: StaffService, db: () => SahsahDatabase, compon
 
   return {
     ...Object.fromEntries(SECTIONS.map((section) => [section.name, placeholder(section)])),
+    content: { component: components.ContentPage, icon: "Folder", handler: contentPage },
     "audit-log": { component: components.AuditLog, icon: "List", handler: auditPage },
     staff: { component: components.StaffPage, icon: "Users", handler: staffPage },
   };
